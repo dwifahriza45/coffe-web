@@ -1,4 +1,11 @@
-import { LayoutDashboard, LockKeyhole, LogOut, UserCog } from "lucide-react";
+import {
+  LayoutDashboard,
+  LockKeyhole,
+  LogOut,
+  Ruler,
+  Shield,
+  UserCog,
+} from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { useState } from "react";
 import { logout as logoutRequest } from "../../api/auth.api";
@@ -20,7 +27,20 @@ export default function Sidebar({
   const canManageUsers = roles.some((role) =>
     ["admin", "hris_admin"].includes(role),
   );
+  const canManageInventory = roles.some((role) =>
+    ["admin", "inventory"].includes(role),
+  );
   const links: Array<{
+    label: string;
+    to: string;
+    icon: typeof LayoutDashboard;
+  }> = [];
+  const hrisLinks: Array<{
+    label: string;
+    to: string;
+    icon: typeof LayoutDashboard;
+  }> = [];
+  const inventoryLinks: Array<{
     label: string;
     to: string;
     icon: typeof LayoutDashboard;
@@ -29,10 +49,22 @@ export default function Sidebar({
     links.push({ label: "Overview", to: "/dashboard", icon: LayoutDashboard });
   }
   if (canManageUsers)
-    links.push({
+    hrisLinks.push({
       label: "User Management",
       to: "/user-management",
       icon: UserCog,
+    });
+  if (canManageUsers)
+    hrisLinks.push({
+      label: "Role Management",
+      to: "/role-management",
+      icon: Shield,
+    });
+  if (canManageInventory)
+    inventoryLinks.push({
+      label: "Unit Management",
+      to: "/unit-management",
+      icon: Ruler,
     });
   async function logout() {
     setIsLoggingOut(true);
@@ -70,8 +102,60 @@ export default function Sidebar({
               {label}
             </NavLink>
           ))}
+          {hrisLinks.length > 0 && (
+            <div className="pt-5">
+              <div className="mb-3 flex items-center gap-3 px-3">
+                <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500">
+                  HRIS
+                </span>
+                <span className="h-px flex-1 bg-white/10" />
+              </div>
+              <div className="space-y-2">
+                {hrisLinks.map(({ label, to, icon: Icon }) => (
+                  <NavLink
+                    key={label}
+                    to={to}
+                    onClick={onClose}
+                    className={({ isActive }) =>
+                      `flex items-center gap-3 rounded-lg p-3 text-sm ${isActive ? "bg-[#4b3023] text-white" : "text-stone-300 hover:bg-white/5"}`
+                    }
+                  >
+                    <Icon size={18} />
+                    {label}
+                  </NavLink>
+                ))}
+              </div>
+            </div>
+          )}
+          {inventoryLinks.length > 0 && (
+            <div className="pt-5">
+              <div className="mb-3 flex items-center gap-3 px-3">
+                <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500">
+                  Inventory
+                </span>
+                <span className="h-px flex-1 bg-white/10" />
+              </div>
+              <div className="space-y-2">
+                {inventoryLinks.map(({ label, to, icon: Icon }) => (
+                  <NavLink
+                    key={label}
+                    to={to}
+                    onClick={onClose}
+                    className={({ isActive }) =>
+                      `flex items-center gap-3 rounded-lg p-3 text-sm ${isActive ? "bg-[#4b3023] text-white" : "text-stone-300 hover:bg-white/5"}`
+                    }
+                  >
+                    <Icon size={18} />
+                    {label}
+                  </NavLink>
+                ))}
+              </div>
+            </div>
+          )}
         </nav>
-        {links.length === 0 && (
+        {links.length === 0 &&
+          hrisLinks.length === 0 &&
+          inventoryLinks.length === 0 && (
           <div className="relative flex flex-1 items-center justify-center">
             <span className="absolute h-36 w-36 rounded-full bg-[#b86b42]/20 blur-2xl" />
             <span className="relative grid h-24 w-24 place-items-center rounded-3xl border border-white/10 bg-white/5 text-stone-500 backdrop-blur-md">

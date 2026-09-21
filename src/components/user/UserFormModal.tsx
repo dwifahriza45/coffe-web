@@ -2,6 +2,7 @@ import { isAxiosError } from "axios";
 import { Eye, EyeOff, UserPlus, X } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { createUser } from "../../api/user.api";
+import ConfirmDialog from "../common/ConfirmDialog";
 import type { ApiResponse } from "../../types/auth";
 import type { CreateUserRequest } from "../../types/user";
 
@@ -28,6 +29,7 @@ export default function UserFormModal({
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   function update(field: keyof CreateUserRequest, value: string) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -57,6 +59,11 @@ export default function UserFormModal({
     event.preventDefault();
     setError("");
     if (!validate()) return;
+    setConfirmOpen(true);
+  }
+
+  async function createConfirmedUser() {
+    setConfirmOpen(false);
     setSubmitting(true);
     try {
       const response = await createUser(form);
@@ -99,6 +106,38 @@ export default function UserFormModal({
         placeholder={placeholder}
         disabled={submitting}
       />
+      {errors[name] && (
+        <p className="mt-1.5 text-xs font-medium text-red-600">
+          {errors[name]}
+        </p>
+      )}
+    </label>
+  );
+  const passwordField = (
+    name: "password" | "confirm_password",
+    label: string,
+    placeholder: string,
+  ) => (
+    <label className="block text-sm font-semibold text-stone-700">
+      {label}
+      <span className="relative mt-2 block">
+        <input
+          type={showPassword ? "text" : "password"}
+          value={form[name]}
+          onChange={(event) => update(name, event.target.value)}
+          className={`${inputClass(name)} mt-0 pr-11`}
+          placeholder={placeholder}
+          disabled={submitting}
+        />
+        <button
+          type="button"
+          onClick={() => setShowPassword((value) => !value)}
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400"
+          aria-label={showPassword ? "Hide password" : "Show password"}
+        >
+          {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+        </button>
+      </span>
       {errors[name] && (
         <p className="mt-1.5 text-xs font-medium text-red-600">
           {errors[name]}
@@ -162,35 +201,10 @@ export default function UserFormModal({
                 </p>
               )}
             </label>
-            <label className="block text-sm font-semibold text-stone-700">
-              Password
-              <span className="relative mt-2 block">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  value={form.password}
-                  onChange={(event) => update("password", event.target.value)}
-                  className={`${inputClass("password")} mt-0 pr-11`}
-                  placeholder="Minimum 8 characters"
-                  disabled={submitting}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((value) => !value)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400"
-                >
-                  {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
-                </button>
-              </span>
-              {errors.password && (
-                <p className="mt-1.5 text-xs font-medium text-red-600">
-                  {errors.password}
-                </p>
-              )}
-            </label>
-            {field(
+            {passwordField("password", "Password", "Minimum 8 characters")}
+            {passwordField(
               "confirm_password",
               "Confirm password",
-              showPassword ? "text" : "password",
               "Repeat password",
             )}
           </div>
@@ -218,6 +232,15 @@ export default function UserFormModal({
           </button>
         </footer>
       </form>
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Create user"
+        message="Create this user account with the details you entered?"
+        confirmText="Create user"
+        submitting={submitting}
+        onCancel={() => setConfirmOpen(false)}
+        onConfirm={createConfirmedUser}
+      />
     </div>
   );
 }
