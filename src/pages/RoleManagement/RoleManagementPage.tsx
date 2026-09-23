@@ -38,12 +38,17 @@ type ConfirmRequest = {
   onConfirm: () => void | Promise<void>;
 };
 
+const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50];
+
 export default function RoleManagementPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [roles, setRoles] = useState<Role[]>([]);
   const [roleUsage, setRoleUsage] = useState<Record<string, boolean>>({});
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [total, setTotal] = useState(0);
   const [refreshKey, setRefreshKey] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -70,10 +75,15 @@ export default function RoleManagementPage() {
       setLoading(true);
       setError("");
       try {
-        const response = await getRoles(search);
+        const response = await getRoles({
+          start: (page - 1) * pageSize,
+          limit: pageSize,
+          name: search,
+        });
         if (!current) return;
         const nextRoles = response.data ?? [];
         setRoles(nextRoles);
+        setTotal(response.total ?? 0);
         const usageEntries = await Promise.all(
           nextRoles.map(async (role) => {
             const usage = await getRoleUsers(role.role_id);
@@ -89,6 +99,7 @@ export default function RoleManagementPage() {
           : undefined;
         setRoles([]);
         setRoleUsage({});
+        setTotal(0);
         setError(response?.message || "Could not load roles.");
       } finally {
         if (current) setLoading(false);
@@ -98,7 +109,7 @@ export default function RoleManagementPage() {
     return () => {
       current = false;
     };
-  }, [search, refreshKey]);
+  }, [page, pageSize, search, refreshKey]);
 
   function refreshRoles() {
     setRefreshKey((value) => value + 1);
@@ -106,6 +117,7 @@ export default function RoleManagementPage() {
 
   function handleSearch(event: FormEvent) {
     event.preventDefault();
+    setPage(1);
     setSearch(searchInput.trim());
   }
 
@@ -300,6 +312,8 @@ export default function RoleManagementPage() {
     }
   }
 
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
   return (
     <div className="flex min-h-screen bg-[#f8f5f0]">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
@@ -331,7 +345,7 @@ export default function RoleManagementPage() {
               <div>
                 <h2 className="font-semibold">All roles</h2>
                 <p className="text-xs text-stone-500">
-                  {roles.length} roles found
+                  {total} roles found
                 </p>
               </div>
               <form
@@ -393,9 +407,6 @@ export default function RoleManagementPage() {
                                 <p className="text-sm font-semibold">
                                   {role.name}
                                 </p>
-                                <p className="text-xs text-stone-400">
-                                  {role.role_id}
-                                </p>
                               </div>
                             </div>
                           </td>
@@ -447,6 +458,46 @@ export default function RoleManagementPage() {
                 </tbody>
               </table>
             </div>
+            <footer className="flex items-center justify-between border-t border-stone-200 px-5 py-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <p className="text-xs text-stone-500">
+                  Page {page} of {totalPages}
+                </p>
+                <label className="flex items-center gap-2 text-xs font-semibold text-stone-500">
+                  Limit
+                  <select
+                    value={pageSize}
+                    onChange={(event) => {
+                      setPage(1);
+                      setPageSize(Number(event.target.value));
+                    }}
+                    className="rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-xs text-stone-700 outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10"
+                  >
+                    {PAGE_SIZE_OPTIONS.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  disabled={page === 1 || loading}
+                  onClick={() => setPage((value) => value - 1)}
+                  className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-40"
+                >
+                  Previous
+                </button>
+                <button
+                  disabled={page >= totalPages || loading}
+                  onClick={() => setPage((value) => value + 1)}
+                  className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-40"
+                >
+                  Next
+                </button>
+              </div>
+            </footer>
           </section>
           <div className="mt-4 flex items-center gap-2 text-xs text-stone-400">
             <ShieldCheck size={15} />
@@ -540,7 +591,7 @@ export default function RoleManagementPage() {
               <div>
                 <h2 className="text-lg font-bold">Assigned users</h2>
                 <p className="mt-1 text-xs text-stone-500">
-                  {usersRole.name} · {usersRole.role_id}
+                  {usersRole.name}
                 </p>
               </div>
               <button
@@ -580,10 +631,7 @@ export default function RoleManagementPage() {
                           >
                             <div>
                               <p className="text-sm font-semibold text-stone-800">
-                                {item.fullname || item.user_id}
-                              </p>
-                              <p className="text-xs text-stone-400">
-                                {item.user_id}
+                                {item.fullname || "Unnamed user"}
                               </p>
                             </div>
                             <button
@@ -643,9 +691,6 @@ export default function RoleManagementPage() {
                               <span className="min-w-0">
                                 <span className="block text-sm font-semibold text-stone-800">
                                   {user.fullname}
-                                </span>
-                                <span className="block text-xs text-stone-400">
-                                  {user.user_id}
                                 </span>
                               </span>
                             </label>

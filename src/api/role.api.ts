@@ -6,13 +6,13 @@ export interface Role {
   name: string;
 }
 
-export const getRoles = async (name = "") =>
+export const getRoles = async (payload: {
+  start: number;
+  limit: number;
+  name: string;
+} = { start: 0, limit: 100, name: "" }) =>
   (
-    await api.post<ApiResponse<Role[]>>("/roles/list", {
-      start: 0,
-      limit: 100,
-      name,
-    })
+    await api.post<ApiResponse<Role[]>>("/roles/list", payload)
   ).data;
 
 export const createRole = async (name: string) =>

@@ -1,7 +1,12 @@
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import LoginPage from "../pages/auth/LoginPage";
+import CategoryManagementPage from "../pages/CategoryManagement/CategoryManagementPage";
+import CategoryDetailPage from "../pages/CategoryDetail/CategoryDetailPage";
 import DashboardPage from "../pages/Dashboard/DashboardPage";
+import IngredientDetailPage from "../pages/IngredientDetail/IngredientDetailPage";
+import IngredientManagementPage from "../pages/IngredientManagement/IngredientManagementPage";
 import NotFoundPage from "../pages/NotFound/NotFoundPage";
+import ProductDetailPage from "../pages/ProductDetail/ProductDetailPage";
 import RoleManagementPage from "../pages/RoleManagement/RoleManagementPage";
 import UnitManagementPage from "../pages/UnitManagement/UnitManagementPage";
 import UserManagementPage from "../pages/UserManagement/UserManagementPage";
@@ -77,6 +82,56 @@ export default function AppRouter() {
             <RequireAuth>
               <RequireRole allowedRoles={["admin", "inventory"]}>
                 <UnitManagementPage />
+              </RequireRole>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/ingredient-management"
+          element={
+            <RequireAuth>
+              <RequireRole allowedRoles={["admin", "inventory"]}>
+                <IngredientManagementPage />
+              </RequireRole>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/ingredient-management/:ingredientID"
+          element={
+            <RequireAuth>
+              <RequireRole allowedRoles={["admin", "inventory"]}>
+                <IngredientDetailPage />
+              </RequireRole>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/category-management"
+          element={
+            <RequireAuth>
+              <RequireRole allowedRoles={["admin", "inventory"]}>
+                <CategoryManagementPage />
+              </RequireRole>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/category-management/:categoryID"
+          element={
+            <RequireAuth>
+              <RequireRole allowedRoles={["admin", "inventory"]}>
+                <CategoryDetailPage />
+              </RequireRole>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/category-management/:categoryID/products/:productID"
+          element={
+            <RequireAuth>
+              <RequireRole allowedRoles={["admin", "inventory"]}>
+                <ProductDetailPage />
               </RequireRole>
             </RequireAuth>
           }

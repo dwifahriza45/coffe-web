@@ -2,6 +2,8 @@ import {
   LayoutDashboard,
   LockKeyhole,
   LogOut,
+  FolderTree,
+  PackageOpen,
   Ruler,
   Shield,
   UserCog,
@@ -11,6 +13,7 @@ import { useState } from "react";
 import { logout as logoutRequest } from "../../api/auth.api";
 import { useAuth } from "../../app/AuthContext";
 import { invalidateSession } from "../../app/authSession";
+import { getUserRoleNames } from "../../app/roleAccess";
 import Brand from "./Brand";
 export default function Sidebar({
   isOpen,
@@ -22,7 +25,7 @@ export default function Sidebar({
   const { user, setUser } = useAuth();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const roles = user?.roles?.map((role) => role.roles_name.toLowerCase()) ?? [];
+  const roles = getUserRoleNames(user);
   const isAdmin = roles.includes("admin");
   const canManageUsers = roles.some((role) =>
     ["admin", "hris_admin"].includes(role),
@@ -40,7 +43,12 @@ export default function Sidebar({
     to: string;
     icon: typeof LayoutDashboard;
   }> = [];
-  const inventoryLinks: Array<{
+  const inventoryMasterLinks: Array<{
+    label: string;
+    to: string;
+    icon: typeof LayoutDashboard;
+  }> = [];
+  const inventoryMenuLinks: Array<{
     label: string;
     to: string;
     icon: typeof LayoutDashboard;
@@ -61,10 +69,22 @@ export default function Sidebar({
       icon: Shield,
     });
   if (canManageInventory)
-    inventoryLinks.push({
+    inventoryMasterLinks.push({
       label: "Unit Management",
       to: "/unit-management",
       icon: Ruler,
+    });
+  if (canManageInventory)
+    inventoryMasterLinks.push({
+      label: "Ingredient Management",
+      to: "/ingredient-management",
+      icon: PackageOpen,
+    });
+  if (canManageInventory)
+    inventoryMenuLinks.push({
+      label: "Category Management",
+      to: "/category-management",
+      icon: FolderTree,
     });
   async function logout() {
     setIsLoggingOut(true);
@@ -127,35 +147,65 @@ export default function Sidebar({
               </div>
             </div>
           )}
-          {inventoryLinks.length > 0 && (
+          {(inventoryMasterLinks.length > 0 || inventoryMenuLinks.length > 0) && (
             <div className="pt-5">
-              <div className="mb-3 flex items-center gap-3 px-3">
-                <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500">
-                  Inventory
-                </span>
-                <span className="h-px flex-1 bg-white/10" />
-              </div>
-              <div className="space-y-2">
-                {inventoryLinks.map(({ label, to, icon: Icon }) => (
-                  <NavLink
-                    key={label}
-                    to={to}
-                    onClick={onClose}
-                    className={({ isActive }) =>
-                      `flex items-center gap-3 rounded-lg p-3 text-sm ${isActive ? "bg-[#4b3023] text-white" : "text-stone-300 hover:bg-white/5"}`
-                    }
-                  >
-                    <Icon size={18} />
-                    {label}
-                  </NavLink>
-                ))}
-              </div>
+              {inventoryMasterLinks.length > 0 && (
+                <>
+                  <div className="mb-3 flex items-center gap-3 px-3">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500">
+                      Master Data
+                    </span>
+                    <span className="h-px flex-1 bg-white/10" />
+                  </div>
+                  <div className="space-y-2">
+                    {inventoryMasterLinks.map(({ label, to, icon: Icon }) => (
+                      <NavLink
+                        key={label}
+                        to={to}
+                        onClick={onClose}
+                        className={({ isActive }) =>
+                          `flex items-center gap-3 rounded-lg p-3 text-sm ${isActive ? "bg-[#4b3023] text-white" : "text-stone-300 hover:bg-white/5"}`
+                        }
+                      >
+                        <Icon size={18} />
+                        {label}
+                      </NavLink>
+                    ))}
+                  </div>
+                </>
+              )}
+              {inventoryMenuLinks.length > 0 && (
+                <div className="pt-5">
+                  <div className="mb-3 flex items-center gap-3 px-3">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500">
+                      Menu
+                    </span>
+                    <span className="h-px flex-1 bg-white/10" />
+                  </div>
+                  <div className="space-y-2">
+                    {inventoryMenuLinks.map(({ label, to, icon: Icon }) => (
+                      <NavLink
+                        key={label}
+                        to={to}
+                        onClick={onClose}
+                        className={({ isActive }) =>
+                          `flex items-center gap-3 rounded-lg p-3 text-sm ${isActive ? "bg-[#4b3023] text-white" : "text-stone-300 hover:bg-white/5"}`
+                        }
+                      >
+                        <Icon size={18} />
+                        {label}
+                      </NavLink>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </nav>
         {links.length === 0 &&
           hrisLinks.length === 0 &&
-          inventoryLinks.length === 0 && (
+          inventoryMasterLinks.length === 0 &&
+          inventoryMenuLinks.length === 0 && (
           <div className="relative flex flex-1 items-center justify-center">
             <span className="absolute h-36 w-36 rounded-full bg-[#b86b42]/20 blur-2xl" />
             <span className="relative grid h-24 w-24 place-items-center rounded-3xl border border-white/10 bg-white/5 text-stone-500 backdrop-blur-md">

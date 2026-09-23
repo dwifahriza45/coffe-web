@@ -34,7 +34,7 @@ import Sidebar from "../../components/layout/Sidebar";
 import UserFormModal from "../../components/user/UserFormModal";
 import type { UpdateUserRequest, User } from "../../types/user";
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50];
 type ActionMode = "edit" | "password" | "active" | "delete";
 type ActionFieldErrors = Record<string, string | undefined>;
 type ConfirmRequest = {
@@ -63,6 +63,7 @@ export default function UserManagementPage() {
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -96,8 +97,8 @@ export default function UserManagementPage() {
       setError("");
       try {
         const response = await getUsers({
-          start: (page - 1) * PAGE_SIZE,
-          limit: PAGE_SIZE,
+          start: (page - 1) * pageSize,
+          limit: pageSize,
           fullname: search,
         });
         if (!current) return;
@@ -133,7 +134,7 @@ export default function UserManagementPage() {
     return () => {
       current = false;
     };
-  }, [page, search, refreshKey]);
+  }, [page, pageSize, search, refreshKey]);
 
   function handleSearch(event: FormEvent) {
     event.preventDefault();
@@ -382,7 +383,7 @@ export default function UserManagementPage() {
     }
   }
 
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const assignedRoleIDs = new Set(roles.map((role) => role.role_id));
   const addableRoles = availableRoles.filter(
     (role) => !assignedRoleIDs.has(role.role_id),
@@ -485,9 +486,6 @@ export default function UserManagementPage() {
                                 <p className="text-sm font-semibold">
                                   {user.fullname}
                                 </p>
-                                <p className="text-xs text-stone-400">
-                                  {user.user_id}
-                                </p>
                               </div>
                             </div>
                           </td>
@@ -576,9 +574,28 @@ export default function UserManagementPage() {
               </table>
             </div>
             <footer className="flex items-center justify-between border-t border-stone-200 px-5 py-4">
-              <p className="text-xs text-stone-500">
-                Page {page} of {totalPages}
-              </p>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <p className="text-xs text-stone-500">
+                  Page {page} of {totalPages}
+                </p>
+                <label className="flex items-center gap-2 text-xs font-semibold text-stone-500">
+                  Limit
+                  <select
+                    value={pageSize}
+                    onChange={(event) => {
+                      setPage(1);
+                      setPageSize(Number(event.target.value));
+                    }}
+                    className="rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-xs text-stone-700 outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10"
+                  >
+                    {PAGE_SIZE_OPTIONS.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
               <div className="flex gap-2">
                 <button
                   disabled={page === 1 || loading}
@@ -633,7 +650,7 @@ export default function UserManagementPage() {
                   {actionMode === "delete" && "Delete user"}
                 </h2>
                 <p className="mt-1 text-xs text-stone-500">
-                  {actionUser.fullname} · {actionUser.user_id}
+                  {actionUser.fullname}
                 </p>
               </div>
               <button
@@ -804,7 +821,7 @@ export default function UserManagementPage() {
               <div>
                 <h2 className="text-lg font-bold">User roles</h2>
                 <p className="mt-1 text-xs text-stone-500">
-                  {rolesUser.fullname} · {rolesUser.user_id}
+                  {rolesUser.fullname}
                 </p>
               </div>
               <button
@@ -845,9 +862,6 @@ export default function UserManagementPage() {
                             <div>
                               <p className="text-sm font-semibold text-stone-800">
                                 {role.role_name || "Unnamed role"}
-                              </p>
-                              <p className="text-xs text-stone-400">
-                                {role.role_id}
                               </p>
                             </div>
                             <button
@@ -890,9 +904,6 @@ export default function UserManagementPage() {
                             <span className="min-w-0">
                               <span className="block text-sm font-semibold text-stone-800">
                                 {role.name}
-                              </span>
-                              <span className="block text-xs text-stone-400">
-                                {role.role_id}
                               </span>
                             </span>
                           </label>

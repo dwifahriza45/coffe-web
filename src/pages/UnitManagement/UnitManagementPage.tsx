@@ -9,11 +9,12 @@ import {
   type Unit,
   type UnitPayload,
 } from "../../api/unit.api";
+import { getIngredientUnitUsage } from "../../api/ingredient.api";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import Navbar from "../../components/layout/Navbar";
 import Sidebar from "../../components/layout/Sidebar";
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50];
 const emptyForm: UnitPayload = {
   code: "",
   name: "",
@@ -24,9 +25,11 @@ const emptyForm: UnitPayload = {
 export default function UnitManagementPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [units, setUnits] = useState<Unit[]>([]);
+  const [unitUsage, setUnitUsage] = useState<Record<string, boolean>>({});
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -52,18 +55,30 @@ export default function UnitManagementPage() {
       setError("");
       try {
         const response = await getUnits({
-          start: (page - 1) * PAGE_SIZE,
-          limit: PAGE_SIZE,
+          start: (page - 1) * pageSize,
+          limit: pageSize,
           name: search,
         });
         if (!current) return;
-        setUnits(response.data ?? []);
+        const nextUnits = response.data ?? [];
+        setUnits(nextUnits);
         setTotal(response.total ?? 0);
+        if (nextUnits.length > 0) {
+          const usage = await getIngredientUnitUsage(
+            nextUnits.map((unit) => unit.unit_id),
+          );
+          if (!current) return;
+          setUnitUsage(usage.data ?? {});
+        } else {
+          setUnitUsage({});
+        }
       } catch (requestError) {
         if (!current) return;
         const response = isAxiosError<{ message?: string }>(requestError)
           ? requestError.response?.data
           : undefined;
+        setUnits([]);
+        setUnitUsage({});
         setError(response?.message || "Could not load units.");
       } finally {
         if (current) setLoading(false);
@@ -73,7 +88,7 @@ export default function UnitManagementPage() {
     return () => {
       current = false;
     };
-  }, [page, search, refreshKey]);
+  }, [page, pageSize, search, refreshKey]);
 
   function openModal(unit?: Unit) {
     setEditingUnit(unit ?? null);
@@ -134,6 +149,7 @@ export default function UnitManagementPage() {
   }
 
   function requestDelete(unit: Unit) {
+    if (unitUsage[unit.unit_id]) return;
     setConfirm({
       title: "Delete unit",
       message: "Delete this unit permanently?",
@@ -160,6 +176,7 @@ export default function UnitManagementPage() {
   }
 
   function requestToggleActive(unit: Unit) {
+    if (unit.active && unitUsage[unit.unit_id]) return;
     setConfirm({
       title: unit.active ? "Deactivate unit" : "Activate unit",
       message: unit.active
@@ -191,7 +208,7 @@ export default function UnitManagementPage() {
     }
   }
 
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
   return (
     <div className="flex min-h-screen bg-[#f8f5f0]">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
@@ -253,6 +270,7 @@ export default function UnitManagementPage() {
                     <th className="px-5 py-3">Unit</th>
                     <th className="px-5 py-3">Code</th>
                     <th className="px-5 py-3">Type</th>
+                    <th className="px-5 py-3">Usage</th>
                     <th className="px-5 py-3">Status</th>
                     <th className="px-5 py-3 text-right">Action</th>
                   </tr>
@@ -260,29 +278,34 @@ export default function UnitManagementPage() {
                 <tbody className="divide-y divide-stone-100">
                   {loading ? (
                     <tr>
-                      <td colSpan={5} className="px-5 py-14 text-center text-sm text-stone-500">
+                      <td colSpan={6} className="px-5 py-14 text-center text-sm text-stone-500">
                         Loading units...
                       </td>
                     </tr>
                   ) : units.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="px-5 py-14 text-center text-sm text-stone-500">
+                      <td colSpan={6} className="px-5 py-14 text-center text-sm text-stone-500">
                         No units found
                       </td>
                     </tr>
                   ) : (
-                    units.map((unit) => (
+                    units.map((unit) => {
+                      const inUse = Boolean(unitUsage[unit.unit_id]);
+                      return (
                       <tr key={unit.unit_id} className="hover:bg-stone-50/70">
                         <td className="px-5 py-4">
                           <p className="text-sm font-semibold">{unit.name}</p>
-                          <p className="text-xs text-stone-400">
-                            {unit.unit_id}
-                          </p>
                         </td>
                         <td className="px-5 py-4 text-sm font-semibold">
                           {unit.code}
                         </td>
                         <td className="px-5 py-4 text-sm">{unit.unit_type}</td>
+                        <td className="px-5 py-4">
+                          <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${inUse ? "bg-amber-50 text-amber-700" : "bg-stone-100 text-stone-500"}`}>
+                            <span className={`size-1.5 rounded-full ${inUse ? "bg-amber-500" : "bg-stone-400"}`} />
+                            {inUse ? "Used" : "Unused"}
+                          </span>
+                        </td>
                         <td className="px-5 py-4">
                           <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${unit.active ? "bg-green-50 text-green-700" : "bg-stone-100 text-stone-500"}`}>
                             {unit.active ? "Active" : "Inactive"}
@@ -301,31 +324,53 @@ export default function UnitManagementPage() {
                             <button
                               type="button"
                               onClick={() => requestToggleActive(unit)}
-                              className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800"
-                              title={unit.active ? "Deactivate unit" : "Activate unit"}
+                              disabled={unit.active && inUse}
+                              className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent"
+                              title={unit.active && inUse ? "Unit is used by ingredients" : unit.active ? "Deactivate unit" : "Activate unit"}
                             >
                               <Power size={15} />
                             </button>
                             <button
                               type="button"
                               onClick={() => requestDelete(unit)}
-                              className="grid size-8 place-items-center rounded-lg text-red-600 hover:bg-red-50"
-                              title="Delete unit"
+                              disabled={inUse}
+                              className="grid size-8 place-items-center rounded-lg text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent"
+                              title={inUse ? "Unit is used by ingredients" : "Delete unit"}
                             >
                               <Trash2 size={15} />
                             </button>
                           </div>
                         </td>
                       </tr>
-                    ))
+                      );
+                    })
                   )}
                 </tbody>
               </table>
             </div>
             <footer className="flex items-center justify-between border-t border-stone-200 px-5 py-4">
-              <p className="text-xs text-stone-500">
-                Page {page} of {totalPages}
-              </p>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                <p className="text-xs text-stone-500">
+                  Page {page} of {totalPages}
+                </p>
+                <label className="flex items-center gap-2 text-xs font-semibold text-stone-500">
+                  Limit
+                  <select
+                    value={pageSize}
+                    onChange={(event) => {
+                      setPage(1);
+                      setPageSize(Number(event.target.value));
+                    }}
+                    className="rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-xs text-stone-700 outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10"
+                  >
+                    {PAGE_SIZE_OPTIONS.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
               <div className="flex gap-2">
                 <button
                   disabled={page === 1 || loading}
@@ -374,15 +419,6 @@ export default function UnitManagementPage() {
                   )}
                 </label>
               ))}
-              <label className="flex items-center gap-2 text-sm font-semibold text-stone-700">
-                <input
-                  type="checkbox"
-                  checked={form.active}
-                  onChange={(event) => setForm((current) => ({ ...current, active: event.target.checked }))}
-                  className="size-4 accent-[#92502f]"
-                />
-                Active
-              </label>
               {actionError && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{actionError}</p>}
             </div>
             <footer className="flex justify-end gap-3 border-t border-stone-200 p-5">
