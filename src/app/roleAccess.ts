@@ -2,6 +2,8 @@ import type { AuthenticatedUser } from "../types/auth";
 
 export const ROLE_HOME_ROUTES = [
   { roles: ["admin"], route: "/dashboard" },
+  { roles: ["ballista"], route: "/category-management" },
+  { roles: ["leader"], route: "/business-days" },
   { roles: ["hris_admin"], route: "/user-management" },
   { roles: ["inventory"], route: "/unit-management" },
 ] as const;

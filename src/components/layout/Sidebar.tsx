@@ -2,6 +2,8 @@ import {
   LayoutDashboard,
   LockKeyhole,
   LogOut,
+  CalendarDays,
+  CupSoda,
   FolderTree,
   PackageOpen,
   Ruler,
@@ -30,8 +32,17 @@ export default function Sidebar({
   const canManageUsers = roles.some((role) =>
     ["admin", "hris_admin"].includes(role),
   );
-  const canManageInventory = roles.some((role) =>
+  const canReadStockMaster = roles.some((role) =>
     ["admin", "inventory"].includes(role),
+  );
+  const canReadMenuCategories = roles.some((role) =>
+    ["admin", "ballista", "leader"].includes(role),
+  );
+  const canReadProducts = roles.some((role) =>
+    ["admin", "ballista", "leader"].includes(role),
+  );
+  const canManageBusinessDays = roles.some((role) =>
+    ["admin", "leader"].includes(role),
   );
   const links: Array<{
     label: string;
@@ -56,6 +67,9 @@ export default function Sidebar({
   if (isAdmin) {
     links.push({ label: "Overview", to: "/dashboard", icon: LayoutDashboard });
   }
+  if (canManageBusinessDays) {
+    links.push({ label: "Business Days", to: "/business-days", icon: CalendarDays });
+  }
   if (canManageUsers)
     hrisLinks.push({
       label: "User Management",
@@ -68,23 +82,29 @@ export default function Sidebar({
       to: "/role-management",
       icon: Shield,
     });
-  if (canManageInventory)
+  if (canReadStockMaster)
     inventoryMasterLinks.push({
       label: "Unit Management",
       to: "/unit-management",
       icon: Ruler,
     });
-  if (canManageInventory)
+  if (canReadStockMaster)
     inventoryMasterLinks.push({
       label: "Ingredient Management",
       to: "/ingredient-management",
       icon: PackageOpen,
     });
-  if (canManageInventory)
+  if (canReadMenuCategories)
     inventoryMenuLinks.push({
-      label: "Category Management",
+      label: "Menu Items",
       to: "/category-management",
       icon: FolderTree,
+    });
+  if (canReadProducts && !canReadMenuCategories)
+    inventoryMenuLinks.push({
+      label: "Menu Items",
+      to: "/menu-items",
+      icon: CupSoda,
     });
   async function logout() {
     setIsLoggingOut(true);

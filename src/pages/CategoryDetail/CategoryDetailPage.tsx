@@ -15,6 +15,8 @@ import { getProductRecipeUsage } from "../../api/recipe.api";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import Navbar from "../../components/layout/Navbar";
 import Sidebar from "../../components/layout/Sidebar";
+import { useAuth } from "../../app/AuthContext";
+import { getUserRoleNames } from "../../app/roleAccess";
 import { formatNumber, normalizeNumberInput } from "../../utils/numberFormat";
 
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50];
@@ -32,6 +34,9 @@ function formatPrice(value: string) {
 }
 
 export default function CategoryDetailPage() {
+  const { user } = useAuth();
+  const roles = getUserRoleNames(user);
+  const canWriteProducts = roles.includes("admin");
   const { categoryID = "" } = useParams();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -238,7 +243,7 @@ export default function CategoryDetailPage() {
         <main className="p-5 sm:p-8">
           <Link to="/category-management" className="mb-5 inline-flex items-center gap-2 text-sm font-semibold text-stone-600 hover:text-stone-900">
             <ArrowLeft size={16} />
-            Category Management
+            Menu Categories
           </Link>
           <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
             <div>
@@ -248,10 +253,10 @@ export default function CategoryDetailPage() {
               <h1 className="font-serif text-3xl font-bold">{category?.name ?? "Category Detail"}</h1>
               <p className="mt-2 text-sm text-stone-500">{category?.description || "Products in this category"}</p>
             </div>
-            <button type="button" onClick={() => openModal()} className="flex items-center gap-2 rounded-lg bg-[#362219] px-5 py-3 text-sm font-semibold text-white">
+            {canWriteProducts && <button type="button" onClick={() => openModal()} className="flex items-center gap-2 rounded-lg bg-[#362219] px-5 py-3 text-sm font-semibold text-white">
               <Plus size={17} />
               Add product
-            </button>
+            </button>}
           </header>
 
           <section className="mt-7 overflow-hidden rounded-xl border border-stone-200 bg-white">
@@ -311,9 +316,9 @@ export default function CategoryDetailPage() {
                           </td>
                           <td className="px-5 py-4">
                             <div className="flex justify-end gap-1.5">
-                              <button type="button" onClick={(event) => { event.stopPropagation(); openModal(product); }} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800" title="Update product"><Pencil size={15} /></button>
-                              <button type="button" onClick={(event) => { event.stopPropagation(); requestToggleActive(product); }} disabled={product.active && inUse} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent" title={product.active && inUse ? "Product is used by recipes" : product.active ? "Deactivate product" : "Activate product"}><Power size={15} /></button>
-                              <button type="button" onClick={(event) => { event.stopPropagation(); requestDelete(product); }} disabled={inUse} className="grid size-8 place-items-center rounded-lg text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent" title={inUse ? "Product is used by recipes" : "Delete product"}><Trash2 size={15} /></button>
+                              {canWriteProducts && <button type="button" onClick={(event) => { event.stopPropagation(); openModal(product); }} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800" title="Update product"><Pencil size={15} /></button>}
+                              {canWriteProducts && <button type="button" onClick={(event) => { event.stopPropagation(); requestToggleActive(product); }} disabled={product.active && inUse} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent" title={product.active && inUse ? "Product is used by recipes" : product.active ? "Deactivate product" : "Activate product"}><Power size={15} /></button>}
+                              {canWriteProducts && <button type="button" onClick={(event) => { event.stopPropagation(); requestDelete(product); }} disabled={inUse} className="grid size-8 place-items-center rounded-lg text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent" title={inUse ? "Product is used by recipes" : "Delete product"}><Trash2 size={15} /></button>}
                             </div>
                           </td>
                         </tr>

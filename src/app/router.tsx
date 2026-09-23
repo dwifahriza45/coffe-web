@@ -1,10 +1,13 @@
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import LoginPage from "../pages/auth/LoginPage";
+import BusinessDayPage from "../pages/BusinessDay/BusinessDayPage";
 import CategoryManagementPage from "../pages/CategoryManagement/CategoryManagementPage";
 import CategoryDetailPage from "../pages/CategoryDetail/CategoryDetailPage";
 import DashboardPage from "../pages/Dashboard/DashboardPage";
 import IngredientDetailPage from "../pages/IngredientDetail/IngredientDetailPage";
 import IngredientManagementPage from "../pages/IngredientManagement/IngredientManagementPage";
+import InventoryCountPage from "../pages/InventoryCount/InventoryCountPage";
+import MenuItemsPage from "../pages/MenuItems/MenuItemsPage";
 import NotFoundPage from "../pages/NotFound/NotFoundPage";
 import ProductDetailPage from "../pages/ProductDetail/ProductDetailPage";
 import RoleManagementPage from "../pages/RoleManagement/RoleManagementPage";
@@ -44,6 +47,26 @@ export default function AppRouter() {
             <RequireAuth>
               <RequireRole allowedRoles={["admin"]}>
                 <DashboardPage />
+              </RequireRole>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/business-days"
+          element={
+            <RequireAuth>
+              <RequireRole allowedRoles={["admin", "leader"]}>
+                <BusinessDayPage />
+              </RequireRole>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/business-days/:businessDayID/inventory-counts"
+          element={
+            <RequireAuth>
+              <RequireRole allowedRoles={["admin", "leader"]}>
+                <InventoryCountPage />
               </RequireRole>
             </RequireAuth>
           }
@@ -110,7 +133,7 @@ export default function AppRouter() {
           path="/category-management"
           element={
             <RequireAuth>
-              <RequireRole allowedRoles={["admin", "inventory"]}>
+              <RequireRole allowedRoles={["admin", "ballista", "leader"]}>
                 <CategoryManagementPage />
               </RequireRole>
             </RequireAuth>
@@ -120,7 +143,7 @@ export default function AppRouter() {
           path="/category-management/:categoryID"
           element={
             <RequireAuth>
-              <RequireRole allowedRoles={["admin", "inventory"]}>
+              <RequireRole allowedRoles={["admin", "ballista", "leader"]}>
                 <CategoryDetailPage />
               </RequireRole>
             </RequireAuth>
@@ -130,7 +153,27 @@ export default function AppRouter() {
           path="/category-management/:categoryID/products/:productID"
           element={
             <RequireAuth>
-              <RequireRole allowedRoles={["admin", "inventory"]}>
+              <RequireRole allowedRoles={["admin", "ballista", "leader", "inventory"]}>
+                <ProductDetailPage />
+              </RequireRole>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/menu-items"
+          element={
+            <RequireAuth>
+              <RequireRole allowedRoles={["admin", "ballista", "leader"]}>
+                <MenuItemsPage />
+              </RequireRole>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/menu-items/:productID"
+          element={
+            <RequireAuth>
+              <RequireRole allowedRoles={["admin", "ballista", "leader", "inventory"]}>
                 <ProductDetailPage />
               </RequireRole>
             </RequireAuth>

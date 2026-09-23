@@ -15,6 +15,8 @@ import { getUnits, type Unit } from "../../api/unit.api";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import Navbar from "../../components/layout/Navbar";
 import Sidebar from "../../components/layout/Sidebar";
+import { useAuth } from "../../app/AuthContext";
+import { getUserRoleNames } from "../../app/roleAccess";
 import { formatNumber, normalizeNumberInput } from "../../utils/numberFormat";
 
 const emptyForm: IngredientUnitPayload = {
@@ -29,6 +31,9 @@ function formatFactor(value: string) {
 }
 
 export default function IngredientDetailPage() {
+  const { user } = useAuth();
+  const roles = getUserRoleNames(user);
+  const canWriteStockMaster = roles.some((role) => ["admin", "inventory"].includes(role));
   const { ingredientID = "" } = useParams();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [ingredient, setIngredient] = useState<Ingredient | null>(null);
@@ -221,10 +226,10 @@ export default function IngredientDetailPage() {
                 Base unit: {ingredient?.base_unit_info?.code ?? ingredient?.base_unit ?? "-"} · Minimum stock: {ingredient ? formatNumber(ingredient.minimum_stock, 3) : "-"}
               </p>
             </div>
-            <button type="button" onClick={() => openModal()} className="flex items-center gap-2 rounded-lg bg-[#362219] px-5 py-3 text-sm font-semibold text-white">
+            {canWriteStockMaster && <button type="button" onClick={() => openModal()} className="flex items-center gap-2 rounded-lg bg-[#362219] px-5 py-3 text-sm font-semibold text-white">
               <ListPlus size={17} />
               Add unit conversion
-            </button>
+            </button>}
           </header>
 
           {error && <div className="mt-5 rounded-lg bg-red-50 p-4 text-sm text-red-700">{error}</div>}
@@ -266,9 +271,9 @@ export default function IngredientDetailPage() {
                         </td>
                         <td className="px-5 py-4">
                           <div className="flex justify-end gap-1.5">
-                            <button type="button" onClick={() => openModal(item)} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800" title="Update ingredient unit"><Pencil size={15} /></button>
-                            <button type="button" onClick={() => requestToggleActive(item)} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800" title={item.active ? "Deactivate ingredient unit" : "Activate ingredient unit"}><Power size={15} /></button>
-                            <button type="button" onClick={() => requestDelete(item)} className="grid size-8 place-items-center rounded-lg text-red-600 hover:bg-red-50" title="Delete ingredient unit"><Trash2 size={15} /></button>
+                            {canWriteStockMaster && <button type="button" onClick={() => openModal(item)} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800" title="Update ingredient unit"><Pencil size={15} /></button>}
+                            {canWriteStockMaster && <button type="button" onClick={() => requestToggleActive(item)} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800" title={item.active ? "Deactivate ingredient unit" : "Activate ingredient unit"}><Power size={15} /></button>}
+                            {canWriteStockMaster && <button type="button" onClick={() => requestDelete(item)} className="grid size-8 place-items-center rounded-lg text-red-600 hover:bg-red-50" title="Delete ingredient unit"><Trash2 size={15} /></button>}
                           </div>
                         </td>
                       </tr>

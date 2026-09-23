@@ -13,6 +13,8 @@ import { getIngredientUnitUsage } from "../../api/ingredient.api";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import Navbar from "../../components/layout/Navbar";
 import Sidebar from "../../components/layout/Sidebar";
+import { useAuth } from "../../app/AuthContext";
+import { getUserRoleNames } from "../../app/roleAccess";
 
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50];
 const emptyForm: UnitPayload = {
@@ -23,6 +25,9 @@ const emptyForm: UnitPayload = {
 };
 
 export default function UnitManagementPage() {
+  const { user } = useAuth();
+  const roles = getUserRoleNames(user);
+  const canWriteStockMaster = roles.some((role) => ["admin", "inventory"].includes(role));
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [units, setUnits] = useState<Unit[]>([]);
   const [unitUsage, setUnitUsage] = useState<Record<string, boolean>>({});
@@ -225,14 +230,14 @@ export default function UnitManagementPage() {
                 Manage inventory measurement units.
               </p>
             </div>
-            <button
+            {canWriteStockMaster && <button
               type="button"
               onClick={() => openModal()}
               className="flex items-center gap-2 rounded-lg bg-[#362219] px-5 py-3 text-sm font-semibold text-white"
             >
               <Plus size={17} />
               Add unit
-            </button>
+            </button>}
           </header>
 
           <section className="mt-7 overflow-hidden rounded-xl border border-stone-200 bg-white">
@@ -313,15 +318,15 @@ export default function UnitManagementPage() {
                         </td>
                         <td className="px-5 py-4">
                           <div className="flex justify-end gap-1.5">
-                            <button
+                            {canWriteStockMaster && <button
                               type="button"
                               onClick={() => openModal(unit)}
                               className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800"
                               title="Update unit"
                             >
                               <Pencil size={15} />
-                            </button>
-                            <button
+                            </button>}
+                            {canWriteStockMaster && <button
                               type="button"
                               onClick={() => requestToggleActive(unit)}
                               disabled={unit.active && inUse}
@@ -329,8 +334,8 @@ export default function UnitManagementPage() {
                               title={unit.active && inUse ? "Unit is used by ingredients" : unit.active ? "Deactivate unit" : "Activate unit"}
                             >
                               <Power size={15} />
-                            </button>
-                            <button
+                            </button>}
+                            {canWriteStockMaster && <button
                               type="button"
                               onClick={() => requestDelete(unit)}
                               disabled={inUse}
@@ -338,7 +343,7 @@ export default function UnitManagementPage() {
                               title={inUse ? "Unit is used by ingredients" : "Delete unit"}
                             >
                               <Trash2 size={15} />
-                            </button>
+                            </button>}
                           </div>
                         </td>
                       </tr>

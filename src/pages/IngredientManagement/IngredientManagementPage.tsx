@@ -15,6 +15,8 @@ import { getUnits, type Unit } from "../../api/unit.api";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import Navbar from "../../components/layout/Navbar";
 import Sidebar from "../../components/layout/Sidebar";
+import { useAuth } from "../../app/AuthContext";
+import { getUserRoleNames } from "../../app/roleAccess";
 import { formatNumber, normalizeNumberInput } from "../../utils/numberFormat";
 
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50];
@@ -26,6 +28,9 @@ const emptyForm: IngredientPayload = {
 };
 
 export default function IngredientManagementPage() {
+  const { user } = useAuth();
+  const roles = getUserRoleNames(user);
+  const canWriteStockMaster = roles.some((role) => ["admin", "inventory"].includes(role));
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
@@ -245,10 +250,10 @@ export default function IngredientManagementPage() {
               <h1 className="font-serif text-3xl font-bold">Ingredient Management</h1>
               <p className="mt-2 text-sm text-stone-500">Manage stock ingredients and base units.</p>
             </div>
-            <button type="button" onClick={() => openModal()} className="flex items-center gap-2 rounded-lg bg-[#362219] px-5 py-3 text-sm font-semibold text-white">
+            {canWriteStockMaster && <button type="button" onClick={() => openModal()} className="flex items-center gap-2 rounded-lg bg-[#362219] px-5 py-3 text-sm font-semibold text-white">
               <Plus size={17} />
               Add ingredient
-            </button>
+            </button>}
           </header>
 
           <section className="mt-7 overflow-hidden rounded-xl border border-stone-200 bg-white">
@@ -310,9 +315,9 @@ export default function IngredientManagementPage() {
                         </td>
                         <td className="px-5 py-4">
                           <div className="flex justify-end gap-1.5">
-                            <button type="button" onClick={(event) => { event.stopPropagation(); openModal(ingredient); }} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800" title="Update ingredient"><Pencil size={15} /></button>
-                            <button type="button" onClick={(event) => { event.stopPropagation(); requestToggleActive(ingredient); }} disabled={ingredient.active && inUse} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent" title={ingredient.active && inUse ? "Ingredient is used by ingredient units" : ingredient.active ? "Deactivate ingredient" : "Activate ingredient"}><Power size={15} /></button>
-                            <button type="button" onClick={(event) => { event.stopPropagation(); requestDelete(ingredient); }} disabled={inUse} className="grid size-8 place-items-center rounded-lg text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent" title={inUse ? "Ingredient is used by ingredient units" : "Delete ingredient"}><Trash2 size={15} /></button>
+                            {canWriteStockMaster && <button type="button" onClick={(event) => { event.stopPropagation(); openModal(ingredient); }} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800" title="Update ingredient"><Pencil size={15} /></button>}
+                            {canWriteStockMaster && <button type="button" onClick={(event) => { event.stopPropagation(); requestToggleActive(ingredient); }} disabled={ingredient.active && inUse} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent" title={ingredient.active && inUse ? "Ingredient is used by ingredient units" : ingredient.active ? "Deactivate ingredient" : "Activate ingredient"}><Power size={15} /></button>}
+                            {canWriteStockMaster && <button type="button" onClick={(event) => { event.stopPropagation(); requestDelete(ingredient); }} disabled={inUse} className="grid size-8 place-items-center rounded-lg text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent" title={inUse ? "Ingredient is used by ingredient units" : "Delete ingredient"}><Trash2 size={15} /></button>}
                           </div>
                         </td>
                       </tr>

@@ -22,6 +22,8 @@ import {
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import Navbar from "../../components/layout/Navbar";
 import Sidebar from "../../components/layout/Sidebar";
+import { useAuth } from "../../app/AuthContext";
+import { getUserRoleNames } from "../../app/roleAccess";
 import { formatNumber, normalizeNumberInput } from "../../utils/numberFormat";
 
 const emptyRecipeForm = { product_id: "", version: "", active: true };
@@ -32,6 +34,9 @@ function formatQuantity(value: string) {
 }
 
 export default function ProductDetailPage() {
+  const { user } = useAuth();
+  const roles = getUserRoleNames(user);
+  const canWriteRecipes = roles.includes("admin");
   const { categoryID = "", productID = "" } = useParams();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [product, setProduct] = useState<Product | null>(null);
@@ -72,7 +77,7 @@ export default function ProductDetailPage() {
         const [productResponse, recipeResponse, ingredientResponse] = await Promise.all([
           getProduct(productID),
           getRecipes({ start: 0, limit: 100, name: "", product_id: productID }),
-          getIngredients({ start: 0, limit: 100, name: "" }),
+          canWriteRecipes ? getIngredients({ start: 0, limit: 100, name: "" }) : Promise.resolve({ data: [] }),
         ]);
         if (!current) return;
         const nextProduct = productResponse.data ?? null;
@@ -100,7 +105,7 @@ export default function ProductDetailPage() {
     return () => {
       current = false;
     };
-  }, [productID, refreshKey]);
+  }, [productID, refreshKey, canWriteRecipes]);
 
   useEffect(() => {
     let current = true;
@@ -289,7 +294,9 @@ export default function ProductDetailPage() {
 
   const currentProductID = product?.product_id ?? productID;
   const backCategoryID = product?.category_id ?? categoryID;
-  const backLabel = product?.category_info?.name ?? "Category Management";
+  const hasCategoryContext = Boolean(categoryID);
+  const backPath = hasCategoryContext && backCategoryID ? `/category-management/${backCategoryID}` : "/menu-items";
+  const backLabel = hasCategoryContext ? product?.category_info?.name ?? "Menu Categories" : "Menu Items";
   const productRecipes = recipes.filter((recipe) => recipe.product_id === currentProductID);
   const selectedRecipe = productRecipes.find((recipe) => recipe.recipe_id === selectedRecipeID) ?? null;
 
@@ -299,7 +306,7 @@ export default function ProductDetailPage() {
       <section className="min-w-0 flex-1">
         <Navbar onMenuClick={() => setSidebarOpen(true)} />
         <main className="p-5 sm:p-8">
-          <Link to={backCategoryID ? `/category-management/${backCategoryID}` : "/category-management"} className="mb-5 inline-flex items-center gap-2 text-sm font-semibold text-stone-600 hover:text-stone-900">
+          <Link to={backPath} className="mb-5 inline-flex items-center gap-2 text-sm font-semibold text-stone-600 hover:text-stone-900">
             <ArrowLeft size={16} />
             {backLabel}
           </Link>
@@ -309,10 +316,10 @@ export default function ProductDetailPage() {
               <h1 className="font-serif text-3xl font-bold">{product?.name ?? "Product Detail"}</h1>
               <p className="mt-2 text-sm text-stone-500">{product?.category_info?.name ?? "No category"}</p>
             </div>
-            <button type="button" onClick={() => openRecipeModal()} className="flex items-center gap-2 rounded-lg bg-[#362219] px-5 py-3 text-sm font-semibold text-white">
+            {canWriteRecipes && <button type="button" onClick={() => openRecipeModal()} className="flex items-center gap-2 rounded-lg bg-[#362219] px-5 py-3 text-sm font-semibold text-white">
               <Plus size={17} />
               Add recipe version
-            </button>
+            </button>}
           </header>
 
           {error && <div className="mt-5 rounded-lg bg-red-50 p-4 text-sm text-red-700">{error}</div>}
@@ -352,13 +359,13 @@ export default function ProductDetailPage() {
                   <p className="text-xs text-stone-500">{selectedRecipe ? "Selected recipe version" : "Select recipe version"}</p>
                 </div>
                 <div className="flex gap-2">
-                  {selectedRecipe && <button type="button" onClick={() => openRecipeModal(selectedRecipe)} className="grid size-9 place-items-center rounded-lg border text-stone-600 hover:bg-stone-50" title="Update recipe"><Pencil size={16} /></button>}
-                  {selectedRecipe && <button type="button" onClick={() => requestToggleRecipeActive(selectedRecipe)} className="grid size-9 place-items-center rounded-lg border text-stone-600 hover:bg-stone-50" title={selectedRecipe.active ? "Deactivate recipe" : "Activate recipe"}><Power size={16} /></button>}
-                  {selectedRecipe && items.length === 0 && <button type="button" onClick={() => requestDeleteRecipe(selectedRecipe)} className="grid size-9 place-items-center rounded-lg border text-red-600 hover:bg-red-50" title="Delete recipe"><Trash2 size={16} /></button>}
-                  <button type="button" onClick={() => openItemModal()} disabled={!selectedRecipeID} className="flex items-center gap-2 rounded-lg bg-[#362219] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+                  {canWriteRecipes && selectedRecipe && <button type="button" onClick={() => openRecipeModal(selectedRecipe)} className="grid size-9 place-items-center rounded-lg border text-stone-600 hover:bg-stone-50" title="Update recipe"><Pencil size={16} /></button>}
+                  {canWriteRecipes && selectedRecipe && <button type="button" onClick={() => requestToggleRecipeActive(selectedRecipe)} className="grid size-9 place-items-center rounded-lg border text-stone-600 hover:bg-stone-50" title={selectedRecipe.active ? "Deactivate recipe" : "Activate recipe"}><Power size={16} /></button>}
+                  {canWriteRecipes && selectedRecipe && items.length === 0 && <button type="button" onClick={() => requestDeleteRecipe(selectedRecipe)} className="grid size-9 place-items-center rounded-lg border text-red-600 hover:bg-red-50" title="Delete recipe"><Trash2 size={16} /></button>}
+                  {canWriteRecipes && <button type="button" onClick={() => openItemModal()} disabled={!selectedRecipeID} className="flex items-center gap-2 rounded-lg bg-[#362219] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
                     <ListPlus size={16} />
                     Add item
-                  </button>
+                  </button>}
                 </div>
               </div>
               <div className="overflow-x-auto">
@@ -386,8 +393,8 @@ export default function ProductDetailPage() {
                           <td className="px-5 py-4 text-sm">{item.ingredient_info?.base_unit_info?.code ?? item.ingredient_info?.base_unit ?? "-"}</td>
                           <td className="px-5 py-4">
                             <div className="flex justify-end gap-1.5">
-                              <button type="button" onClick={() => openItemModal(item)} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800" title="Update item"><Pencil size={15} /></button>
-                              <button type="button" onClick={() => requestDeleteItem(item)} className="grid size-8 place-items-center rounded-lg text-red-600 hover:bg-red-50" title="Delete item"><Trash2 size={15} /></button>
+                              {canWriteRecipes && <button type="button" onClick={() => openItemModal(item)} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800" title="Update item"><Pencil size={15} /></button>}
+                              {canWriteRecipes && <button type="button" onClick={() => requestDeleteItem(item)} className="grid size-8 place-items-center rounded-lg text-red-600 hover:bg-red-50" title="Delete item"><Trash2 size={15} /></button>}
                             </div>
                           </td>
                         </tr>
