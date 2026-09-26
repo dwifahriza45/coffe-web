@@ -86,11 +86,11 @@ export default function ProductDetailPage() {
         setProduct(nextProduct);
         setRecipes(nextRecipes);
         setIngredients(ingredientResponse.data ?? []);
-        setSelectedRecipeID((currentID) =>
-          nextRecipes.some((recipe) => recipe.recipe_id === currentID)
-            ? currentID
-            : nextRecipes[0]?.recipe_id ?? "",
-        );
+        setSelectedRecipeID((currentID) => {
+          const currentRecipe = nextRecipes.find((recipe) => recipe.recipe_id === currentID);
+          if (currentRecipe?.active) return currentID;
+          return nextRecipes.find((recipe) => recipe.active)?.recipe_id ?? nextRecipes[0]?.recipe_id ?? "";
+        });
       } catch (requestError) {
         if (!current) return;
         const response = isAxiosError<{ message?: string }>(requestError)
@@ -298,6 +298,8 @@ export default function ProductDetailPage() {
   const backPath = hasCategoryContext && backCategoryID ? `/category-management/${backCategoryID}` : "/menu-items";
   const backLabel = hasCategoryContext ? product?.category_info?.name ?? "Menu Categories" : "Menu Items";
   const productRecipes = recipes.filter((recipe) => recipe.product_id === currentProductID);
+  const activeRecipes = productRecipes.filter((recipe) => recipe.active);
+  const inactiveRecipes = productRecipes.filter((recipe) => !recipe.active);
   const selectedRecipe = productRecipes.find((recipe) => recipe.recipe_id === selectedRecipeID) ?? null;
 
   return (
@@ -325,31 +327,55 @@ export default function ProductDetailPage() {
           {error && <div className="mt-5 rounded-lg bg-red-50 p-4 text-sm text-red-700">{error}</div>}
 
           <section className="mt-7 grid gap-5 xl:grid-cols-[330px_1fr]">
-            <div className="overflow-hidden rounded-xl border border-stone-200 bg-white">
-              <div className="flex items-center justify-between border-b border-stone-200 p-4">
-                <div>
-                  <h2 className="font-semibold">Recipe Versions</h2>
-                  <p className="text-xs text-stone-500">{productRecipes.length} versions</p>
+            <div className="space-y-4">
+              <div className="overflow-hidden rounded-xl border border-stone-200 bg-white">
+                <div className="flex items-center justify-between border-b border-stone-200 p-4">
+                  <div>
+                    <h2 className="font-semibold">Recipe Versions</h2>
+                    <p className="text-xs text-stone-500">{productRecipes.length} versions</p>
+                  </div>
+                  <BookOpen size={19} className="text-stone-400" />
                 </div>
-                <BookOpen size={19} className="text-stone-400" />
+                <div className="divide-y divide-stone-100">
+                  {loading ? (
+                    <p className="p-5 text-sm text-stone-500">Loading recipes...</p>
+                  ) : productRecipes.length === 0 ? (
+                    <p className="p-5 text-sm text-stone-500">No recipe version yet</p>
+                  ) : activeRecipes.length === 0 ? (
+                    <p className="p-5 text-sm text-stone-500">No active recipe</p>
+                  ) : (
+                    activeRecipes.map((recipe) => (
+                      <button key={recipe.recipe_id} type="button" onClick={() => setSelectedRecipeID(recipe.recipe_id)} className={`flex w-full items-center justify-between bg-white p-4 text-left hover:bg-stone-50 ${selectedRecipeID === recipe.recipe_id ? "ring-1 ring-inset ring-stone-300" : ""}`}>
+                        <span>
+                          <b className="block text-sm">Version {recipe.version}</b>
+                          <small className="text-stone-500">Active recipe</small>
+                        </span>
+                        <span className="rounded-full bg-green-50 px-2 py-1 text-[11px] font-semibold text-green-700">Active</span>
+                      </button>
+                    ))
+                  )}
+                </div>
               </div>
-              <div className="divide-y divide-stone-100">
-                {loading ? (
-                  <p className="p-5 text-sm text-stone-500">Loading recipes...</p>
-                ) : productRecipes.length === 0 ? (
-                  <p className="p-5 text-sm text-stone-500">No recipe version yet</p>
-                ) : (
-                  productRecipes.map((recipe) => (
-                    <button key={recipe.recipe_id} type="button" onClick={() => setSelectedRecipeID(recipe.recipe_id)} className={`flex w-full items-center justify-between p-4 text-left hover:bg-white ${recipe.active ? "bg-white" : "bg-[#f2e2d8]"} ${selectedRecipeID === recipe.recipe_id ? "ring-1 ring-inset ring-stone-300" : ""}`}>
-                      <span>
-                        <b className="block text-sm">Version {recipe.version}</b>
-                        <small className="text-stone-500">{recipe.active ? "Active recipe" : "Inactive recipe"}</small>
-                      </span>
-                      <span className={`rounded-full px-2 py-1 text-[11px] font-semibold ${recipe.active ? "bg-green-50 text-green-700" : "bg-stone-100 text-stone-500"}`}>{recipe.active ? "Active" : "Inactive"}</span>
-                    </button>
-                  ))
-                )}
-              </div>
+
+              {!loading && inactiveRecipes.length > 0 && (
+                <div className="overflow-hidden rounded-xl border border-stone-200 bg-white">
+                  <div className="border-b border-stone-200 p-4">
+                    <h2 className="font-semibold">Inactive Versions</h2>
+                    <p className="text-xs text-stone-500">{inactiveRecipes.length} inactive</p>
+                  </div>
+                  <div className="divide-y divide-stone-100">
+                    {inactiveRecipes.map((recipe) => (
+                      <button key={recipe.recipe_id} type="button" onClick={() => setSelectedRecipeID(recipe.recipe_id)} className={`flex w-full items-center justify-between bg-white p-4 text-left hover:bg-stone-50 ${selectedRecipeID === recipe.recipe_id ? "ring-1 ring-inset ring-stone-300" : ""}`}>
+                        <span>
+                          <b className="block text-sm">Version {recipe.version}</b>
+                          <small className="text-stone-500">Inactive recipe</small>
+                        </span>
+                        <span className="rounded-full bg-white px-2 py-1 text-[11px] font-semibold text-stone-500">Inactive</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="overflow-hidden rounded-xl border border-stone-200 bg-white">
