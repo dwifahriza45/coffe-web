@@ -257,14 +257,14 @@ export default function CategoryManagementPage() {
                     <th className="px-5 py-3">Description</th>
                     <th className="px-5 py-3">Usage</th>
                     <th className="px-5 py-3">Status</th>
-                    <th className="px-5 py-3 text-right">Action</th>
+                    {canWriteMenuCategories && <th className="px-5 py-3 text-right">Action</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-100">
                   {loading ? (
-                    <tr><td colSpan={5} className="px-5 py-14 text-center text-sm text-stone-500">Loading categories...</td></tr>
+                    <tr><td colSpan={canWriteMenuCategories ? 5 : 4} className="px-5 py-14 text-center text-sm text-stone-500">Loading categories...</td></tr>
                   ) : categories.length === 0 ? (
-                    <tr><td colSpan={5} className="px-5 py-14 text-center text-sm text-stone-500">No categories found</td></tr>
+                    <tr><td colSpan={canWriteMenuCategories ? 5 : 4} className="px-5 py-14 text-center text-sm text-stone-500">No categories found</td></tr>
                   ) : (
                     categories.map((category) => {
                       const inUse = Boolean(categoryUsage[category.category_id]);
@@ -285,13 +285,13 @@ export default function CategoryManagementPage() {
                             {category.active ? "Active" : "Inactive"}
                           </span>
                         </td>
-                        <td className="px-5 py-4">
+                        {canWriteMenuCategories && <td className="px-5 py-4">
                           <div className="flex justify-end gap-1.5">
                             {canWriteMenuCategories && <button type="button" onClick={(event) => { event.stopPropagation(); openModal(category); }} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800" title="Update category"><Pencil size={15} /></button>}
                             {canWriteMenuCategories && <button type="button" onClick={(event) => { event.stopPropagation(); requestToggleActive(category); }} disabled={category.active && inUse} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent" title={category.active && inUse ? "Category is used by products" : category.active ? "Deactivate category" : "Activate category"}><Power size={15} /></button>}
                             {canWriteMenuCategories && <button type="button" onClick={(event) => { event.stopPropagation(); requestDelete(category); }} disabled={inUse} className="grid size-8 place-items-center rounded-lg text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent" title={inUse ? "Category is used by products" : "Delete category"}><Trash2 size={15} /></button>}
                           </div>
-                        </td>
+                        </td>}
                       </tr>
                       );
                     })

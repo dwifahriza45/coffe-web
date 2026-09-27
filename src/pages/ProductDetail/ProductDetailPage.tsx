@@ -401,14 +401,14 @@ export default function ProductDetailPage() {
                       <th className="px-5 py-3">Ingredient</th>
                       <th className="px-5 py-3">Quantity</th>
                       <th className="px-5 py-3">Base Unit</th>
-                      <th className="px-5 py-3 text-right">Action</th>
+                      {canWriteRecipes && <th className="px-5 py-3 text-right">Action</th>}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-stone-100">
                     {itemsLoading ? (
-                      <tr><td colSpan={4} className="px-5 py-14 text-center text-sm text-stone-500">Loading items...</td></tr>
+                      <tr><td colSpan={canWriteRecipes ? 4 : 3} className="px-5 py-14 text-center text-sm text-stone-500">Loading items...</td></tr>
                     ) : items.length === 0 ? (
-                      <tr><td colSpan={4} className="px-5 py-14 text-center text-sm text-stone-500">No items found</td></tr>
+                      <tr><td colSpan={canWriteRecipes ? 4 : 3} className="px-5 py-14 text-center text-sm text-stone-500">No items found</td></tr>
                     ) : (
                       items.map((item) => (
                         <tr key={item.recipe_item_id}>
@@ -417,12 +417,12 @@ export default function ProductDetailPage() {
                           </td>
                           <td className="px-5 py-4 text-sm font-semibold">{formatQuantity(item.quantity)}</td>
                           <td className="px-5 py-4 text-sm">{item.ingredient_info?.base_unit_info?.code ?? item.ingredient_info?.base_unit ?? "-"}</td>
-                          <td className="px-5 py-4">
+                          {canWriteRecipes && <td className="px-5 py-4">
                             <div className="flex justify-end gap-1.5">
                               {canWriteRecipes && <button type="button" onClick={() => openItemModal(item)} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800" title="Update item"><Pencil size={15} /></button>}
                               {canWriteRecipes && <button type="button" onClick={() => requestDeleteItem(item)} className="grid size-8 place-items-center rounded-lg text-red-600 hover:bg-red-50" title="Delete item"><Trash2 size={15} /></button>}
                             </div>
-                          </td>
+                          </td>}
                         </tr>
                       ))
                     )}

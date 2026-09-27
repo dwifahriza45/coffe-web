@@ -286,14 +286,14 @@ export default function CategoryDetailPage() {
                     <th className="px-5 py-3">Price</th>
                     <th className="px-5 py-3">Usage</th>
                     <th className="px-5 py-3">Status</th>
-                    <th className="px-5 py-3 text-right">Action</th>
+                    {canWriteProducts && <th className="px-5 py-3 text-right">Action</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-100">
                   {loading ? (
-                    <tr><td colSpan={5} className="px-5 py-14 text-center text-sm text-stone-500">Loading products...</td></tr>
+                    <tr><td colSpan={canWriteProducts ? 5 : 4} className="px-5 py-14 text-center text-sm text-stone-500">Loading products...</td></tr>
                   ) : products.length === 0 ? (
-                    <tr><td colSpan={5} className="px-5 py-14 text-center text-sm text-stone-500">No products found</td></tr>
+                    <tr><td colSpan={canWriteProducts ? 5 : 4} className="px-5 py-14 text-center text-sm text-stone-500">No products found</td></tr>
                   ) : (
                     products.map((product) => {
                       const inUse = Boolean(productUsage[product.product_id]);
@@ -314,13 +314,13 @@ export default function CategoryDetailPage() {
                               {product.active ? "Active" : "Inactive"}
                             </span>
                           </td>
-                          <td className="px-5 py-4">
+                          {canWriteProducts && <td className="px-5 py-4">
                             <div className="flex justify-end gap-1.5">
                               {canWriteProducts && <button type="button" onClick={(event) => { event.stopPropagation(); openModal(product); }} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800" title="Update product"><Pencil size={15} /></button>}
                               {canWriteProducts && <button type="button" onClick={(event) => { event.stopPropagation(); requestToggleActive(product); }} disabled={product.active && inUse} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent" title={product.active && inUse ? "Product is used by recipes" : product.active ? "Deactivate product" : "Activate product"}><Power size={15} /></button>}
                               {canWriteProducts && <button type="button" onClick={(event) => { event.stopPropagation(); requestDelete(product); }} disabled={inUse} className="grid size-8 place-items-center rounded-lg text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent" title={inUse ? "Product is used by recipes" : "Delete product"}><Trash2 size={15} /></button>}
                             </div>
-                          </td>
+                          </td>}
                         </tr>
                       );
                     })

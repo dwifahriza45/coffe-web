@@ -1,3 +1,4 @@
+import { getDraftStockReceiptCount } from "../../api/stockReceipt.api";
 import { CalendarDays, CheckCircle2, ClipboardCheck, Lock, Plus, Search } from "lucide-react";
 import { isAxiosError } from "axios";
 import { useEffect, useState, type FormEvent } from "react";
@@ -35,6 +36,7 @@ export default function BusinessDayPage() {
   const isTodayActionOnly = !roles.includes("admin") && roles.includes("leader");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [items, setItems] = useState<BusinessDay[]>([]);
+  const [draftStockInCounts, setDraftStockInCounts] = useState<Record<string, number>>({});
   const [closingSubmitted, setClosingSubmitted] = useState<Record<string, boolean>>({});
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
@@ -79,11 +81,13 @@ export default function BusinessDayPage() {
               status: "",
               name: "",
             });
-            return [item.business_day_id, counts.data?.some((count) => count.count_type === "CLOSING" && count.status === "SUBMITTED") ?? false] as const;
+            const pending = item.status === "OPEN" ? await getDraftStockReceiptCount(item.business_day_id) : 0;
+            return [item.business_day_id, counts.data?.some((count) => count.count_type === "CLOSING" && count.status === "SUBMITTED") ?? false, pending] as const;
           }),
         );
         if (!current) return;
-        setClosingSubmitted(Object.fromEntries(statusEntries));
+        setClosingSubmitted(Object.fromEntries(statusEntries.map(([id, submitted]) => [id, submitted])));
+        setDraftStockInCounts(Object.fromEntries(statusEntries.map(([id, , pending]) => [id, pending])));
       } catch (requestError) {
         if (!current) return;
         const response = isAxiosError<{ message?: string }>(requestError)
@@ -218,7 +222,7 @@ export default function BusinessDayPage() {
                     <tr><td colSpan={7} className="px-5 py-14 text-center text-sm text-stone-500">No business days found</td></tr>
                   ) : (
                     items.map((item) => {
-                      const canClose = item.status === "OPEN" && closingSubmitted[item.business_day_id] && (!isTodayActionOnly || item.business_date === today());
+                      const canClose = item.status === "OPEN" && closingSubmitted[item.business_day_id] && draftStockInCounts[item.business_day_id] === 0 && (!isTodayActionOnly || item.business_date === today());
                       return (
                       <tr key={item.business_day_id}>
                         <td className="px-5 py-4 text-sm">{item.business_date}</td>
@@ -238,7 +242,7 @@ export default function BusinessDayPage() {
                               <ClipboardCheck size={14} />
                               Stock Count
                             </Link>
-                            <button type="button" onClick={() => requestClose(item)} disabled={!canClose || submitting} title={closingSubmitted[item.business_day_id] ? "Close business day" : "Submit closing stock first"} className="rounded-lg border px-3 py-2 text-xs font-semibold text-stone-700 hover:bg-stone-50 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent">
+                            <button type="button" onClick={() => requestClose(item)} disabled={!canClose || submitting} title={draftStockInCounts[item.business_day_id] > 0 ? "Submit all draft Stock In first" : closingSubmitted[item.business_day_id] ? "Close business day" : "Submit closing stock first"} className="rounded-lg border px-3 py-2 text-xs font-semibold text-stone-700 hover:bg-stone-50 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent">
                               Close
                             </button>
                           </div>

@@ -7,6 +7,11 @@ export interface StockReceiptUserInfo {
 }
 
 export interface StockReceipt {
+  has_items: boolean;
+  status: "DRAFT" | "SUBMITTED";
+  submitted_by?: string;
+  submitted_by_info?: StockReceiptUserInfo;
+  submitted_at?: string;
   stock_receipt_id: string;
   business_day_id: string;
   business_day_info?: {
@@ -33,6 +38,8 @@ export const getStockReceipts = async (payload: {
   limit: number;
   name: string;
   receipt_date: string;
+  business_day_id?: string;
+  status?: "DRAFT" | "SUBMITTED";
 }) => (await api.post<ApiResponse<StockReceipt[]>>("/stock-receipts/list", payload)).data;
 
 export const getStockReceipt = async (stockReceiptID: string) =>
@@ -46,3 +53,14 @@ export const updateStockReceipt = async (stockReceiptID: string, payload: StockR
 
 export const deleteStockReceipt = async (stockReceiptID: string) =>
   (await api.delete<ApiResponse<null>>(`/stock-receipts/${stockReceiptID}`)).data;
+
+export const saveStockReceiptDraft = async (stockReceiptID: string, payload: StockReceiptPayload) =>
+  (await api.patch<ApiResponse<null>>(`/stock-receipts/${stockReceiptID}/draft`, payload)).data;
+
+export const submitStockReceipt = async (stockReceiptID: string) =>
+  (await api.patch<ApiResponse<null>>(`/stock-receipts/${stockReceiptID}/submit`, {})).data;
+
+export async function getDraftStockReceiptCount(businessDayID: string) {
+  const response = await getStockReceipts({ start: 0, limit: 1, name: "", receipt_date: "", business_day_id: businessDayID, status: "DRAFT" });
+  return response.total ?? response.data?.length ?? 0;
+}

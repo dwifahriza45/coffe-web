@@ -1,5 +1,6 @@
 import {
   LayoutDashboard,
+  ArrowRightLeft,
   LockKeyhole,
   LogOut,
   CalendarDays,
@@ -9,11 +10,14 @@ import {
   PackageOpen,
   PackagePlus,
   Ruler,
+  Truck,
   Shield,
+  Search,
+  X,
   UserCog,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { logout as logoutRequest } from "../../api/auth.api";
 import { useAuth } from "../../app/AuthContext";
 import { invalidateSession } from "../../app/authSession";
@@ -27,6 +31,8 @@ export default function Sidebar({
   onClose: () => void;
 }) {
   const { user, setUser } = useAuth();
+  const [menuSearch, setMenuSearch] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const roles = getUserRoleNames(user);
@@ -46,9 +52,8 @@ export default function Sidebar({
   const canManageBusinessDays = roles.some((role) =>
     ["admin", "leader"].includes(role),
   );
-  const canReadStockCounts = roles.some((role) =>
-    ["admin", "leader", "inventory"].includes(role),
-  );
+  const showInventoryOperations =
+    roles.includes("inventory") && !canManageBusinessDays;
   const links: Array<{
     label: string;
     to: string;
@@ -104,18 +109,22 @@ export default function Sidebar({
       to: "/ingredient-management",
       icon: PackageOpen,
     });
-  if (canReadStockCounts)
+  if (canReadStockMaster)
+    inventoryMasterLinks.push({ label: "Suppliers", to: "/supplier-management", icon: Truck });
+  if (showInventoryOperations)
     inventoryOperationLinks.push({
       label: "Stock Count",
       to: "/stock-count",
       icon: ClipboardCheck,
     });
-  if (canReadStockCounts)
+  if (showInventoryOperations)
     inventoryOperationLinks.push({
       label: "Stock In",
       to: "/stock-in",
       icon: PackagePlus,
     });
+  if (showInventoryOperations)
+    inventoryOperationLinks.push({ label: "Stock Movement", to: "/stock-movements", icon: ArrowRightLeft });
   if (canReadMenuCategories)
     inventoryMenuLinks.push({
       label: "Menu Items",
@@ -128,6 +137,18 @@ export default function Sidebar({
       to: "/menu-items",
       icon: CupSoda,
     });
+  const searchTerms = menuSearch.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  function matchesMenu(label: string, group: string) {
+    const text = `${group} ${label}`.toLowerCase();
+    return searchTerms.every((term) => text.includes(term));
+  }
+  const filteredLinks = links.filter((link) => matchesMenu(link.label, ""));
+  const filteredHrisLinks = hrisLinks.filter((link) => matchesMenu(link.label, "HRIS"));
+  const filteredInventoryMasterLinks = inventoryMasterLinks.filter((link) => matchesMenu(link.label, "Master Data"));
+  const filteredInventoryOperationLinks = inventoryOperationLinks.filter((link) => matchesMenu(link.label, "Inventory"));
+  const filteredInventoryMenuLinks = inventoryMenuLinks.filter((link) => matchesMenu(link.label, "Menu"));
+  const hasMenus = [links, hrisLinks, inventoryMasterLinks, inventoryOperationLinks, inventoryMenuLinks].some((group) => group.length > 0);
+  const resultCount = [filteredLinks, filteredHrisLinks, filteredInventoryMasterLinks, filteredInventoryOperationLinks, filteredInventoryMenuLinks].reduce((total, group) => total + group.length, 0);
   async function logout() {
     setIsLoggingOut(true);
     try {
@@ -147,11 +168,36 @@ export default function Sidebar({
         className={`fixed inset-0 z-40 bg-black/50 lg:hidden ${isOpen ? "" : "hidden"}`}
       />
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex h-screen w-60 shrink-0 flex-col bg-[#211712] p-6 transition-transform duration-300 lg:sticky lg:top-0 lg:translate-x-0 ${isOpen ? "translate-x-0" : "-translate-x-full"}`}
+        className={`fixed inset-y-0 left-0 z-50 flex h-screen w-72 max-w-[calc(100vw-2rem)] shrink-0 flex-col bg-[#211712] p-6 transition-transform duration-300 lg:sticky lg:top-0 lg:translate-x-0 ${isOpen ? "translate-x-0" : "-translate-x-full"}`}
       >
         <Brand />
-        <nav className="mt-12 space-y-2">
-          {links.map(({ label, to, icon: Icon }) => (
+        {hasMenus && (
+          <div role="search" aria-label="Search sidebar menus" className="mt-7 flex shrink-0 items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-stone-400 transition focus-within:border-[#b86b42] focus-within:ring-2 focus-within:ring-[#b86b42]/20">
+            <Search size={16} className="shrink-0" aria-hidden="true" />
+            <input
+              ref={searchInputRef}
+              type="text"
+              aria-label="Search menus"
+              placeholder="Search menus..."
+              value={menuSearch}
+              onChange={(event) => setMenuSearch(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  event.stopPropagation();
+                  setMenuSearch("");
+                }
+              }}
+              className="min-w-0 flex-1 bg-transparent text-sm text-stone-100 outline-none placeholder:text-stone-500"
+            />
+            {menuSearch && (
+              <button type="button" aria-label="Clear menu search" onClick={() => { setMenuSearch(""); searchInputRef.current?.focus(); }} className="grid size-6 shrink-0 place-items-center rounded text-stone-400 transition hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-[#b86b42]">
+                <X size={14} />
+              </button>
+            )}
+          </div>
+        )}
+        <nav aria-label="Main navigation" className="sidebar-scroll mt-4 -mr-2 min-h-0 flex-1 space-y-2 overflow-y-auto pb-5 pr-2">
+          {filteredLinks.map(({ label, to, icon: Icon }) => (
             <NavLink
               key={label}
               to={to}
@@ -164,7 +210,7 @@ export default function Sidebar({
               {label}
             </NavLink>
           ))}
-          {hrisLinks.length > 0 && (
+          {filteredHrisLinks.length > 0 && (
             <div className="pt-5">
               <div className="mb-3 flex items-center gap-3 px-3">
                 <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500">
@@ -173,7 +219,7 @@ export default function Sidebar({
                 <span className="h-px flex-1 bg-white/10" />
               </div>
               <div className="space-y-2">
-                {hrisLinks.map(({ label, to, icon: Icon }) => (
+                {filteredHrisLinks.map(({ label, to, icon: Icon }) => (
                   <NavLink
                     key={label}
                     to={to}
@@ -189,9 +235,9 @@ export default function Sidebar({
               </div>
             </div>
           )}
-          {(inventoryMasterLinks.length > 0 || inventoryOperationLinks.length > 0 || inventoryMenuLinks.length > 0) && (
+          {(filteredInventoryMasterLinks.length > 0 || filteredInventoryOperationLinks.length > 0 || filteredInventoryMenuLinks.length > 0) && (
             <div className="pt-5">
-              {inventoryMasterLinks.length > 0 && (
+              {filteredInventoryMasterLinks.length > 0 && (
                 <>
                   <div className="mb-3 flex items-center gap-3 px-3">
                     <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500">
@@ -200,7 +246,7 @@ export default function Sidebar({
                     <span className="h-px flex-1 bg-white/10" />
                   </div>
                   <div className="space-y-2">
-                    {inventoryMasterLinks.map(({ label, to, icon: Icon }) => (
+                    {filteredInventoryMasterLinks.map(({ label, to, icon: Icon }) => (
                       <NavLink
                         key={label}
                         to={to}
@@ -216,7 +262,7 @@ export default function Sidebar({
                   </div>
                 </>
               )}
-              {inventoryOperationLinks.length > 0 && (
+              {filteredInventoryOperationLinks.length > 0 && (
                 <div className="pt-5">
                   <div className="mb-3 flex items-center gap-3 px-3">
                     <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500">
@@ -225,7 +271,7 @@ export default function Sidebar({
                     <span className="h-px flex-1 bg-white/10" />
                   </div>
                   <div className="space-y-2">
-                    {inventoryOperationLinks.map(({ label, to, icon: Icon }) => (
+                    {filteredInventoryOperationLinks.map(({ label, to, icon: Icon }) => (
                       <NavLink
                         key={label}
                         to={to}
@@ -241,7 +287,7 @@ export default function Sidebar({
                   </div>
                 </div>
               )}
-              {inventoryMenuLinks.length > 0 && (
+              {filteredInventoryMenuLinks.length > 0 && (
                 <div className="pt-5">
                   <div className="mb-3 flex items-center gap-3 px-3">
                     <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500">
@@ -250,7 +296,7 @@ export default function Sidebar({
                     <span className="h-px flex-1 bg-white/10" />
                   </div>
                   <div className="space-y-2">
-                    {inventoryMenuLinks.map(({ label, to, icon: Icon }) => (
+                    {filteredInventoryMenuLinks.map(({ label, to, icon: Icon }) => (
                       <NavLink
                         key={label}
                         to={to}
@@ -268,6 +314,13 @@ export default function Sidebar({
               )}
             </div>
           )}
+          {hasMenus && resultCount === 0 && (
+            <div role="status" className="rounded-xl border border-white/10 bg-white/5 px-3 py-6 text-center">
+              <Search size={22} className="mx-auto mb-3 text-stone-500" />
+              <p className="text-sm font-medium text-stone-300">No menus found</p>
+              <p className="mt-1 text-xs text-stone-400">Try another keyword.</p>
+            </div>
+          )}
         </nav>
         {links.length === 0 &&
           hrisLinks.length === 0 &&
@@ -281,7 +334,7 @@ export default function Sidebar({
             </span>
           </div>
         )}
-        <div className="mt-auto flex items-center gap-2 border-t border-white/15 pt-5 text-stone-300">
+        <div className="mt-auto flex shrink-0 items-center gap-2 border-t border-white/15 pt-5 text-stone-300">
           <span className="grid size-9 place-items-center rounded-full bg-[#b86b42] text-xs text-white">
             {user?.fullname?.slice(0, 2).toUpperCase() || "KR"}
           </span>

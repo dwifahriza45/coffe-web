@@ -1,3 +1,5 @@
+import StockMovementPage from "../pages/StockMovement/StockMovementPage";
+import SupplierManagementPage from "../pages/SupplierManagement/SupplierManagementPage";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import LoginPage from "../pages/auth/LoginPage";
 import BusinessDayPage from "../pages/BusinessDay/BusinessDayPage";
@@ -152,6 +154,8 @@ export default function AppRouter() {
             </RequireAuth>
           }
         />
+        <Route path="/supplier-management" element={<RequireAuth><RequireRole allowedRoles={["admin", "leader", "inventory"]}><SupplierManagementPage /></RequireRole></RequireAuth>} />
+        <Route path="/stock-movements" element={<RequireAuth><RequireRole allowedRoles={["admin", "leader", "inventory"]}><StockMovementPage /></RequireRole></RequireAuth>} />
         <Route
           path="/unit-management"
           element={

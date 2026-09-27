@@ -1,3 +1,4 @@
+import { getDraftStockReceiptCount } from "../../api/stockReceipt.api";
 import { ArrowLeft, Pencil, Plus, Trash2, X } from "lucide-react";
 import { isAxiosError } from "axios";
 import { useEffect, useState, type FormEvent } from "react";
@@ -36,12 +37,15 @@ export default function InventoryCountDetailPage() {
   const canSubmit = roles.some((role) => ["admin", "leader"].includes(role));
   const { businessDayID = "", inventoryCountID = "" } = useParams();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [draftStockInCount, setDraftStockInCount] = useState<number | null>(null);
   const [count, setCount] = useState<InventoryCount | null>(null);
   const [items, setItems] = useState<InventoryCountItem[]>([]);
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [savingDraft, setSavingDraft] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryCountItem | null>(null);
   const [itemForm, setItemForm] = useState(emptyItemForm);
@@ -59,6 +63,7 @@ export default function InventoryCountDetailPage() {
     let current = true;
     async function loadDetail() {
       setLoading(true);
+      setDraftStockInCount(null);
       setError("");
       try {
         const [countResponse, itemResponse, ingredientResponse] = await Promise.all([
@@ -68,6 +73,9 @@ export default function InventoryCountDetailPage() {
         ]);
         if (!current) return;
         const nextCount = countResponse.data ?? null;
+        const pending = nextCount?.count_type === "CLOSING" ? await getDraftStockReceiptCount(nextCount.business_day_id) : 0;
+        if (!current) return;
+        setDraftStockInCount(pending);
         setCount(nextCount);
         setNotes(nextCount?.notes ?? "");
         setItems(itemResponse.data ?? []);
@@ -100,11 +108,15 @@ export default function InventoryCountDetailPage() {
   }
 
   async function saveDraft() {
+    if (!canMutateDraft || submitting || loading) return;
+    setSavingDraft(true);
+    setNotice("");
     setSubmitting(true);
     setError("");
     try {
       await saveInventoryCountDraft(inventoryCountID, { notes });
-      setRefreshKey((value) => value + 1);
+      setCount((current) => current ? { ...current, notes } : current);
+      setNotice("Draft saved successfully.");
     } catch (requestError) {
       const response = isAxiosError<{ message?: string }>(requestError)
         ? requestError.response?.data
@@ -112,10 +124,13 @@ export default function InventoryCountDetailPage() {
       setError(response?.message || "Could not save draft.");
     } finally {
       setSubmitting(false);
+      setSavingDraft(false);
     }
   }
 
   function requestSubmit() {
+    if (loading || draftStockInCount === null || draftStockInCount > 0) return;
+    setNotice("");
     setConfirm({
       title: `Submit ${countTitle(count?.count_type)}`,
       message: "Submit this stock count?",
@@ -125,6 +140,7 @@ export default function InventoryCountDetailPage() {
         setSubmitting(true);
         try {
           await submitInventoryCount(inventoryCountID);
+          setNotice("Stock count submitted successfully.");
           setRefreshKey((value) => value + 1);
         } catch (requestError) {
           const response = isAxiosError<{ message?: string }>(requestError)
@@ -217,17 +233,26 @@ export default function InventoryCountDetailPage() {
                   <span className="rounded-full bg-stone-100 px-2.5 py-1 text-stone-600">Submitted at {formatDateTime(count?.counted_at)}</span>
                 </div>
               </div>
-              <div className="flex gap-2">
-                <button type="button" onClick={() => void saveDraft()} disabled={!canMutateDraft || submitting} className="rounded-lg border border-stone-300 px-4 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent">Save Draft</button>
-                {canSubmit && <button type="button" onClick={requestSubmit} disabled={locked || submitting} className="rounded-lg bg-[#362219] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Submit</button>}
-              </div>
             </div>
 
             <label className="mt-5 block text-sm font-semibold text-stone-700">
               Notes
-              <textarea value={notes} onChange={(event) => setNotes(event.target.value)} disabled={!canMutateDraft || submitting} placeholder="Example: counted after morning prep, all dry goods checked." className="mt-2 min-h-24 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm font-normal outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10 disabled:bg-stone-100" />
+              <textarea value={notes} onChange={(event) => { setNotes(event.target.value); setNotice(""); }} disabled={!canMutateDraft || submitting || loading} placeholder="Example: counted after morning prep, all dry goods checked." className="mt-2 min-h-24 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm font-normal outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10 disabled:bg-stone-100" />
             </label>
+
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <button type="button" onClick={() => void saveDraft()} disabled={!canMutateDraft || submitting || loading} className="rounded-lg border border-stone-300 px-4 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent">{savingDraft ? "Saving..." : "Save Draft"}</button>
+              {canSubmit && <button type="button" onClick={requestSubmit} disabled={locked || submitting || loading || draftStockInCount === null || draftStockInCount > 0} className="rounded-lg bg-[#362219] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Submit</button>}
+            </div>
+            {notice && <p role="status" className="mt-3 text-sm text-emerald-700">{notice}</p>}
           </section>
+
+          {!locked && draftStockInCount !== null && draftStockInCount > 0 && (
+            <div role="status" className="mt-5 rounded-lg bg-amber-50 p-4 text-sm text-amber-800">
+              {draftStockInCount} Stock In record(s) are still DRAFT. Submit all Stock In for this business day before submitting Closing Stock.
+              <Link to={`/stock-in?${new URLSearchParams({ businessDayID: count?.business_day_id ?? businessDayID, date: count?.business_day_info?.business_date ?? "" })}`} className="ml-2 font-semibold underline">Open Stock In</Link>
+            </div>
+          )}
 
           {error && <div className="mt-5 rounded-lg bg-red-50 p-4 text-sm text-red-700">{error}</div>}
 

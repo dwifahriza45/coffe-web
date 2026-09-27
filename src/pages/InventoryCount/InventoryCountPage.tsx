@@ -1,4 +1,4 @@
-import { ArrowLeft, ClipboardCheck } from "lucide-react";
+import { ArrowLeft, ClipboardCheck, PackagePlus } from "lucide-react";
 import { isAxiosError } from "axios";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
@@ -108,6 +108,32 @@ export default function InventoryCountPage() {
     return order[first.count_type] - order[second.count_type];
   });
 
+  function renderCount(item: InventoryCount) {
+    return (
+                <Link key={item.inventory_count_id} to={businessDayID ? `/business-days/${businessDayID}/inventory-counts/${item.inventory_count_id}` : `/stock-count/${item.inventory_count_id}`} className="group grid gap-4 rounded-xl border border-stone-200 bg-white p-5 transition hover:border-stone-300 hover:bg-stone-50/60 sm:grid-cols-[1fr_auto] sm:items-center">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h2 className="text-base font-semibold transition-colors group-hover:text-[#92502f]">{countTitle(item.count_type)}</h2>
+                      <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${item.status === "SUBMITTED" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
+                        {item.status}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-sm text-stone-500">{countDescription(item.count_type)}</p>
+                    {!businessDayID && <p className="mt-1 text-xs font-semibold text-stone-400">{item.business_day_info?.business_date ?? item.business_day_id}</p>}
+                    <dl className="mt-4 grid gap-2 text-sm sm:grid-cols-[92px_minmax(0,1fr)_96px_minmax(0,1fr)]">
+                      <dt className="text-stone-500">Counted by</dt>
+                      <dd className="font-medium text-stone-800">{item.counted_by_info?.fullname ?? item.counted_by ?? "-"}</dd>
+                      <dt className="text-stone-500">Submitted</dt>
+                      <dd className="font-medium text-stone-800">{formatDateTime(item.counted_at)}</dd>
+                    </dl>
+                  </div>
+                  <span className="inline-flex w-fit items-center justify-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-semibold text-stone-700 transition group-hover:border-[#92502f] group-hover:text-[#92502f]">
+                    {item.status === "SUBMITTED" ? "View" : "Open"}
+                  </span>
+                </Link>
+    );
+  }
+
   return (
     <div className="flex min-h-screen bg-[#f8f5f0]">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
@@ -133,32 +159,24 @@ export default function InventoryCountPage() {
             {loading ? (
               <div className="rounded-xl border border-stone-200 bg-white p-6 text-sm text-stone-500">Loading stock counts...</div>
             ) : items.length === 0 ? (
-              <div className="rounded-xl border border-stone-200 bg-white p-6 text-sm text-stone-500">No stock counts found for today</div>
+              <div className="rounded-xl border border-stone-200 bg-white p-6 text-sm text-stone-500">No stock counts found for this date</div>
             ) : (
-              orderedItems.map((item) => (
-                <Link key={item.inventory_count_id} to={businessDayID ? `/business-days/${businessDayID}/inventory-counts/${item.inventory_count_id}` : `/stock-count/${item.inventory_count_id}`} className="group grid gap-4 rounded-xl border border-stone-200 bg-white p-5 transition hover:border-stone-300 hover:bg-stone-50/60 sm:grid-cols-[1fr_auto] sm:items-center">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="text-base font-semibold transition-colors group-hover:text-[#92502f]">{countTitle(item.count_type)}</h2>
-                      <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${item.status === "SUBMITTED" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
-                        {item.status}
-                      </span>
-                    </div>
-                    <p className="mt-1 text-sm text-stone-500">{countDescription(item.count_type)}</p>
-                    {!businessDayID && <p className="mt-1 text-xs font-semibold text-stone-400">{item.business_day_info?.business_date ?? item.business_day_id}</p>}
-                    <dl className="mt-4 grid gap-2 text-sm sm:grid-cols-[92px_minmax(0,1fr)_96px_minmax(0,1fr)]">
-                      <dt className="text-stone-500">Counted by</dt>
-                      <dd className="font-medium text-stone-800">{item.counted_by_info?.fullname ?? item.counted_by ?? "-"}</dd>
-                      <dt className="text-stone-500">Submitted</dt>
-                      <dd className="font-medium text-stone-800">{formatDateTime(item.counted_at)}</dd>
-                    </dl>
-                  </div>
-                  <span className="inline-flex w-fit items-center justify-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-semibold text-stone-700 transition group-hover:border-[#92502f] group-hover:text-[#92502f]">
-                    {item.status === "SUBMITTED" ? "View" : "Open"}
-                  </span>
-                </Link>
-              ))
+              orderedItems.filter((item) => item.count_type === "OPENING").map(renderCount)
             )}
+            {businessDayID && businessDay && (
+              <Link to={`/stock-in?businessDayID=${encodeURIComponent(businessDayID)}&date=${businessDay.business_date}`} className="group flex items-center justify-between gap-4 rounded-xl border border-stone-200 bg-white p-5 transition hover:border-stone-300 hover:bg-stone-50/60">
+                <div>
+                  <h2 className="flex items-center gap-2 text-base font-semibold"><PackagePlus size={19} /> Stock In</h2>
+                  <p className="mt-1 text-sm text-stone-500">Incoming stock for this business day</p>
+                </div>
+                <span className="rounded-lg border border-stone-300 px-4 py-2 text-sm font-semibold text-stone-700">Open</span>
+              </Link>
+            )}
+            <Link to={businessDayID ? `/stock-movements?businessDayID=${encodeURIComponent(businessDayID)}` : "/stock-movements"} className="group flex items-center justify-between gap-4 rounded-xl border border-stone-200 bg-white p-5 hover:bg-stone-50">
+              <div><h2 className="text-base font-semibold">Stock Movement</h2><p className="mt-1 text-sm text-stone-500">Quantity ledger for this business day</p></div>
+              <span className="rounded-lg border border-stone-300 px-4 py-2 text-sm font-semibold text-stone-700">View</span>
+            </Link>
+            {!loading && orderedItems.filter((item) => item.count_type === "CLOSING").map(renderCount)}
           </section>
         </main>
       </section>

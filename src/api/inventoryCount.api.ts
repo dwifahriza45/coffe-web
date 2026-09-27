@@ -39,3 +39,9 @@ export const submitInventoryCount = async (inventoryCountID: string) =>
 
 export const saveInventoryCountDraft = async (inventoryCountID: string, payload: { notes: string }) =>
   (await api.patch<ApiResponse<null>>(`/inventory-counts/${inventoryCountID}/draft`, payload)).data;
+
+export async function isOpeningStockSubmitted(businessDayID: string) {
+  if (!businessDayID) return false;
+  const response = await getInventoryCounts({ start: 0, limit: 1, business_day_id: businessDayID, count_type: "OPENING", status: "SUBMITTED", name: "" });
+  return (response.data ?? []).some((count) => count.business_day_id === businessDayID && count.count_type === "OPENING" && count.status === "SUBMITTED");
+}

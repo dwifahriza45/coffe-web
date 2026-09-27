@@ -1,9 +1,11 @@
+import SupplierSelect from "../../components/suppliers/SupplierSelect";
+import { isOpeningStockSubmitted } from "../../api/inventoryCount.api";
 import { isAxiosError } from "axios";
 import { ArrowLeft, PackagePlus, Pencil, Plus, Trash2, X } from "lucide-react";
-import { useEffect, useState, type FormEvent } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { Link, Navigate, useParams, useSearchParams } from "react-router-dom";
 import { getIngredients, type Ingredient } from "../../api/ingredient.api";
-import { getStockReceipt, type StockReceipt } from "../../api/stockReceipt.api";
+import { getStockReceipt, saveStockReceiptDraft, submitStockReceipt, type StockReceipt, type StockReceiptPayload } from "../../api/stockReceipt.api";
 import {
   createStockReceiptItem,
   deleteStockReceiptItem,
@@ -17,6 +19,10 @@ import Navbar from "../../components/layout/Navbar";
 import Sidebar from "../../components/layout/Sidebar";
 import { formatNumber, normalizeNumberInput } from "../../utils/numberFormat";
 
+import { useAuth } from "../../app/AuthContext";
+import { getUserRoleNames } from "../../app/roleAccess";
+import { currentBusinessDate } from "../../utils/businessDate";
+
 const emptyForm: StockReceiptItemPayload = { stock_receipt_id: "", ingredient_id: "", quantity: "", notes: "" };
 
 function formatDate(value?: string) {
@@ -24,18 +30,31 @@ function formatDate(value?: string) {
 }
 
 export default function StockReceiptDetailPage() {
+  const { user } = useAuth();
+  const roles = getUserRoleNames(user);
+  const requiresOpening = roles.some((role) => ["admin", "leader"].includes(role));
+  const [openingSubmitted, setOpeningSubmitted] = useState(false);
+  const todayOnly = roles.includes("inventory") && !roles.some((role) => ["admin", "leader"].includes(role));
+  const [searchParams] = useSearchParams();
+  const contextQuery = !todayOnly && searchParams.get("businessDayID") ? `?${searchParams}` : "";
   const { stockReceiptID = "" } = useParams();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [receipt, setReceipt] = useState<StockReceipt | null>(null);
+  const [draft, setDraft] = useState<StockReceiptPayload>({ supplier_name: "", notes: "" });
+  const loadedReceiptID = useRef("");
+  const [notice, setNotice] = useState("");
   const [items, setItems] = useState<StockReceiptItem[]>([]);
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [supplierError, setSupplierError] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<StockReceiptItem | null>(null);
   const [form, setForm] = useState<StockReceiptItemPayload>(emptyForm);
   const [submitting, setSubmitting] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const locked = receipt?.status === "SUBMITTED";
+  const canWrite = !loading && !submitting && receipt?.status === "DRAFT" && (!requiresOpening || openingSubmitted);
   const [confirm, setConfirm] = useState<{
     title: string;
     message: string;
@@ -48,6 +67,7 @@ export default function StockReceiptDetailPage() {
     let current = true;
     async function loadDetail() {
       setLoading(true);
+      setOpeningSubmitted(false);
       setError("");
       try {
         const [receiptResponse, itemResponse, ingredientResponse] = await Promise.all([
@@ -56,7 +76,14 @@ export default function StockReceiptDetailPage() {
           getIngredients({ start: 0, limit: 100, name: "" }),
         ]);
         if (!current) return;
+        const submitted = requiresOpening ? await isOpeningStockSubmitted(receiptResponse.data?.business_day_id ?? "") : false;
+        if (!current) return;
+        setOpeningSubmitted(submitted);
         setReceipt(receiptResponse.data ?? null);
+        if (receiptResponse.data && loadedReceiptID.current !== stockReceiptID) {
+          loadedReceiptID.current = stockReceiptID;
+          setDraft({ supplier_name: receiptResponse.data.supplier_name, notes: receiptResponse.data.notes });
+        }
         setItems(itemResponse.data ?? []);
         setIngredients((ingredientResponse.data ?? []).filter((ingredient) => ingredient.active));
       } catch (requestError) {
@@ -71,9 +98,36 @@ export default function StockReceiptDetailPage() {
     return () => {
       current = false;
     };
-  }, [stockReceiptID, refreshKey]);
+  }, [stockReceiptID, refreshKey, requiresOpening]);
+
+  async function saveReceipt(submit = false) {
+    if (!draft.supplier_name.trim()) { setSupplierError("Please select a supplier."); setNotice(""); return; }
+    if (!canWrite) return;
+    setConfirm(null);
+    setSubmitting(true);
+    setError("");
+    setNotice("");
+    try {
+      await saveStockReceiptDraft(stockReceiptID, draft);
+      if (submit) await submitStockReceipt(stockReceiptID);
+      setNotice(submit ? "Stock in submitted successfully." : "Draft saved successfully.");
+      setRefreshKey((value) => value + 1);
+    } catch (requestError) {
+      const response = isAxiosError<{ message?: string }>(requestError) ? requestError.response?.data : undefined;
+      setError(response?.message || "Could not save stock in.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function requestSubmitReceipt() {
+    if (!draft.supplier_name.trim()) { setSupplierError("Please select a supplier."); setNotice(""); return; }
+    if (!canWrite) return;
+    setConfirm({ title: "Submit stock in", message: "Submit this stock in? After submitting, this record and its items cannot be edited or deleted.", confirmText: "Submit", onConfirm: () => saveReceipt(true) });
+  }
 
   function openItemModal(item?: StockReceiptItem) {
+    if (!canWrite) return;
     setEditingItem(item ?? null);
     setForm(item ? {
       stock_receipt_id: item.stock_receipt_id,
@@ -86,6 +140,7 @@ export default function StockReceiptDetailPage() {
 
   function submitItem(event: FormEvent) {
     event.preventDefault();
+    if (!canWrite) return;
     if (!form.ingredient_id || !form.quantity) return;
     setConfirm({
       title: editingItem ? "Update item" : "Add item",
@@ -96,6 +151,7 @@ export default function StockReceiptDetailPage() {
   }
 
   async function submitItemConfirmed() {
+    if (!canWrite) return;
     setConfirm(null);
     setSubmitting(true);
     try {
@@ -112,6 +168,7 @@ export default function StockReceiptDetailPage() {
   }
 
   function requestDelete(item: StockReceiptItem) {
+    if (!canWrite) return;
     setConfirm({
       title: "Delete item",
       message: "Delete this received item?",
@@ -133,13 +190,17 @@ export default function StockReceiptDetailPage() {
     });
   }
 
+  if (todayOnly && receipt && receipt.receipt_date !== currentBusinessDate()) {
+    return <Navigate to="/stock-in" replace />;
+  }
+
   return (
     <div className="flex min-h-screen bg-[#f8f5f0]">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <section className="min-w-0 flex-1">
         <Navbar onMenuClick={() => setSidebarOpen(true)} />
         <main className="p-5 sm:p-8">
-          <Link to="/stock-in" className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-stone-600 hover:text-stone-900">
+          <Link to={`/stock-in${contextQuery}`} className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-stone-600 hover:text-stone-900">
             <ArrowLeft size={17} />
             Stock In
           </Link>
@@ -155,14 +216,33 @@ export default function StockReceiptDetailPage() {
                 <div className="mt-4 grid gap-2 text-sm sm:grid-cols-[100px_minmax(0,1fr)]">
                   <span className="text-stone-500">Date</span>
                   <span className="font-medium">{formatDate(receipt?.receipt_date)}</span>
-                  <span className="text-stone-500">Supplier</span>
-                  <span className="font-medium">{receipt?.supplier_name || "-"}</span>
-                  <span className="text-stone-500">Notes</span>
-                  <span className="font-medium">{receipt?.notes || "-"}</span>
                 </div>
               </div>
             </div>
+            <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold">
+              <span className={`rounded-full px-2.5 py-1 ${locked ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>{receipt?.status ?? "DRAFT"}</span>
+              <span className="rounded-full bg-stone-100 px-2.5 py-1 text-stone-600">Submitted by {receipt?.submitted_by_info?.fullname || receipt?.submitted_by || "-"}</span>
+              <span className="rounded-full bg-stone-100 px-2.5 py-1 text-stone-600">Submitted at {receipt?.submitted_at ? new Date(receipt.submitted_at).toLocaleString("en-GB") : "-"}</span>
+            </div>
+            <label className="mt-5 block text-sm font-semibold text-stone-700">
+              Supplier *
+              <SupplierSelect value={draft.supplier_name} onChange={(supplier_name) => { setDraft((current) => ({ ...current, supplier_name })); setSupplierError(""); }} disabled={!canWrite} />
+                {supplierError && <span role="alert" className="mt-2 block text-xs text-red-600">{supplierError}</span>}
+            </label>
+            <label className="mt-5 block text-sm font-semibold text-stone-700">
+              Notes
+              <textarea value={draft.notes} onChange={(event) => setDraft((current) => ({ ...current, notes: event.target.value }))} disabled={!canWrite} placeholder="Example: delivery received complete, invoice checked." className="mt-2 min-h-24 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm font-normal outline-none focus:border-[#b86b42] disabled:bg-stone-100" />
+            </label>
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <button type="button" onClick={() => void saveReceipt()} disabled={!canWrite} className="rounded-lg border border-stone-300 px-4 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40">Save Draft</button>
+              <button type="button" onClick={requestSubmitReceipt} disabled={!canWrite} className="rounded-lg bg-[#362219] px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40">Submit</button>
+            </div>
+            {notice && <p role="status" className="mt-3 text-sm text-emerald-700">{notice}</p>}
           </section>
+
+          {!loading && !locked && requiresOpening && !openingSubmitted && <div className="mt-5 rounded-lg bg-amber-50 p-4 text-sm text-amber-800">Submit Opening Stock before adding or changing stock in.</div>}
+
+          {locked && <p className="mt-5 rounded-lg bg-stone-100 p-4 text-sm text-stone-600">This stock in has been submitted and can no longer be changed.</p>}
 
           {error && <div className="mt-5 rounded-lg bg-red-50 p-4 text-sm text-red-700">{error}</div>}
 
@@ -172,7 +252,7 @@ export default function StockReceiptDetailPage() {
                 <h2 className="font-semibold">Stock Receipt Items</h2>
                 <p className="text-xs text-stone-500">{items.length} items</p>
               </div>
-              <button type="button" onClick={() => openItemModal()} className="flex items-center gap-2 rounded-lg bg-[#362219] px-4 py-2 text-sm font-semibold text-white">
+              <button type="button" onClick={() => openItemModal()} disabled={!canWrite} className="disabled:cursor-not-allowed disabled:opacity-40 flex items-center gap-2 rounded-lg bg-[#362219] px-4 py-2 text-sm font-semibold text-white">
                 <Plus size={16} />
                 Add item
               </button>
@@ -195,12 +275,12 @@ export default function StockReceiptDetailPage() {
                   ) : items.map((item) => (
                     <tr key={item.stock_receipt_item_id}>
                       <td className="px-5 py-4 text-sm font-semibold">{item.ingredient_info?.name ?? item.ingredient_id}</td>
-                      <td className="px-5 py-4 text-sm">{formatNumber(item.quantity, 3)}</td>
+                      <td className="px-5 py-4 text-sm">{formatNumber(item.quantity, 3)} <span className="text-stone-500">{item.ingredient_info?.base_unit_info?.code}</span></td>
                       <td className="px-5 py-4 text-sm text-stone-600">{item.notes || "-"}</td>
                       <td className="px-5 py-4">
                         <div className="flex justify-end gap-1.5">
-                          <button type="button" onClick={() => openItemModal(item)} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-900"><Pencil size={15} /></button>
-                          <button type="button" onClick={() => requestDelete(item)} className="grid size-8 place-items-center rounded-lg text-red-600 hover:bg-red-50"><Trash2 size={15} /></button>
+                          <button type="button" onClick={() => openItemModal(item)} disabled={!canWrite} className="disabled:cursor-not-allowed disabled:opacity-40 grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-900"><Pencil size={15} /></button>
+                          <button type="button" onClick={() => requestDelete(item)} disabled={!canWrite} className="disabled:cursor-not-allowed disabled:opacity-40 grid size-8 place-items-center rounded-lg text-red-600 hover:bg-red-50"><Trash2 size={15} /></button>
                         </div>
                       </td>
                     </tr>
@@ -228,7 +308,7 @@ export default function StockReceiptDetailPage() {
                 </select>
               </label>
               <label className="block text-sm font-semibold text-stone-700">
-                Quantity
+                Quantity ({ingredients.find((ingredient) => ingredient.ingredient_id === form.ingredient_id)?.base_unit_info?.code || "base unit"})
                 <input inputMode="decimal" value={formatNumber(form.quantity, 3)} onChange={(event) => setForm((current) => ({ ...current, quantity: normalizeNumberInput(event.target.value) }))} required className="mt-2 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10" />
               </label>
               <label className="block text-sm font-semibold text-stone-700">
@@ -238,7 +318,7 @@ export default function StockReceiptDetailPage() {
             </div>
             <footer className="flex justify-end gap-3 border-t border-stone-200 p-5">
               <button type="button" onClick={() => setModalOpen(false)} className="rounded-lg border border-stone-300 px-4 py-2.5 text-sm font-semibold hover:bg-stone-50">Cancel</button>
-              <button type="submit" disabled={submitting} className="rounded-lg bg-[#362219] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">{submitting ? "Saving..." : "Save"}</button>
+              <button type="submit" disabled={submitting || !canWrite} className="rounded-lg bg-[#362219] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">{submitting ? "Saving..." : "Save"}</button>
             </footer>
           </form>
         </div>
