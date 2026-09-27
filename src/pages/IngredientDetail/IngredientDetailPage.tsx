@@ -208,6 +208,8 @@ export default function IngredientDetailPage() {
     });
   }
 
+  const columnCount = canWriteStockMaster ? 4 : 3;
+
   return (
     <div className="flex min-h-screen bg-[#f8f5f0]">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
@@ -248,14 +250,14 @@ export default function IngredientDetailPage() {
                     <th className="px-5 py-3">Unit</th>
                     <th className="px-5 py-3">Conversion</th>
                     <th className="px-5 py-3">Status</th>
-                    <th className="px-5 py-3 text-right">Action</th>
+                    {canWriteStockMaster && <th className="px-5 py-3 text-right">Action</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-100">
                   {loading ? (
-                    <tr><td colSpan={4} className="px-5 py-14 text-center text-sm text-stone-500">Loading unit conversions...</td></tr>
+                    <tr><td colSpan={columnCount} className="px-5 py-14 text-center text-sm text-stone-500">Loading unit conversions...</td></tr>
                   ) : items.length === 0 ? (
-                    <tr><td colSpan={4} className="px-5 py-14 text-center text-sm text-stone-500">No unit conversions found</td></tr>
+                    <tr><td colSpan={columnCount} className="px-5 py-14 text-center text-sm text-stone-500">No unit conversions found</td></tr>
                   ) : (
                     items.map((item) => (
                       <tr key={item.ingredient_unit_id}>
@@ -269,13 +271,13 @@ export default function IngredientDetailPage() {
                             {item.active ? "Active" : "Inactive"}
                           </span>
                         </td>
-                        <td className="px-5 py-4">
+                        {canWriteStockMaster && <td className="px-5 py-4">
                           <div className="flex justify-end gap-1.5">
-                            {canWriteStockMaster && <button type="button" onClick={() => openModal(item)} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800" title="Update ingredient unit"><Pencil size={15} /></button>}
-                            {canWriteStockMaster && <button type="button" onClick={() => requestToggleActive(item)} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800" title={item.active ? "Deactivate ingredient unit" : "Activate ingredient unit"}><Power size={15} /></button>}
-                            {canWriteStockMaster && <button type="button" onClick={() => requestDelete(item)} className="grid size-8 place-items-center rounded-lg text-red-600 hover:bg-red-50" title="Delete ingredient unit"><Trash2 size={15} /></button>}
+                            <button type="button" onClick={() => openModal(item)} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800" title="Update ingredient unit"><Pencil size={15} /></button>
+                            <button type="button" onClick={() => requestToggleActive(item)} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800" title={item.active ? "Deactivate ingredient unit" : "Activate ingredient unit"}><Power size={15} /></button>
+                            <button type="button" onClick={() => requestDelete(item)} className="grid size-8 place-items-center rounded-lg text-red-600 hover:bg-red-50" title="Delete ingredient unit"><Trash2 size={15} /></button>
                           </div>
-                        </td>
+                        </td>}
                       </tr>
                     ))
                   )}

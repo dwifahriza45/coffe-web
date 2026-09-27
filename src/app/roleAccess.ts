@@ -5,7 +5,7 @@ export const ROLE_HOME_ROUTES = [
   { roles: ["ballista"], route: "/category-management" },
   { roles: ["leader"], route: "/business-days" },
   { roles: ["hris_admin"], route: "/user-management" },
-  { roles: ["inventory"], route: "/unit-management" },
+  { roles: ["inventory"], route: "/stock-count" },
 ] as const;
 
 export const getUserRoleNames = (user: AuthenticatedUser | null) =>

@@ -1,4 +1,4 @@
-import { ArrowLeft, ClipboardCheck, Search } from "lucide-react";
+import { ArrowLeft, ClipboardCheck } from "lucide-react";
 import { isAxiosError } from "axios";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
@@ -7,18 +7,42 @@ import { getInventoryCounts, type InventoryCount } from "../../api/inventoryCoun
 import Navbar from "../../components/layout/Navbar";
 import Sidebar from "../../components/layout/Sidebar";
 
-const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50];
+function formatDateTime(value?: string) {
+  return value ? new Date(value).toLocaleString("en-GB") : "-";
+}
+
+function formatBusinessDate(value?: string) {
+  if (!value) return "";
+  return new Date(`${value}T00:00:00`).toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
+}
+
+function today() {
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function countTitle(type: InventoryCount["count_type"]) {
+  return type === "OPENING" ? "Opening Stock" : "Closing Stock";
+}
+
+function countDescription(type: InventoryCount["count_type"]) {
+  return type === "OPENING"
+    ? "Physical stock before operational activities"
+    : "Physical stock after operational activities";
+}
 
 export default function InventoryCountPage() {
   const { businessDayID = "" } = useParams();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [items, setItems] = useState<InventoryCount[]>([]);
   const [businessDay, setBusinessDay] = useState<BusinessDay | null>(null);
-  const [searchInput, setSearchInput] = useState("");
-  const [search, setSearch] = useState("");
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
-  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -29,23 +53,24 @@ export default function InventoryCountPage() {
       setError("");
       try {
         const response = await getInventoryCounts({
-          start: (page - 1) * pageSize,
-          limit: pageSize,
+          start: 0,
+          limit: businessDayID ? 10 : 100,
           business_day_id: businessDayID,
           count_type: "",
           status: "",
-          name: search,
+          name: "",
         });
         if (!current) return;
-        setItems(response.data ?? []);
-        setTotal(response.total ?? 0);
+        const nextItems = businessDayID
+          ? response.data ?? []
+          : (response.data ?? []).filter((item) => item.business_day_info?.business_date === today());
+        setItems(nextItems);
       } catch (requestError) {
         if (!current) return;
         const response = isAxiosError<{ message?: string }>(requestError)
           ? requestError.response?.data
           : undefined;
         setItems([]);
-        setTotal(0);
         setError(response?.message || "Could not load inventory counts.");
       } finally {
         if (current) setLoading(false);
@@ -55,11 +80,15 @@ export default function InventoryCountPage() {
     return () => {
       current = false;
     };
-  }, [businessDayID, page, pageSize, search]);
+  }, [businessDayID]);
 
   useEffect(() => {
     let current = true;
     async function loadBusinessDay() {
+      if (!businessDayID) {
+        setBusinessDay(null);
+        return;
+      }
       try {
         const response = await getBusinessDays({ start: 0, limit: 100, status: "", business_date: "" });
         const found = response.data?.find((day) => day.business_day_id === businessDayID) ?? null;
@@ -74,7 +103,10 @@ export default function InventoryCountPage() {
     };
   }, [businessDayID]);
 
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const orderedItems = [...items].sort((first, second) => {
+    const order = { OPENING: 0, CLOSING: 1 };
+    return order[first.count_type] - order[second.count_type];
+  });
 
   return (
     <div className="flex min-h-screen bg-[#f8f5f0]">
@@ -83,78 +115,50 @@ export default function InventoryCountPage() {
         <Navbar onMenuClick={() => setSidebarOpen(true)} />
         <main className="p-5 sm:p-8">
           <header>
-            <Link to="/business-days" className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-stone-600 hover:text-stone-900">
-              <ArrowLeft size={17} />
-              Business Days
-            </Link>
+            {businessDayID && (
+              <Link to="/business-days" className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-stone-600 hover:text-stone-900">
+                <ArrowLeft size={17} />
+                Business Days
+              </Link>
+            )}
             <div className="mb-3 flex size-11 items-center justify-center rounded-xl bg-[#e8efe5] text-[#547144]">
               <ClipboardCheck size={22} />
             </div>
-            <h1 className="font-serif text-3xl font-bold">Inventory Counts</h1>
-            <p className="mt-2 text-sm text-stone-500">{businessDay?.business_date ?? businessDayID}</p>
+            <h1 className="font-serif text-3xl font-bold">Stock Count</h1>
+            <p className="mt-2 text-sm text-stone-500">{formatBusinessDate(businessDay?.business_date) || (businessDayID ? businessDayID : formatBusinessDate(today()))}</p>
           </header>
 
-          <section className="mt-7 overflow-hidden rounded-xl border border-stone-200 bg-white">
-            <div className="flex flex-col gap-4 border-b border-stone-200 p-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h2 className="font-semibold">Count documents</h2>
-                <p className="text-xs text-stone-500">{total} counts found</p>
-              </div>
-              <form onSubmit={(event) => { event.preventDefault(); setPage(1); setSearch(searchInput.trim()); }} className="flex w-full max-w-sm items-center gap-2 rounded-lg border border-stone-200 px-3 py-2.5 focus-within:border-[#b86b42] focus-within:ring-4 focus-within:ring-[#b86b42]/10">
-                <Search size={17} className="text-stone-400" />
-                <input value={searchInput} onChange={(event) => setSearchInput(event.target.value)} className="min-w-0 flex-1 bg-transparent text-sm outline-none" placeholder="Search count..." />
-              </form>
-            </div>
-            {error && <div className="m-4 rounded-lg bg-red-50 p-4 text-sm text-red-700">{error}</div>}
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-170 text-left">
-                <thead className="bg-stone-50 text-xs uppercase tracking-wider text-stone-500">
-                  <tr>
-                    <th className="px-5 py-3">Type</th>
-                    <th className="px-5 py-3">Status</th>
-                    <th className="px-5 py-3">Counted By</th>
-                    <th className="px-5 py-3">Counted At</th>
-                    <th className="px-5 py-3">Notes</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-stone-100">
-                  {loading ? (
-                    <tr><td colSpan={5} className="px-5 py-14 text-center text-sm text-stone-500">Loading inventory counts...</td></tr>
-                  ) : items.length === 0 ? (
-                    <tr><td colSpan={5} className="px-5 py-14 text-center text-sm text-stone-500">No inventory counts found</td></tr>
-                  ) : (
-                    items.map((item) => (
-                      <tr key={item.inventory_count_id}>
-                        <td className="px-5 py-4 text-sm font-semibold">{item.count_type}</td>
-                        <td className="px-5 py-4 text-sm">
-                          <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${item.status === "SUBMITTED" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
-                            {item.status}
-                          </span>
-                        </td>
-                        <td className="px-5 py-4 text-sm">{item.counted_by_info?.fullname ?? item.counted_by}</td>
-                        <td className="px-5 py-4 text-sm text-stone-600">{new Date(item.counted_at).toLocaleString("en-GB")}</td>
-                        <td className="px-5 py-4 text-sm text-stone-600">{item.notes || "-"}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-            <footer className="flex items-center justify-between border-t border-stone-200 px-5 py-4">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                <p className="text-xs text-stone-500">Page {page} of {totalPages}</p>
-                <label className="flex items-center gap-2 text-xs font-semibold text-stone-500">
-                  Limit
-                  <select value={pageSize} onChange={(event) => { setPage(1); setPageSize(Number(event.target.value)); }} className="rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-xs text-stone-700 outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10">
-                    {PAGE_SIZE_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
-                  </select>
-                </label>
-              </div>
-              <div className="flex gap-2">
-                <button disabled={page === 1 || loading} onClick={() => setPage((value) => value - 1)} className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-40">Previous</button>
-                <button disabled={page >= totalPages || loading} onClick={() => setPage((value) => value + 1)} className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-40">Next</button>
-              </div>
-            </footer>
+          <section className="mt-7 max-w-5xl space-y-3">
+            {error && <div className="rounded-lg bg-red-50 p-4 text-sm text-red-700">{error}</div>}
+            {loading ? (
+              <div className="rounded-xl border border-stone-200 bg-white p-6 text-sm text-stone-500">Loading stock counts...</div>
+            ) : items.length === 0 ? (
+              <div className="rounded-xl border border-stone-200 bg-white p-6 text-sm text-stone-500">No stock counts found for today</div>
+            ) : (
+              orderedItems.map((item) => (
+                <Link key={item.inventory_count_id} to={businessDayID ? `/business-days/${businessDayID}/inventory-counts/${item.inventory_count_id}` : `/stock-count/${item.inventory_count_id}`} className="group grid gap-4 rounded-xl border border-stone-200 bg-white p-5 transition hover:border-stone-300 hover:bg-stone-50/60 sm:grid-cols-[1fr_auto] sm:items-center">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h2 className="text-base font-semibold transition-colors group-hover:text-[#92502f]">{countTitle(item.count_type)}</h2>
+                      <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${item.status === "SUBMITTED" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
+                        {item.status}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-sm text-stone-500">{countDescription(item.count_type)}</p>
+                    {!businessDayID && <p className="mt-1 text-xs font-semibold text-stone-400">{item.business_day_info?.business_date ?? item.business_day_id}</p>}
+                    <dl className="mt-4 grid gap-2 text-sm sm:grid-cols-[92px_minmax(0,1fr)_96px_minmax(0,1fr)]">
+                      <dt className="text-stone-500">Counted by</dt>
+                      <dd className="font-medium text-stone-800">{item.counted_by_info?.fullname ?? item.counted_by ?? "-"}</dd>
+                      <dt className="text-stone-500">Submitted</dt>
+                      <dd className="font-medium text-stone-800">{formatDateTime(item.counted_at)}</dd>
+                    </dl>
+                  </div>
+                  <span className="inline-flex w-fit items-center justify-center rounded-lg border border-stone-300 px-4 py-2 text-sm font-semibold text-stone-700 transition group-hover:border-[#92502f] group-hover:text-[#92502f]">
+                    {item.status === "SUBMITTED" ? "View" : "Open"}
+                  </span>
+                </Link>
+              ))
+            )}
           </section>
         </main>
       </section>

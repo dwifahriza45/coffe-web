@@ -108,9 +108,9 @@ export default function MenuItemsPage() {
                     <tr><td colSpan={4} className="px-5 py-14 text-center text-sm text-stone-500">No menu items found</td></tr>
                   ) : (
                     products.map((product) => (
-                      <tr key={product.product_id} onClick={() => navigate(`/menu-items/${product.product_id}`)} className="cursor-pointer hover:bg-stone-50/70">
+                      <tr key={product.product_id} onClick={() => navigate(`/menu-items/${product.product_id}`)} className="group cursor-pointer hover:bg-stone-50/70">
                         <td className="px-5 py-4">
-                          <p className="text-sm font-semibold">{product.name}</p>
+                          <p className="inline-flex text-sm font-semibold transition-colors group-hover:text-[#92502f] group-hover:underline group-hover:underline-offset-4">{product.name}</p>
                           {product.description && <p className="mt-1 max-w-xs truncate text-xs text-stone-500">{product.description}</p>}
                         </td>
                         <td className="px-5 py-4 text-sm">{product.category_info?.name ?? "-"}</td>

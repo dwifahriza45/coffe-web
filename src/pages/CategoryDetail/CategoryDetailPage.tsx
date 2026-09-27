@@ -298,9 +298,9 @@ export default function CategoryDetailPage() {
                     products.map((product) => {
                       const inUse = Boolean(productUsage[product.product_id]);
                       return (
-                        <tr key={product.product_id} onClick={() => navigate(`/category-management/${categoryID}/products/${product.product_id}`)} className="cursor-pointer hover:bg-stone-50/70">
+                        <tr key={product.product_id} onClick={() => navigate(`/category-management/${categoryID}/products/${product.product_id}`)} className="group cursor-pointer hover:bg-stone-50/70">
                           <td className="px-5 py-4">
-                            <p className="text-sm font-semibold">{product.name}</p>
+                            <p className="inline-flex text-sm font-semibold transition-colors group-hover:text-[#92502f] group-hover:underline group-hover:underline-offset-4">{product.name}</p>
                             {product.description && <p className="mt-1 max-w-xs truncate text-xs text-stone-500">{product.description}</p>}
                           </td>
                           <td className="px-5 py-4 text-sm font-semibold">{formatPrice(product.price)}</td>

@@ -235,6 +235,7 @@ export default function IngredientManagementPage() {
   }
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const columnCount = canWriteStockMaster ? 6 : 5;
 
   return (
     <div className="flex min-h-screen bg-[#f8f5f0]">
@@ -284,21 +285,21 @@ export default function IngredientManagementPage() {
                     <th className="px-5 py-3">Min stock</th>
                     <th className="px-5 py-3">Usage</th>
                     <th className="px-5 py-3">Status</th>
-                    <th className="px-5 py-3 text-right">Action</th>
+                    {canWriteStockMaster && <th className="px-5 py-3 text-right">Action</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-100">
                   {loading ? (
-                    <tr><td colSpan={6} className="px-5 py-14 text-center text-sm text-stone-500">Loading ingredients...</td></tr>
+                    <tr><td colSpan={columnCount} className="px-5 py-14 text-center text-sm text-stone-500">Loading ingredients...</td></tr>
                   ) : ingredients.length === 0 ? (
-                    <tr><td colSpan={6} className="px-5 py-14 text-center text-sm text-stone-500">No ingredients found</td></tr>
+                    <tr><td colSpan={columnCount} className="px-5 py-14 text-center text-sm text-stone-500">No ingredients found</td></tr>
                   ) : (
                     ingredients.map((ingredient) => {
                       const inUse = Boolean(ingredientUsage[ingredient.ingredient_id]);
                       return (
-                      <tr key={ingredient.ingredient_id} onClick={() => navigate(`/ingredient-management/${ingredient.ingredient_id}`)} className="cursor-pointer hover:bg-stone-50/70">
+                      <tr key={ingredient.ingredient_id} onClick={() => navigate(`/ingredient-management/${ingredient.ingredient_id}`)} className="group cursor-pointer hover:bg-stone-50/70">
                         <td className="px-5 py-4">
-                          <p className="text-sm font-semibold">{ingredient.name}</p>
+                          <p className="inline-flex text-sm font-semibold transition-colors group-hover:text-[#92502f] group-hover:underline group-hover:underline-offset-4">{ingredient.name}</p>
                         </td>
                         <td className="px-5 py-4 text-sm">{ingredient.base_unit_info?.name ?? ingredient.base_unit}</td>
                         <td className="px-5 py-4 text-sm">{formatNumber(ingredient.minimum_stock, 3)}</td>
@@ -313,13 +314,13 @@ export default function IngredientManagementPage() {
                             {ingredient.active ? "Active" : "Inactive"}
                           </span>
                         </td>
-                        <td className="px-5 py-4">
+                        {canWriteStockMaster && <td className="px-5 py-4">
                           <div className="flex justify-end gap-1.5">
-                            {canWriteStockMaster && <button type="button" onClick={(event) => { event.stopPropagation(); openModal(ingredient); }} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800" title="Update ingredient"><Pencil size={15} /></button>}
-                            {canWriteStockMaster && <button type="button" onClick={(event) => { event.stopPropagation(); requestToggleActive(ingredient); }} disabled={ingredient.active && inUse} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent" title={ingredient.active && inUse ? "Ingredient is used by ingredient units" : ingredient.active ? "Deactivate ingredient" : "Activate ingredient"}><Power size={15} /></button>}
-                            {canWriteStockMaster && <button type="button" onClick={(event) => { event.stopPropagation(); requestDelete(ingredient); }} disabled={inUse} className="grid size-8 place-items-center rounded-lg text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent" title={inUse ? "Ingredient is used by ingredient units" : "Delete ingredient"}><Trash2 size={15} /></button>}
+                            <button type="button" onClick={(event) => { event.stopPropagation(); openModal(ingredient); }} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800" title="Update ingredient"><Pencil size={15} /></button>
+                            <button type="button" onClick={(event) => { event.stopPropagation(); requestToggleActive(ingredient); }} disabled={ingredient.active && inUse} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent" title={ingredient.active && inUse ? "Ingredient is used by ingredient units" : ingredient.active ? "Deactivate ingredient" : "Activate ingredient"}><Power size={15} /></button>
+                            <button type="button" onClick={(event) => { event.stopPropagation(); requestDelete(ingredient); }} disabled={inUse} className="grid size-8 place-items-center rounded-lg text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent" title={inUse ? "Ingredient is used by ingredient units" : "Delete ingredient"}><Trash2 size={15} /></button>
                           </div>
-                        </td>
+                        </td>}
                       </tr>
                       );
                     })

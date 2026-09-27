@@ -214,6 +214,7 @@ export default function UnitManagementPage() {
   }
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const columnCount = canWriteStockMaster ? 6 : 5;
   return (
     <div className="flex min-h-screen bg-[#f8f5f0]">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
@@ -277,19 +278,19 @@ export default function UnitManagementPage() {
                     <th className="px-5 py-3">Type</th>
                     <th className="px-5 py-3">Usage</th>
                     <th className="px-5 py-3">Status</th>
-                    <th className="px-5 py-3 text-right">Action</th>
+                    {canWriteStockMaster && <th className="px-5 py-3 text-right">Action</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-100">
                   {loading ? (
                     <tr>
-                      <td colSpan={6} className="px-5 py-14 text-center text-sm text-stone-500">
+                      <td colSpan={columnCount} className="px-5 py-14 text-center text-sm text-stone-500">
                         Loading units...
                       </td>
                     </tr>
                   ) : units.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-5 py-14 text-center text-sm text-stone-500">
+                      <td colSpan={columnCount} className="px-5 py-14 text-center text-sm text-stone-500">
                         No units found
                       </td>
                     </tr>
@@ -316,17 +317,17 @@ export default function UnitManagementPage() {
                             {unit.active ? "Active" : "Inactive"}
                           </span>
                         </td>
-                        <td className="px-5 py-4">
+                        {canWriteStockMaster && <td className="px-5 py-4">
                           <div className="flex justify-end gap-1.5">
-                            {canWriteStockMaster && <button
+                            <button
                               type="button"
                               onClick={() => openModal(unit)}
                               className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800"
                               title="Update unit"
                             >
                               <Pencil size={15} />
-                            </button>}
-                            {canWriteStockMaster && <button
+                            </button>
+                            <button
                               type="button"
                               onClick={() => requestToggleActive(unit)}
                               disabled={unit.active && inUse}
@@ -334,8 +335,8 @@ export default function UnitManagementPage() {
                               title={unit.active && inUse ? "Unit is used by ingredients" : unit.active ? "Deactivate unit" : "Activate unit"}
                             >
                               <Power size={15} />
-                            </button>}
-                            {canWriteStockMaster && <button
+                            </button>
+                            <button
                               type="button"
                               onClick={() => requestDelete(unit)}
                               disabled={inUse}
@@ -343,9 +344,9 @@ export default function UnitManagementPage() {
                               title={inUse ? "Unit is used by ingredients" : "Delete unit"}
                             >
                               <Trash2 size={15} />
-                            </button>}
+                            </button>
                           </div>
-                        </td>
+                        </td>}
                       </tr>
                       );
                     })

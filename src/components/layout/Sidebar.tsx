@@ -3,9 +3,11 @@ import {
   LockKeyhole,
   LogOut,
   CalendarDays,
+  ClipboardCheck,
   CupSoda,
   FolderTree,
   PackageOpen,
+  PackagePlus,
   Ruler,
   Shield,
   UserCog,
@@ -33,7 +35,7 @@ export default function Sidebar({
     ["admin", "hris_admin"].includes(role),
   );
   const canReadStockMaster = roles.some((role) =>
-    ["admin", "inventory"].includes(role),
+    ["admin", "leader", "inventory"].includes(role),
   );
   const canReadMenuCategories = roles.some((role) =>
     ["admin", "ballista", "leader"].includes(role),
@@ -43,6 +45,9 @@ export default function Sidebar({
   );
   const canManageBusinessDays = roles.some((role) =>
     ["admin", "leader"].includes(role),
+  );
+  const canReadStockCounts = roles.some((role) =>
+    ["admin", "leader", "inventory"].includes(role),
   );
   const links: Array<{
     label: string;
@@ -55,6 +60,11 @@ export default function Sidebar({
     icon: typeof LayoutDashboard;
   }> = [];
   const inventoryMasterLinks: Array<{
+    label: string;
+    to: string;
+    icon: typeof LayoutDashboard;
+  }> = [];
+  const inventoryOperationLinks: Array<{
     label: string;
     to: string;
     icon: typeof LayoutDashboard;
@@ -93,6 +103,18 @@ export default function Sidebar({
       label: "Ingredient Management",
       to: "/ingredient-management",
       icon: PackageOpen,
+    });
+  if (canReadStockCounts)
+    inventoryOperationLinks.push({
+      label: "Stock Count",
+      to: "/stock-count",
+      icon: ClipboardCheck,
+    });
+  if (canReadStockCounts)
+    inventoryOperationLinks.push({
+      label: "Stock In",
+      to: "/stock-in",
+      icon: PackagePlus,
     });
   if (canReadMenuCategories)
     inventoryMenuLinks.push({
@@ -167,7 +189,7 @@ export default function Sidebar({
               </div>
             </div>
           )}
-          {(inventoryMasterLinks.length > 0 || inventoryMenuLinks.length > 0) && (
+          {(inventoryMasterLinks.length > 0 || inventoryOperationLinks.length > 0 || inventoryMenuLinks.length > 0) && (
             <div className="pt-5">
               {inventoryMasterLinks.length > 0 && (
                 <>
@@ -193,6 +215,31 @@ export default function Sidebar({
                     ))}
                   </div>
                 </>
+              )}
+              {inventoryOperationLinks.length > 0 && (
+                <div className="pt-5">
+                  <div className="mb-3 flex items-center gap-3 px-3">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500">
+                      Inventory
+                    </span>
+                    <span className="h-px flex-1 bg-white/10" />
+                  </div>
+                  <div className="space-y-2">
+                    {inventoryOperationLinks.map(({ label, to, icon: Icon }) => (
+                      <NavLink
+                        key={label}
+                        to={to}
+                        onClick={onClose}
+                        className={({ isActive }) =>
+                          `flex items-center gap-3 rounded-lg p-3 text-sm ${isActive ? "bg-[#4b3023] text-white" : "text-stone-300 hover:bg-white/5"}`
+                        }
+                      >
+                        <Icon size={18} />
+                        {label}
+                      </NavLink>
+                    ))}
+                  </div>
+                </div>
               )}
               {inventoryMenuLinks.length > 0 && (
                 <div className="pt-5">
@@ -225,6 +272,7 @@ export default function Sidebar({
         {links.length === 0 &&
           hrisLinks.length === 0 &&
           inventoryMasterLinks.length === 0 &&
+          inventoryOperationLinks.length === 0 &&
           inventoryMenuLinks.length === 0 && (
           <div className="relative flex flex-1 items-center justify-center">
             <span className="absolute h-36 w-36 rounded-full bg-[#b86b42]/20 blur-2xl" />

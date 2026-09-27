@@ -269,9 +269,9 @@ export default function CategoryManagementPage() {
                     categories.map((category) => {
                       const inUse = Boolean(categoryUsage[category.category_id]);
                       return (
-                      <tr key={category.category_id} onClick={() => navigate(`/category-management/${category.category_id}`)} className="cursor-pointer hover:bg-stone-50/70">
+                      <tr key={category.category_id} onClick={() => navigate(`/category-management/${category.category_id}`)} className="group cursor-pointer hover:bg-stone-50/70">
                         <td className="px-5 py-4">
-                          <p className="text-sm font-semibold">{category.name}</p>
+                          <p className="inline-flex text-sm font-semibold transition-colors group-hover:text-[#92502f] group-hover:underline group-hover:underline-offset-4">{category.name}</p>
                         </td>
                         <td className="px-5 py-4 text-sm text-stone-600">{category.description || "-"}</td>
                         <td className="px-5 py-4">
