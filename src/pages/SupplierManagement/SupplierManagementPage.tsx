@@ -17,7 +17,6 @@ import { getUserRoleNames } from "../../app/roleAccess";
 
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50];
 const emptyForm: SupplierPayload = {
-  code: "",
   name: "",
   phone: "",
   email: "",
@@ -94,7 +93,6 @@ export default function SupplierManagementPage() {
     setForm(
       supplier
         ? {
-            code: supplier.code,
             name: supplier.name,
             phone: supplier.phone,
             email: supplier.email,
@@ -112,8 +110,8 @@ export default function SupplierManagementPage() {
     event.preventDefault();
     setFieldErrors({});
     setActionError("");
-    if (!form.code.trim() || !form.name.trim()) {
-      setFieldErrors({ code: "Code and name are required" });
+    if (!form.name.trim()) {
+      setFieldErrors({ name: "Name is required" });
       return;
     }
     setConfirm({
@@ -203,11 +201,10 @@ export default function SupplierManagementPage() {
     setSubmitting(true);
     try {
       await updateSupplier(supplier.supplier_id, {
-        code: supplier.code,
         name: supplier.name,
         phone: supplier.phone,
-            email: supplier.email,
-            address: supplier.address,
+        email: supplier.email,
+        address: supplier.address,
         active: !supplier.active,
       });
       setNotice("Supplier status updated successfully.");
@@ -223,7 +220,7 @@ export default function SupplierManagementPage() {
   }
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const columnCount = canWriteStockMaster ? 7 : 6;
+  const columnCount = canWriteStockMaster ? 6 : 5;
   return (
     <div className="flex min-h-screen bg-[#f8f5f0]">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
@@ -285,7 +282,6 @@ export default function SupplierManagementPage() {
                 <thead className="bg-stone-50 text-xs uppercase tracking-wider text-stone-500">
                   <tr>
                     <th className="px-5 py-3">Supplier</th>
-                    <th className="px-5 py-3">Code</th>
                     <th className="px-5 py-3">Phone</th>
                     <th className="px-5 py-3">Email</th>
                     <th className="px-5 py-3">Address</th>
@@ -312,9 +308,7 @@ export default function SupplierManagementPage() {
                       <tr key={supplier.supplier_id} className="hover:bg-stone-50/70">
                         <td className="px-5 py-4">
                           <p className="text-sm font-semibold">{supplier.name}</p>
-                        </td>
-                        <td className="px-5 py-4 text-sm font-semibold">
-                          {supplier.code}
+                          <p className="mt-1 text-xs text-stone-500">{supplier.supplier_id}</p>
                         </td>
                         <td className="px-5 py-4 text-sm">{supplier.phone || "-"}</td>
                         <td className="px-5 py-4 text-sm">{supplier.email || "-"}</td>
@@ -414,14 +408,14 @@ export default function SupplierManagementPage() {
               </button>
             </header>
             <div className="space-y-4 p-5">
-              {(["code", "name", "phone", "email", "address"] as const).map((field) => (
+              {(["name", "phone", "email", "address"] as const).map((field) => (
                 <label key={field} className="block text-sm font-semibold text-stone-700">
-                  {({ code: "Code", name: "Name", phone: "Phone", email: "Email", address: "Address" })[field]}{(field === "code" || field === "name") ? " *" : ""}
+                  {({ name: "Name", phone: "Phone", email: "Email", address: "Address" })[field]}{field === "name" ? " *" : ""}
                   <input
                     type={field === "email" ? "email" : field === "phone" ? "tel" : "text"}
-                    required={field === "code" || field === "name"}
+                    required={field === "name"}
                     minLength={field === "name" ? 2 : undefined}
-                    maxLength={({ code: 30, name: 120, phone: 30, email: 254, address: 1000 })[field]}
+                    maxLength={({ name: 120, phone: 30, email: 254, address: 1000 })[field]}
                     value={form[field]}
                     onChange={(event) => {
                       setForm((current) => ({ ...current, [field]: event.target.value }));

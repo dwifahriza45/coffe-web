@@ -3,7 +3,6 @@ import type { ApiResponse } from "../types/auth";
 
 export interface Supplier {
   supplier_id: string;
-  code: string;
   name: string;
   phone: string;
   email: string;
@@ -12,7 +11,6 @@ export interface Supplier {
 }
 
 export interface SupplierPayload {
-  code: string;
   name: string;
   phone: string;
   email: string;

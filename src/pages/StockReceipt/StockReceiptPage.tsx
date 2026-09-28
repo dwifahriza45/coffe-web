@@ -1,14 +1,13 @@
 import SupplierSelect from "../../components/suppliers/SupplierSelect";
 import { isOpeningStockSubmitted } from "../../api/inventoryCount.api";
 import { isAxiosError } from "axios";
-import { ArrowLeft, ArrowRight, PackagePlus, Pencil, Plus, Search, Trash2, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, PackagePlus, Plus, Search, Trash2, X } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
   createStockReceipt,
   deleteStockReceipt,
   getStockReceipts,
-  updateStockReceipt,
   type StockReceipt,
   type StockReceiptPayload,
 } from "../../api/stockReceipt.api";
@@ -56,7 +55,6 @@ export default function StockReceiptPage() {
   const [supplierError, setSupplierError] = useState("");
   const [notice, setNotice] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
-  const [editingItem, setEditingItem] = useState<StockReceipt | null>(null);
   const [form, setForm] = useState<StockReceiptPayload>(emptyForm);
   const [submitting, setSubmitting] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -120,19 +118,18 @@ export default function StockReceiptPage() {
   const canWrite = !requiresOpening || openingSubmitted;
   const canCreate = Boolean(activeBusinessDay) && canWrite;
 
-  function openModal(item?: StockReceipt) {
-    if (!canWrite || item?.status === "SUBMITTED" || (!item && !canCreate)) return;
+  function openModal() {
+    if (!canCreate) return;
     setNotice("");
     setSupplierError("");
-    setEditingItem(item ?? null);
-    setForm(item ? { supplier_name: item.supplier_name, notes: item.notes } : emptyForm);
+    setForm(emptyForm);
     setModalOpen(true);
   }
 
   function submitForm(event: FormEvent) {
     event.preventDefault();
     if (!form.supplier_name.trim()) { setSupplierError("Please select a supplier."); return; }
-    if (!canWrite || editingItem?.status === "SUBMITTED" || (!editingItem && !canCreate)) {
+    if (!canCreate) {
       setError("Open a business day and submit Opening Stock before creating stock in.");
       return;
     }
@@ -146,12 +143,11 @@ export default function StockReceiptPage() {
 
   async function submitConfirmed() {
     if (!form.supplier_name.trim()) { setConfirm(null); setSupplierError("Please select a supplier."); return; }
-    if (!canWrite || editingItem?.status === "SUBMITTED" || (!editingItem && !canCreate)) return;
+    if (!canCreate) return;
     setConfirm(null);
     setSubmitting(true);
     try {
-      if (editingItem) await updateStockReceipt(editingItem.stock_receipt_id, form);
-      else await createStockReceipt(form);
+      await createStockReceipt(form);
       setNotice("Draft saved successfully.");
       setModalOpen(false);
       setRefreshKey((value) => value + 1);
@@ -261,7 +257,6 @@ export default function StockReceiptPage() {
                       <td className="px-5 py-4">
                         <div className="flex justify-end gap-1.5">
                           <Link to={`/stock-in/${item.stock_receipt_id}${contextQuery}`} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-900" title="Open"><ArrowRight size={15} /></Link>
-                          <button type="button" onClick={() => openModal(item)} disabled={!canWrite || item.status === "SUBMITTED"} className="disabled:cursor-not-allowed disabled:opacity-40 grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-900" title="Update"><Pencil size={15} /></button>
                           <button type="button" onClick={() => requestDelete(item)} disabled={!canWrite || item.status === "SUBMITTED" || item.has_items} className="disabled:cursor-not-allowed disabled:opacity-40 grid size-8 place-items-center rounded-lg text-red-600 hover:bg-red-50" title={item.has_items ? "Remove all items before deleting this stock in" : "Delete"}><Trash2 size={15} /></button>
                         </div>
                       </td>
@@ -293,15 +288,15 @@ export default function StockReceiptPage() {
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
           <form onSubmit={submitForm} className="w-full max-w-lg rounded-2xl bg-white shadow-2xl">
             <header className="flex items-start justify-between border-b border-stone-200 p-5">
-              <h2 className="text-lg font-bold">{editingItem ? "Update stock in" : "Add stock in"}</h2>
+              <h2 className="text-lg font-bold">Add stock in</h2>
               <button type="button" onClick={() => setModalOpen(false)} className="grid size-9 place-items-center rounded-lg hover:bg-stone-100"><X size={18} /></button>
             </header>
             <div className="space-y-4 p-5">
               <label className="block text-sm font-semibold text-stone-700">
                 Business Date
                 <div className="mt-2 rounded-lg border border-stone-200 bg-stone-50 px-3.5 py-3">
-                  <p className="text-sm font-semibold text-stone-900">{formatDate(editingItem?.receipt_date ?? activeBusinessDay?.business_date)}</p>
-                  <p className="mt-1 text-xs font-medium text-stone-500">{editingItem ? "Saved from this stock in record" : "Auto from current open business day"}</p>
+                  <p className="text-sm font-semibold text-stone-900">{formatDate(activeBusinessDay?.business_date)}</p>
+                  <p className="mt-1 text-xs font-medium text-stone-500">Auto from current open business day</p>
                 </div>
               </label>
               <label className="block text-sm font-semibold text-stone-700">
