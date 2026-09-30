@@ -1,13 +1,5 @@
 import type { AuthenticatedUser } from "../types/auth";
 
-export const ROLE_HOME_ROUTES = [
-  { roles: ["admin"], route: "/dashboard" },
-  { roles: ["ballista"], route: "/category-management" },
-  { roles: ["leader"], route: "/business-days" },
-  { roles: ["hris_admin"], route: "/user-management" },
-  { roles: ["inventory"], route: "/stock-count" },
-] as const;
-
 export const getUserRoleNames = (user: AuthenticatedUser | null) =>
   user?.roles?.map((role) => role.roles_name.toLowerCase()) ?? [];
 
@@ -19,8 +11,34 @@ export const userHasRole = (
   return allowed.some((role) => roles.includes(role.toLowerCase()));
 };
 
+export type PermissionAction = "read" | "create" | "update" | "delete";
+
+export const userCan = (
+  user: AuthenticatedUser | null,
+  menuKey: string,
+  action: PermissionAction = "read",
+) => {
+  const permission = user?.permissions?.find(
+    (item) => item.menu_key === menuKey,
+  );
+  if (!permission) return false;
+  switch (action) {
+    case "create":
+      return permission.can_create;
+    case "update":
+      return permission.can_update;
+    case "delete":
+      return permission.can_delete;
+    default:
+      return (
+        permission.can_read ||
+        permission.can_create ||
+        permission.can_update ||
+        permission.can_delete
+      );
+  }
+};
+
 export const getHomeRoute = (user: AuthenticatedUser | null) => {
-  const match = ROLE_HOME_ROUTES.find(({ roles }) => userHasRole(user, roles));
-  if (match) return match.route;
-  return "/unauthorized";
+  return user ? "/home" : "/login";
 };

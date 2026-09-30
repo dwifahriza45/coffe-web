@@ -1,4 +1,4 @@
-import { Activity, ArrowLeft, ArrowRight, CheckCircle2, ClipboardCheck, PackagePlus } from "lucide-react";
+import { Activity, ArrowLeft, ArrowRight, CheckCircle2, ClipboardCheck, PackagePlus, SlidersHorizontal } from "lucide-react";
 import { isAxiosError } from "axios";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
@@ -91,7 +91,12 @@ export default function InventoryCountPage() {
     let current = true;
     async function loadBusinessDay() {
       if (!businessDayID) {
-        setBusinessDay(null);
+        try {
+          const response = await getBusinessDays({ start: 0, limit: 1, status: "OPEN", business_date: today() });
+          if (current) setBusinessDay(response.data?.[0] ?? null);
+        } catch {
+          if (current) setBusinessDay(null);
+        }
         return;
       }
       try {
@@ -117,11 +122,13 @@ export default function InventoryCountPage() {
   const openingSubmitted = openingCount?.status === "SUBMITTED";
   const closingSubmitted = closingCount?.status === "SUBMITTED";
   const showWorkflow = !loading && items.length > 0;
-  const stockInPath = businessDayID && businessDay
-    ? `/stock-in?businessDayID=${encodeURIComponent(businessDayID)}&date=${businessDay.business_date}`
+  const scopedBusinessDayID = businessDayID || businessDay?.business_day_id || "";
+  const scopedBusinessDate = businessDay?.business_date || today();
+  const stockInPath = scopedBusinessDayID
+    ? `/stock-in?businessDayID=${encodeURIComponent(scopedBusinessDayID)}&date=${scopedBusinessDate}`
     : "/stock-in";
-  const movementPath = businessDayID
-    ? `/stock-movements?businessDayID=${encodeURIComponent(businessDayID)}`
+  const movementPath = scopedBusinessDayID
+    ? `/stock-movements?businessDayID=${encodeURIComponent(scopedBusinessDayID)}&date=${scopedBusinessDate}`
     : "/stock-movements";
 
   function countPath(item: InventoryCount) {
@@ -189,19 +196,19 @@ export default function InventoryCountPage() {
           </header>
 
           {showWorkflow && (
-            <section className="mt-7 max-w-5xl rounded-xl border border-stone-200 bg-white">
+            <section className="mt-7 max-w-7xl rounded-xl border border-stone-200 bg-white">
               <div className="grid gap-4 p-5 lg:grid-cols-[1fr_auto] lg:items-center">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">{inventoryOnly ? "Today" : "Daily workflow"}</p>
                   <h2 className="mt-1 text-xl font-bold text-stone-950">
-                    {openingSubmitted ? closingSubmitted ? "Stock count complete" : "Opening stock is done" : "Start with opening stock"}
+                    {openingSubmitted ? closingSubmitted ? "Stock count complete" : "Continue daily inventory" : "Start with Opening Stock"}
                   </h2>
                   <p className="mt-1 text-sm text-stone-500">
                     {openingSubmitted
                       ? closingSubmitted
-                        ? "Daily stock count has been submitted."
-                        : "Add Stock In only when goods arrive. If there is no incoming stock, continue to Closing Stock."
-                      : "Record the physical stock before operational activities."}
+                        ? "Opening and Closing Stock have been submitted."
+                        : "Record Stock In or Adjustment when needed. If there is none, continue to Closing Stock."
+                      : "Count physical stock before operational activities begin."}
                   </p>
                 </div>
                 {action.path ? (
@@ -213,24 +220,52 @@ export default function InventoryCountPage() {
                   <button disabled className="rounded-lg bg-stone-200 px-5 py-3 text-sm font-semibold text-stone-500">{action.label}</button>
                 )}
               </div>
-              <div className="grid border-t border-stone-100 text-sm sm:grid-cols-3">
-                <div className="px-5 py-4">
-                  <p className="font-semibold text-stone-900">Opening</p>
-                  <p className={openingSubmitted ? "mt-1 text-emerald-700" : "mt-1 text-amber-700"}>{openingSubmitted ? "Submitted" : "Draft"}</p>
+              <div className="grid border-t border-stone-100 text-sm md:grid-cols-2 xl:grid-cols-5">
+                <div className="flex gap-3 px-5 py-4">
+                  <span className={`grid size-8 shrink-0 place-items-center rounded-full text-xs font-bold ${openingSubmitted ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>1</span>
+                  <div>
+                    <p className="font-semibold text-stone-900">Opening Stock</p>
+                    <p className="mt-1 text-stone-500">Count beginning stock.</p>
+                    <p className={openingSubmitted ? "mt-2 font-semibold text-emerald-700" : "mt-2 font-semibold text-amber-700"}>{openingSubmitted ? "Submitted" : "Not submitted"}</p>
+                  </div>
                 </div>
-                <Link to={stockInPath} className="border-t border-stone-100 px-5 py-4 hover:bg-stone-50 sm:border-l sm:border-t-0">
-                  <p className="flex items-center gap-2 font-semibold text-stone-900"><PackagePlus size={16} /> Stock In</p>
-                  <p className="mt-1 text-stone-500">Optional when goods arrive</p>
+                <Link to={stockInPath} className="flex gap-3 border-t border-stone-100 px-5 py-4 hover:bg-stone-50 md:border-l md:border-t-0">
+                  <span className="grid size-8 shrink-0 place-items-center rounded-full bg-stone-100 text-xs font-bold text-stone-600">2</span>
+                  <div>
+                    <p className="flex items-center gap-2 font-semibold text-stone-900"><PackagePlus size={16} /> Stock In</p>
+                    <p className="mt-1 text-stone-500">Use only when goods arrive.</p>
+                    <p className="mt-2 font-semibold text-stone-700">Optional</p>
+                  </div>
                 </Link>
-                <div className="border-t border-stone-100 px-5 py-4 sm:border-l sm:border-t-0">
-                  <p className="font-semibold text-stone-900">Closing</p>
-                  <p className={closingSubmitted ? "mt-1 text-emerald-700" : "mt-1 text-amber-700"}>{closingSubmitted ? "Submitted" : "Draft"}</p>
+                <Link to={scopedBusinessDayID ? `/stock-adjustments?${new URLSearchParams({ businessDayID: scopedBusinessDayID, date: scopedBusinessDate })}` : "/stock-adjustments"} className="flex gap-3 border-t border-stone-100 px-5 py-4 hover:bg-stone-50 xl:border-l xl:border-t-0">
+                  <span className="grid size-8 shrink-0 place-items-center rounded-full bg-stone-100 text-xs font-bold text-stone-600">3</span>
+                  <div>
+                    <p className="flex items-center gap-2 font-semibold text-stone-900"><SlidersHorizontal size={16} /> Adjustment</p>
+                    <p className="mt-1 text-stone-500">Correct stock when needed.</p>
+                    <p className="mt-2 font-semibold text-stone-700">Optional</p>
+                  </div>
+                </Link>
+                <Link to={movementPath} className="flex gap-3 border-t border-stone-100 px-5 py-4 hover:bg-stone-50 md:border-l xl:border-t-0">
+                  <span className="grid size-8 shrink-0 place-items-center rounded-full bg-stone-100 text-xs font-bold text-stone-600">4</span>
+                  <div>
+                    <p className="flex items-center gap-2 font-semibold text-stone-900"><Activity size={16} /> Movement</p>
+                    <p className="mt-1 text-stone-500">Review the ledger.</p>
+                    <p className="mt-2 font-semibold text-stone-700">Review</p>
+                  </div>
+                </Link>
+                <div className="flex gap-3 border-t border-stone-100 px-5 py-4 xl:border-l xl:border-t-0">
+                  <span className={`grid size-8 shrink-0 place-items-center rounded-full text-xs font-bold ${closingSubmitted ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>5</span>
+                  <div>
+                    <p className="font-semibold text-stone-900">Closing Stock</p>
+                    <p className="mt-1 text-stone-500">Count ending stock.</p>
+                    <p className={closingSubmitted ? "mt-2 font-semibold text-emerald-700" : "mt-2 font-semibold text-amber-700"}>{closingSubmitted ? "Submitted" : "Not submitted"}</p>
+                  </div>
                 </div>
               </div>
             </section>
           )}
 
-          <section className="mt-7 max-w-5xl overflow-hidden rounded-xl border border-stone-200 bg-white">
+          <section className="mt-7 max-w-7xl overflow-hidden rounded-xl border border-stone-200 bg-white">
             <div className="border-b border-stone-100 px-5 py-4">
               <h2 className="font-semibold text-stone-950">Stock count tasks</h2>
               <p className="mt-1 text-sm text-stone-500">Opening and closing counts for this business day.</p>
@@ -246,26 +281,6 @@ export default function InventoryCountPage() {
             {!loading && orderedItems.filter((item) => item.count_type === "CLOSING").map(renderCount)}
           </section>
 
-          {showWorkflow && !inventoryOnly && (
-            <section className="mt-4 grid max-w-5xl gap-3 sm:grid-cols-2">
-              {businessDayID && businessDay && (
-                <Link to={stockInPath} className="group flex items-center justify-between gap-4 rounded-xl border border-stone-200 bg-white p-5 transition hover:border-stone-300 hover:bg-stone-50/60">
-                  <div>
-                    <h2 className="flex items-center gap-2 text-base font-semibold"><PackagePlus size={19} /> Stock In</h2>
-                    <p className="mt-1 text-sm text-stone-500">Add or review incoming stock.</p>
-                  </div>
-                  <span className="rounded-lg border border-stone-300 px-4 py-2 text-sm font-semibold text-stone-700">Open</span>
-                </Link>
-              )}
-              <Link to={movementPath} className="group flex items-center justify-between gap-4 rounded-xl border border-stone-200 bg-white p-5 transition hover:border-stone-300 hover:bg-stone-50/60">
-                <div>
-                  <h2 className="flex items-center gap-2 text-base font-semibold"><Activity size={19} /> Stock Movement</h2>
-                  <p className="mt-1 text-sm text-stone-500">View the quantity ledger.</p>
-                </div>
-                <span className="rounded-lg border border-stone-300 px-4 py-2 text-sm font-semibold text-stone-700">View</span>
-              </Link>
-            </section>
-          )}
         </main>
       </section>
     </div>

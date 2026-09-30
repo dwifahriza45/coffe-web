@@ -1,6 +1,5 @@
 import {
   LayoutDashboard,
-  ArrowRightLeft,
   LockKeyhole,
   LogOut,
   CalendarDays,
@@ -8,7 +7,6 @@ import {
   CupSoda,
   FolderTree,
   PackageOpen,
-  PackagePlus,
   Ruler,
   Truck,
   Shield,
@@ -21,7 +19,7 @@ import { useRef, useState } from "react";
 import { logout as logoutRequest } from "../../api/auth.api";
 import { useAuth } from "../../app/AuthContext";
 import { invalidateSession } from "../../app/authSession";
-import { getUserRoleNames } from "../../app/roleAccess";
+import { userCan } from "../../app/roleAccess";
 import Brand from "./Brand";
 export default function Sidebar({
   isOpen,
@@ -35,25 +33,19 @@ export default function Sidebar({
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const roles = getUserRoleNames(user);
-  const isAdmin = roles.includes("admin");
-  const canManageUsers = roles.some((role) =>
-    ["admin", "hris_admin"].includes(role),
-  );
-  const canReadStockMaster = roles.some((role) =>
-    ["admin", "leader", "inventory"].includes(role),
-  );
-  const canReadMenuCategories = roles.some((role) =>
-    ["admin", "ballista", "leader"].includes(role),
-  );
-  const canReadProducts = roles.some((role) =>
-    ["admin", "ballista", "leader"].includes(role),
-  );
-  const canManageBusinessDays = roles.some((role) =>
-    ["admin", "leader"].includes(role),
-  );
-  const showInventoryOperations =
-    roles.includes("inventory") && !canManageBusinessDays;
+  const canReadDashboard = userCan(user, "dashboard");
+  const canReadUsers = userCan(user, "users");
+  const canReadRoles = userCan(user, "roles");
+  const canReadBusinessDays = userCan(user, "business_days");
+  const canReadInventoryCounts = userCan(user, "inventory_counts");
+  const canReadStockReceipts = userCan(user, "stock_receipts");
+  const canReadStockAdjustments = userCan(user, "stock_adjustments");
+  const canReadStockMovements = userCan(user, "stock_movements");
+  const canReadUnits = userCan(user, "units");
+  const canReadIngredients = userCan(user, "ingredients");
+  const canReadSuppliers = userCan(user, "suppliers");
+  const canReadCategories = userCan(user, "categories");
+  const canReadProducts = userCan(user, "products");
   const links: Array<{
     label: string;
     to: string;
@@ -79,59 +71,69 @@ export default function Sidebar({
     to: string;
     icon: typeof LayoutDashboard;
   }> = [];
-  if (isAdmin) {
+  if (canReadDashboard) {
     links.push({ label: "Overview", to: "/dashboard", icon: LayoutDashboard });
   }
-  if (canManageBusinessDays) {
+  if (canReadBusinessDays) {
     links.push({ label: "Business Days", to: "/business-days", icon: CalendarDays });
   }
-  if (canManageUsers)
+  if (canReadUsers)
     hrisLinks.push({
       label: "User Management",
       to: "/user-management",
       icon: UserCog,
     });
-  if (canManageUsers)
+  if (canReadRoles)
     hrisLinks.push({
       label: "Role Management",
       to: "/role-management",
       icon: Shield,
     });
-  if (canReadStockMaster)
+  if (canReadUnits)
     inventoryMasterLinks.push({
       label: "Unit Management",
       to: "/unit-management",
       icon: Ruler,
     });
-  if (canReadStockMaster)
+  if (canReadIngredients)
     inventoryMasterLinks.push({
       label: "Ingredient Management",
       to: "/ingredient-management",
       icon: PackageOpen,
     });
-  if (canReadStockMaster)
+  if (canReadSuppliers)
     inventoryMasterLinks.push({ label: "Suppliers", to: "/supplier-management", icon: Truck });
-  if (showInventoryOperations)
+  if (canReadInventoryCounts)
     inventoryOperationLinks.push({
       label: "Stock Count",
       to: "/stock-count",
       icon: ClipboardCheck,
     });
-  if (showInventoryOperations)
+  if (canReadStockReceipts)
     inventoryOperationLinks.push({
       label: "Stock In",
       to: "/stock-in",
-      icon: PackagePlus,
+      icon: Truck,
     });
-  if (showInventoryOperations)
-    inventoryOperationLinks.push({ label: "Stock Movement", to: "/stock-movements", icon: ArrowRightLeft });
-  if (canReadMenuCategories)
+  if (canReadStockAdjustments)
+    inventoryOperationLinks.push({
+      label: "Stock Adjustments",
+      to: "/stock-adjustments",
+      icon: ClipboardCheck,
+    });
+  if (canReadStockMovements)
+    inventoryOperationLinks.push({
+      label: "Stock Movements",
+      to: "/stock-movements",
+      icon: PackageOpen,
+    });
+  if (canReadCategories)
     inventoryMenuLinks.push({
       label: "Menu Items",
       to: "/category-management",
       icon: FolderTree,
     });
-  if (canReadProducts && !canReadMenuCategories)
+  if (canReadProducts && !canReadCategories)
     inventoryMenuLinks.push({
       label: "Menu Items",
       to: "/menu-items",
@@ -210,60 +212,10 @@ export default function Sidebar({
               {label}
             </NavLink>
           ))}
-          {filteredHrisLinks.length > 0 && (
-            <div className="pt-5">
-              <div className="mb-3 flex items-center gap-3 px-3">
-                <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500">
-                  HRIS
-                </span>
-                <span className="h-px flex-1 bg-white/10" />
-              </div>
-              <div className="space-y-2">
-                {filteredHrisLinks.map(({ label, to, icon: Icon }) => (
-                  <NavLink
-                    key={label}
-                    to={to}
-                    onClick={onClose}
-                    className={({ isActive }) =>
-                      `flex items-center gap-3 rounded-lg p-3 text-sm ${isActive ? "bg-[#4b3023] text-white" : "text-stone-300 hover:bg-white/5"}`
-                    }
-                  >
-                    <Icon size={18} />
-                    {label}
-                  </NavLink>
-                ))}
-              </div>
-            </div>
-          )}
           {(filteredInventoryMasterLinks.length > 0 || filteredInventoryOperationLinks.length > 0 || filteredInventoryMenuLinks.length > 0) && (
             <div className="pt-5">
-              {filteredInventoryMasterLinks.length > 0 && (
-                <>
-                  <div className="mb-3 flex items-center gap-3 px-3">
-                    <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500">
-                      Master Data
-                    </span>
-                    <span className="h-px flex-1 bg-white/10" />
-                  </div>
-                  <div className="space-y-2">
-                    {filteredInventoryMasterLinks.map(({ label, to, icon: Icon }) => (
-                      <NavLink
-                        key={label}
-                        to={to}
-                        onClick={onClose}
-                        className={({ isActive }) =>
-                          `flex items-center gap-3 rounded-lg p-3 text-sm ${isActive ? "bg-[#4b3023] text-white" : "text-stone-300 hover:bg-white/5"}`
-                        }
-                      >
-                        <Icon size={18} />
-                        {label}
-                      </NavLink>
-                    ))}
-                  </div>
-                </>
-              )}
               {filteredInventoryOperationLinks.length > 0 && (
-                <div className="pt-5">
+                <div>
                   <div className="mb-3 flex items-center gap-3 px-3">
                     <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500">
                       Inventory
@@ -312,6 +264,56 @@ export default function Sidebar({
                   </div>
                 </div>
               )}
+              {filteredInventoryMasterLinks.length > 0 && (
+                <div className="pt-5">
+                  <div className="mb-3 flex items-center gap-3 px-3">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500">
+                      Master Data
+                    </span>
+                    <span className="h-px flex-1 bg-white/10" />
+                  </div>
+                  <div className="space-y-2">
+                    {filteredInventoryMasterLinks.map(({ label, to, icon: Icon }) => (
+                      <NavLink
+                        key={label}
+                        to={to}
+                        onClick={onClose}
+                        className={({ isActive }) =>
+                          `flex items-center gap-3 rounded-lg p-3 text-sm ${isActive ? "bg-[#4b3023] text-white" : "text-stone-300 hover:bg-white/5"}`
+                        }
+                      >
+                        <Icon size={18} />
+                        {label}
+                      </NavLink>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          {filteredHrisLinks.length > 0 && (
+            <div className="pt-5">
+              <div className="mb-3 flex items-center gap-3 px-3">
+                <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500">
+                  HRIS
+                </span>
+                <span className="h-px flex-1 bg-white/10" />
+              </div>
+              <div className="space-y-2">
+                {filteredHrisLinks.map(({ label, to, icon: Icon }) => (
+                  <NavLink
+                    key={label}
+                    to={to}
+                    onClick={onClose}
+                    className={({ isActive }) =>
+                      `flex items-center gap-3 rounded-lg p-3 text-sm ${isActive ? "bg-[#4b3023] text-white" : "text-stone-300 hover:bg-white/5"}`
+                    }
+                  >
+                    <Icon size={18} />
+                    {label}
+                  </NavLink>
+                ))}
+              </div>
             </div>
           )}
           {hasMenus && resultCount === 0 && (

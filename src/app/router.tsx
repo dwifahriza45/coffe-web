@@ -10,10 +10,13 @@ import IngredientDetailPage from "../pages/IngredientDetail/IngredientDetailPage
 import IngredientManagementPage from "../pages/IngredientManagement/IngredientManagementPage";
 import InventoryCountPage from "../pages/InventoryCount/InventoryCountPage";
 import InventoryCountDetailPage from "../pages/InventoryCountDetail/InventoryCountDetailPage";
+import HomePage from "../pages/Home/HomePage";
 import MenuItemsPage from "../pages/MenuItems/MenuItemsPage";
 import NotFoundPage from "../pages/NotFound/NotFoundPage";
 import ProductDetailPage from "../pages/ProductDetail/ProductDetailPage";
 import RoleManagementPage from "../pages/RoleManagement/RoleManagementPage";
+import StockAdjustmentPage from "../pages/StockAdjustment/StockAdjustmentPage";
+import StockAdjustmentDetailPage from "../pages/StockAdjustmentDetail/StockAdjustmentDetailPage";
 import StockReceiptPage from "../pages/StockReceipt/StockReceiptPage";
 import StockReceiptDetailPage from "../pages/StockReceiptDetail/StockReceiptDetailPage";
 import UnitManagementPage from "../pages/UnitManagement/UnitManagementPage";
@@ -22,7 +25,7 @@ import UnauthorizedPage from "../pages/Unauthorized/UnauthorizedPage";
 import {
   RedirectIfAuthenticated,
   RequireAuth,
-  RequireRole,
+  RequirePermission,
   RoleHomeRedirect,
 } from "./AuthGuard";
 
@@ -47,12 +50,20 @@ export default function AppRouter() {
           }
         />
         <Route
+          path="/home"
+          element={
+            <RequireAuth>
+              <HomePage />
+            </RequireAuth>
+          }
+        />
+        <Route
           path="/dashboard"
           element={
             <RequireAuth>
-              <RequireRole allowedRoles={["admin"]}>
+              <RequirePermission menuKey="dashboard">
                 <DashboardPage />
-              </RequireRole>
+              </RequirePermission>
             </RequireAuth>
           }
         />
@@ -60,9 +71,9 @@ export default function AppRouter() {
           path="/business-days"
           element={
             <RequireAuth>
-              <RequireRole allowedRoles={["admin", "leader"]}>
+              <RequirePermission menuKey="business_days">
                 <BusinessDayPage />
-              </RequireRole>
+              </RequirePermission>
             </RequireAuth>
           }
         />
@@ -70,9 +81,9 @@ export default function AppRouter() {
           path="/business-days/:businessDayID/inventory-counts"
           element={
             <RequireAuth>
-              <RequireRole allowedRoles={["admin", "leader", "inventory"]}>
+              <RequirePermission menuKey="inventory_counts">
                 <InventoryCountPage />
-              </RequireRole>
+              </RequirePermission>
             </RequireAuth>
           }
         />
@@ -80,9 +91,9 @@ export default function AppRouter() {
           path="/business-days/:businessDayID/inventory-counts/:inventoryCountID"
           element={
             <RequireAuth>
-              <RequireRole allowedRoles={["admin", "leader", "inventory"]}>
+              <RequirePermission menuKey="inventory_counts">
                 <InventoryCountDetailPage />
-              </RequireRole>
+              </RequirePermission>
             </RequireAuth>
           }
         />
@@ -90,9 +101,9 @@ export default function AppRouter() {
           path="/stock-count"
           element={
             <RequireAuth>
-              <RequireRole allowedRoles={["admin", "leader", "inventory"]}>
+              <RequirePermission menuKey="inventory_counts">
                 <InventoryCountPage />
-              </RequireRole>
+              </RequirePermission>
             </RequireAuth>
           }
         />
@@ -100,9 +111,9 @@ export default function AppRouter() {
           path="/stock-count/:inventoryCountID"
           element={
             <RequireAuth>
-              <RequireRole allowedRoles={["admin", "leader", "inventory"]}>
+              <RequirePermission menuKey="inventory_counts">
                 <InventoryCountDetailPage />
-              </RequireRole>
+              </RequirePermission>
             </RequireAuth>
           }
         />
@@ -110,9 +121,9 @@ export default function AppRouter() {
           path="/stock-in"
           element={
             <RequireAuth>
-              <RequireRole allowedRoles={["admin", "leader", "inventory"]}>
+              <RequirePermission menuKey="stock_receipts">
                 <StockReceiptPage />
-              </RequireRole>
+              </RequirePermission>
             </RequireAuth>
           }
         />
@@ -120,9 +131,9 @@ export default function AppRouter() {
           path="/stock-in/:stockReceiptID"
           element={
             <RequireAuth>
-              <RequireRole allowedRoles={["admin", "leader", "inventory"]}>
+              <RequirePermission menuKey="stock_receipts">
                 <StockReceiptDetailPage />
-              </RequireRole>
+              </RequirePermission>
             </RequireAuth>
           }
         />
@@ -138,9 +149,9 @@ export default function AppRouter() {
           path="/user-management"
           element={
             <RequireAuth>
-              <RequireRole allowedRoles={["admin", "hris_admin"]}>
+              <RequirePermission menuKey="users">
                 <UserManagementPage />
-              </RequireRole>
+              </RequirePermission>
             </RequireAuth>
           }
         />
@@ -148,21 +159,23 @@ export default function AppRouter() {
           path="/role-management"
           element={
             <RequireAuth>
-              <RequireRole allowedRoles={["admin", "hris_admin"]}>
+              <RequirePermission menuKey="roles">
                 <RoleManagementPage />
-              </RequireRole>
+              </RequirePermission>
             </RequireAuth>
           }
         />
-        <Route path="/supplier-management" element={<RequireAuth><RequireRole allowedRoles={["admin", "leader", "inventory"]}><SupplierManagementPage /></RequireRole></RequireAuth>} />
-        <Route path="/stock-movements" element={<RequireAuth><RequireRole allowedRoles={["admin", "leader", "inventory"]}><StockMovementPage /></RequireRole></RequireAuth>} />
+        <Route path="/supplier-management" element={<RequireAuth><RequirePermission menuKey="suppliers"><SupplierManagementPage /></RequirePermission></RequireAuth>} />
+        <Route path="/stock-adjustments" element={<RequireAuth><RequirePermission menuKey="stock_adjustments"><StockAdjustmentPage /></RequirePermission></RequireAuth>} />
+        <Route path="/stock-adjustments/:adjustmentID" element={<RequireAuth><RequirePermission menuKey="stock_adjustments"><StockAdjustmentDetailPage /></RequirePermission></RequireAuth>} />
+        <Route path="/stock-movements" element={<RequireAuth><RequirePermission menuKey="stock_movements"><StockMovementPage /></RequirePermission></RequireAuth>} />
         <Route
           path="/unit-management"
           element={
             <RequireAuth>
-              <RequireRole allowedRoles={["admin", "leader", "inventory"]}>
+              <RequirePermission menuKey="units">
                 <UnitManagementPage />
-              </RequireRole>
+              </RequirePermission>
             </RequireAuth>
           }
         />
@@ -170,9 +183,9 @@ export default function AppRouter() {
           path="/ingredient-management"
           element={
             <RequireAuth>
-              <RequireRole allowedRoles={["admin", "leader", "inventory"]}>
+              <RequirePermission menuKey="ingredients">
                 <IngredientManagementPage />
-              </RequireRole>
+              </RequirePermission>
             </RequireAuth>
           }
         />
@@ -180,9 +193,9 @@ export default function AppRouter() {
           path="/ingredient-management/:ingredientID"
           element={
             <RequireAuth>
-              <RequireRole allowedRoles={["admin", "leader", "inventory"]}>
+              <RequirePermission menuKey="ingredients">
                 <IngredientDetailPage />
-              </RequireRole>
+              </RequirePermission>
             </RequireAuth>
           }
         />
@@ -190,9 +203,9 @@ export default function AppRouter() {
           path="/category-management"
           element={
             <RequireAuth>
-              <RequireRole allowedRoles={["admin", "ballista", "leader"]}>
+              <RequirePermission menuKey="categories">
                 <CategoryManagementPage />
-              </RequireRole>
+              </RequirePermission>
             </RequireAuth>
           }
         />
@@ -200,9 +213,9 @@ export default function AppRouter() {
           path="/category-management/:categoryID"
           element={
             <RequireAuth>
-              <RequireRole allowedRoles={["admin", "ballista", "leader"]}>
+              <RequirePermission menuKey="categories">
                 <CategoryDetailPage />
-              </RequireRole>
+              </RequirePermission>
             </RequireAuth>
           }
         />
@@ -210,9 +223,9 @@ export default function AppRouter() {
           path="/category-management/:categoryID/products/:productID"
           element={
             <RequireAuth>
-              <RequireRole allowedRoles={["admin", "ballista", "leader", "inventory"]}>
+              <RequirePermission menuKey="products">
                 <ProductDetailPage />
-              </RequireRole>
+              </RequirePermission>
             </RequireAuth>
           }
         />
@@ -220,9 +233,9 @@ export default function AppRouter() {
           path="/menu-items"
           element={
             <RequireAuth>
-              <RequireRole allowedRoles={["admin", "ballista", "leader"]}>
+              <RequirePermission menuKey="categories">
                 <MenuItemsPage />
-              </RequireRole>
+              </RequirePermission>
             </RequireAuth>
           }
         />
@@ -230,9 +243,9 @@ export default function AppRouter() {
           path="/menu-items/:productID"
           element={
             <RequireAuth>
-              <RequireRole allowedRoles={["admin", "ballista", "leader", "inventory"]}>
+              <RequirePermission menuKey="products">
                 <ProductDetailPage />
-              </RequireRole>
+              </RequirePermission>
             </RequireAuth>
           }
         />

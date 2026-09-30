@@ -14,7 +14,7 @@ import ConfirmDialog from "../../components/common/ConfirmDialog";
 import Navbar from "../../components/layout/Navbar";
 import Sidebar from "../../components/layout/Sidebar";
 import { useAuth } from "../../app/AuthContext";
-import { getUserRoleNames } from "../../app/roleAccess";
+import { userCan } from "../../app/roleAccess";
 
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50];
 const emptyForm: UnitPayload = {
@@ -26,8 +26,10 @@ const emptyForm: UnitPayload = {
 
 export default function UnitManagementPage() {
   const { user } = useAuth();
-  const roles = getUserRoleNames(user);
-  const canWriteStockMaster = roles.some((role) => ["admin", "inventory"].includes(role));
+  const canCreateUnits = userCan(user, "units", "create");
+  const canUpdateUnits = userCan(user, "units", "update");
+  const canDeleteUnits = userCan(user, "units", "delete");
+  const showActions = canUpdateUnits || canDeleteUnits;
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [units, setUnits] = useState<Unit[]>([]);
   const [unitUsage, setUnitUsage] = useState<Record<string, boolean>>({});
@@ -214,7 +216,7 @@ export default function UnitManagementPage() {
   }
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const columnCount = canWriteStockMaster ? 6 : 5;
+  const columnCount = showActions ? 6 : 5;
   return (
     <div className="flex min-h-screen bg-[#f8f5f0]">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
@@ -231,7 +233,7 @@ export default function UnitManagementPage() {
                 Manage inventory measurement units.
               </p>
             </div>
-            {canWriteStockMaster && <button
+            {canCreateUnits && <button
               type="button"
               onClick={() => openModal()}
               className="flex items-center gap-2 rounded-lg bg-[#362219] px-5 py-3 text-sm font-semibold text-white"
@@ -278,7 +280,7 @@ export default function UnitManagementPage() {
                     <th className="px-5 py-3">Type</th>
                     <th className="px-5 py-3">Usage</th>
                     <th className="px-5 py-3">Status</th>
-                    {canWriteStockMaster && <th className="px-5 py-3 text-right">Action</th>}
+                    {showActions && <th className="px-5 py-3 text-right">Action</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-100">
@@ -317,34 +319,40 @@ export default function UnitManagementPage() {
                             {unit.active ? "Active" : "Inactive"}
                           </span>
                         </td>
-                        {canWriteStockMaster && <td className="px-5 py-4">
+                        {showActions && <td className="px-5 py-4">
                           <div className="flex justify-end gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => openModal(unit)}
-                              className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800"
-                              title="Update unit"
-                            >
-                              <Pencil size={15} />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => requestToggleActive(unit)}
-                              disabled={unit.active && inUse}
-                              className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent"
-                              title={unit.active && inUse ? "Unit is used by ingredients" : unit.active ? "Deactivate unit" : "Activate unit"}
-                            >
-                              <Power size={15} />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => requestDelete(unit)}
-                              disabled={inUse}
-                              className="grid size-8 place-items-center rounded-lg text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent"
-                              title={inUse ? "Unit is used by ingredients" : "Delete unit"}
-                            >
-                              <Trash2 size={15} />
-                            </button>
+                            {canUpdateUnits && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => openModal(unit)}
+                                  className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800"
+                                  title="Update unit"
+                                >
+                                  <Pencil size={15} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => requestToggleActive(unit)}
+                                  disabled={unit.active && inUse}
+                                  className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent"
+                                  title={unit.active && inUse ? "Unit is used by ingredients" : unit.active ? "Deactivate unit" : "Activate unit"}
+                                >
+                                  <Power size={15} />
+                                </button>
+                              </>
+                            )}
+                            {canDeleteUnits && (
+                              <button
+                                type="button"
+                                onClick={() => requestDelete(unit)}
+                                disabled={inUse}
+                                className="grid size-8 place-items-center rounded-lg text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent"
+                                title={inUse ? "Unit is used by ingredients" : "Delete unit"}
+                              >
+                                <Trash2 size={15} />
+                              </button>
+                            )}
                           </div>
                         </td>}
                       </tr>

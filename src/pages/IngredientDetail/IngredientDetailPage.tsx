@@ -16,7 +16,7 @@ import ConfirmDialog from "../../components/common/ConfirmDialog";
 import Navbar from "../../components/layout/Navbar";
 import Sidebar from "../../components/layout/Sidebar";
 import { useAuth } from "../../app/AuthContext";
-import { getUserRoleNames } from "../../app/roleAccess";
+import { userCan } from "../../app/roleAccess";
 import { formatNumber, normalizeNumberInput } from "../../utils/numberFormat";
 
 const emptyForm: IngredientUnitPayload = {
@@ -32,8 +32,12 @@ function formatFactor(value: string) {
 
 export default function IngredientDetailPage() {
   const { user } = useAuth();
-  const roles = getUserRoleNames(user);
-  const canWriteStockMaster = roles.some((role) => ["admin", "inventory"].includes(role));
+  const canCreateIngredientUnits = userCan(user, "ingredient_units", "create");
+  const canReadIngredientUnits = userCan(user, "ingredient_units", "read");
+  const canUpdateIngredientUnits = userCan(user, "ingredient_units", "update");
+  const canDeleteIngredientUnits = userCan(user, "ingredient_units", "delete");
+  const showActions = canUpdateIngredientUnits || canDeleteIngredientUnits;
+  const shouldLoadUnits = canCreateIngredientUnits || canUpdateIngredientUnits;
   const { ingredientID = "" } = useParams();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [ingredient, setIngredient] = useState<Ingredient | null>(null);
@@ -65,14 +69,18 @@ export default function IngredientDetailPage() {
       try {
         const [ingredientResponse, unitResponse, itemResponse] = await Promise.all([
           getIngredient(ingredientID),
-          getUnits({ start: 0, limit: 100, name: "" }),
-          getIngredientUnits({
-            start: 0,
-            limit: 100,
-            ingredient_id: ingredientID,
-            unit_id: "",
-            name: "",
-          }),
+          shouldLoadUnits
+            ? getUnits({ start: 0, limit: 100, name: "" })
+            : Promise.resolve({ data: [] }),
+          canReadIngredientUnits
+            ? getIngredientUnits({
+                start: 0,
+                limit: 100,
+                ingredient_id: ingredientID,
+                unit_id: "",
+                name: "",
+              })
+            : Promise.resolve({ data: [] }),
         ]);
         if (!current) return;
         setIngredient(ingredientResponse.data ?? null);
@@ -95,7 +103,7 @@ export default function IngredientDetailPage() {
     return () => {
       current = false;
     };
-  }, [ingredientID, refreshKey]);
+  }, [canReadIngredientUnits, ingredientID, refreshKey, shouldLoadUnits]);
 
   function openModal(item?: IngredientUnit) {
     setEditingItem(item ?? null);
@@ -208,7 +216,7 @@ export default function IngredientDetailPage() {
     });
   }
 
-  const columnCount = canWriteStockMaster ? 4 : 3;
+  const columnCount = showActions ? 4 : 3;
 
   return (
     <div className="flex min-h-screen bg-[#f8f5f0]">
@@ -228,7 +236,7 @@ export default function IngredientDetailPage() {
                 Base unit: {ingredient?.base_unit_info?.code ?? ingredient?.base_unit ?? "-"} · Minimum stock: {ingredient ? formatNumber(ingredient.minimum_stock, 3) : "-"}
               </p>
             </div>
-            {canWriteStockMaster && <button type="button" onClick={() => openModal()} className="flex items-center gap-2 rounded-lg bg-[#362219] px-5 py-3 text-sm font-semibold text-white">
+            {canCreateIngredientUnits && <button type="button" onClick={() => openModal()} className="flex items-center gap-2 rounded-lg bg-[#362219] px-5 py-3 text-sm font-semibold text-white">
               <ListPlus size={17} />
               Add unit conversion
             </button>}
@@ -250,7 +258,7 @@ export default function IngredientDetailPage() {
                     <th className="px-5 py-3">Unit</th>
                     <th className="px-5 py-3">Conversion</th>
                     <th className="px-5 py-3">Status</th>
-                    {canWriteStockMaster && <th className="px-5 py-3 text-right">Action</th>}
+                    {showActions && <th className="px-5 py-3 text-right">Action</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-100">
@@ -271,11 +279,11 @@ export default function IngredientDetailPage() {
                             {item.active ? "Active" : "Inactive"}
                           </span>
                         </td>
-                        {canWriteStockMaster && <td className="px-5 py-4">
+                        {showActions && <td className="px-5 py-4">
                           <div className="flex justify-end gap-1.5">
-                            <button type="button" onClick={() => openModal(item)} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800" title="Update ingredient unit"><Pencil size={15} /></button>
-                            <button type="button" onClick={() => requestToggleActive(item)} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800" title={item.active ? "Deactivate ingredient unit" : "Activate ingredient unit"}><Power size={15} /></button>
-                            <button type="button" onClick={() => requestDelete(item)} className="grid size-8 place-items-center rounded-lg text-red-600 hover:bg-red-50" title="Delete ingredient unit"><Trash2 size={15} /></button>
+                            {canUpdateIngredientUnits && <button type="button" onClick={() => openModal(item)} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800" title="Update ingredient unit"><Pencil size={15} /></button>}
+                            {canUpdateIngredientUnits && <button type="button" onClick={() => requestToggleActive(item)} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800" title={item.active ? "Deactivate ingredient unit" : "Activate ingredient unit"}><Power size={15} /></button>}
+                            {canDeleteIngredientUnits && <button type="button" onClick={() => requestDelete(item)} className="grid size-8 place-items-center rounded-lg text-red-600 hover:bg-red-50" title="Delete ingredient unit"><Trash2 size={15} /></button>}
                           </div>
                         </td>}
                       </tr>

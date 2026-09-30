@@ -1,20 +1,22 @@
 import { getDraftStockReceiptCount } from "../../api/stockReceipt.api";
-import { CalendarDays, CheckCircle2, ClipboardCheck, Lock, Plus, Search } from "lucide-react";
+import { CalendarDays, CheckCircle2, ClipboardCheck, Lock, Plus, Search, Trash2 } from "lucide-react";
 import { isAxiosError } from "axios";
 import { useEffect, useState, type FormEvent } from "react";
-import { Link } from "react-router-dom";
 import {
   closeBusinessDay,
+  deleteBusinessDay,
   getBusinessDays,
   openBusinessDay,
   type BusinessDay,
 } from "../../api/businessDay.api";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
+import TableActionButton from "../../components/common/TableActionButton";
 import Navbar from "../../components/layout/Navbar";
 import Sidebar from "../../components/layout/Sidebar";
 import { useAuth } from "../../app/AuthContext";
-import { getUserRoleNames } from "../../app/roleAccess";
+import { getUserRoleNames, userCan } from "../../app/roleAccess";
 import { getInventoryCounts } from "../../api/inventoryCount.api";
+import { getDraftStockAdjustmentCount } from "../../api/stockAdjustment.api";
 
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50];
 
@@ -34,10 +36,17 @@ export default function BusinessDayPage() {
   const { user } = useAuth();
   const roles = getUserRoleNames(user);
   const isTodayActionOnly = !roles.includes("admin") && roles.includes("leader");
+  const canCreateBusinessDay = userCan(user, "business_days", "create");
+  const canUpdateBusinessDay = userCan(user, "business_days", "update");
+  const canDeleteBusinessDay = userCan(user, "business_days", "delete");
+  const canReadInventoryCounts = userCan(user, "inventory_counts", "read");
+  const showActions = canUpdateBusinessDay || canDeleteBusinessDay || canReadInventoryCounts;
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [items, setItems] = useState<BusinessDay[]>([]);
   const [draftStockInCounts, setDraftStockInCounts] = useState<Record<string, number>>({});
+  const [draftStockAdjustmentCounts, setDraftStockAdjustmentCounts] = useState<Record<string, number>>({});
   const [closingSubmitted, setClosingSubmitted] = useState<Record<string, boolean>>({});
+  const [stockCountExists, setStockCountExists] = useState<Record<string, boolean>>({});
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -75,19 +84,22 @@ export default function BusinessDayPage() {
           nextItems.map(async (item) => {
             const counts = await getInventoryCounts({
               start: 0,
-              limit: 2,
+              limit: 10,
               business_day_id: item.business_day_id,
-              count_type: "CLOSING",
+              count_type: "",
               status: "",
               name: "",
             });
-            const pending = item.status === "OPEN" ? await getDraftStockReceiptCount(item.business_day_id) : 0;
-            return [item.business_day_id, counts.data?.some((count) => count.count_type === "CLOSING" && count.status === "SUBMITTED") ?? false, pending] as const;
+            const pendingStockIn = item.status === "OPEN" ? await getDraftStockReceiptCount(item.business_day_id) : 0;
+            const pendingAdjustment = item.status === "OPEN" ? await getDraftStockAdjustmentCount(item.business_day_id) : 0;
+            return [item.business_day_id, counts.data?.some((count) => count.count_type === "CLOSING" && count.status === "SUBMITTED") ?? false, pendingStockIn, pendingAdjustment, Boolean(counts.data?.length)] as const;
           }),
         );
         if (!current) return;
         setClosingSubmitted(Object.fromEntries(statusEntries.map(([id, submitted]) => [id, submitted])));
         setDraftStockInCounts(Object.fromEntries(statusEntries.map(([id, , pending]) => [id, pending])));
+        setDraftStockAdjustmentCounts(Object.fromEntries(statusEntries.map(([id, , , pending]) => [id, pending])));
+        setStockCountExists(Object.fromEntries(statusEntries.map(([id, , , , exists]) => [id, exists])));
       } catch (requestError) {
         if (!current) return;
         const response = isAxiosError<{ message?: string }>(requestError)
@@ -95,6 +107,8 @@ export default function BusinessDayPage() {
           : undefined;
         setItems([]);
         setClosingSubmitted({});
+        setStockCountExists({});
+        setDraftStockAdjustmentCounts({});
         setTotal(0);
         setError(response?.message || "Could not load business days.");
       } finally {
@@ -159,9 +173,33 @@ export default function BusinessDayPage() {
     });
   }
 
+  function requestDelete(item: BusinessDay) {
+    setConfirm({
+      title: "Delete business day",
+      message: `Delete business day for ${item.business_date}? This is only allowed when it has no operational records.`,
+      confirmText: "Delete day",
+      tone: "danger",
+      onConfirm: async () => {
+        setConfirm(null);
+        setSubmitting(true);
+        try {
+          await deleteBusinessDay(item.business_day_id);
+          setRefreshKey((value) => value + 1);
+        } catch (requestError) {
+          const response = isAxiosError<{ message?: string }>(requestError)
+            ? requestError.response?.data
+            : undefined;
+          setError(response?.message || "Could not delete business day.");
+        } finally {
+          setSubmitting(false);
+        }
+      },
+    });
+  }
+
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const selectedBusinessDay = items.find((item) => item.business_date === businessDate);
-  const canOpenBusinessDay = Boolean(businessDate) && !selectedBusinessDay && !submitting;
+  const canOpenBusinessDay = canCreateBusinessDay && Boolean(businessDate) && !selectedBusinessDay && !submitting;
 
   return (
     <div className="flex min-h-screen bg-[#f8f5f0]">
@@ -177,13 +215,15 @@ export default function BusinessDayPage() {
               <h1 className="font-serif text-3xl font-bold">Business Days</h1>
               <p className="mt-2 text-sm text-stone-500">Track operational dates for daily, monthly, and yearly reports.</p>
             </div>
-            <form onSubmit={submitOpen} className="flex flex-col gap-2 sm:flex-row">
-              <input type="date" value={businessDate} onChange={(event) => setBusinessDate(event.target.value)} className="rounded-lg border border-stone-300 bg-white px-3.5 py-3 text-sm outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10 disabled:bg-stone-100" disabled={submitting || isTodayActionOnly} />
-              <button type="submit" disabled={!canOpenBusinessDay} title={selectedBusinessDay ? "Business day already exists" : "Open business day"} className="flex items-center justify-center gap-2 rounded-lg bg-[#362219] px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60">
-                <Plus size={17} />
-                Open business day
-              </button>
-            </form>
+            {canCreateBusinessDay && (
+              <form onSubmit={submitOpen} className="flex flex-col gap-2 sm:flex-row">
+                <input type="date" value={businessDate} onChange={(event) => setBusinessDate(event.target.value)} className="rounded-lg border border-stone-300 bg-white px-3.5 py-3 text-sm outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10 disabled:bg-stone-100" disabled={submitting || isTodayActionOnly} />
+                <button type="submit" disabled={!canOpenBusinessDay} title={selectedBusinessDay ? "Business day already exists" : "Open business day"} className="flex items-center justify-center gap-2 rounded-lg bg-[#362219] px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60">
+                  <Plus size={17} />
+                  Open business day
+                </button>
+              </form>
+            )}
           </header>
 
           <section className="mt-7 overflow-hidden rounded-xl border border-stone-200 bg-white">
@@ -212,17 +252,28 @@ export default function BusinessDayPage() {
                     <th className="px-5 py-3">Closed By</th>
                     <th className="px-5 py-3">Closed At</th>
                     <th className="px-5 py-3">Status</th>
-                    <th className="px-5 py-3 text-right">Action</th>
+                    {showActions && <th className="px-5 py-3 text-right">Action</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-100">
                   {loading ? (
-                    <tr><td colSpan={7} className="px-5 py-14 text-center text-sm text-stone-500">Loading business days...</td></tr>
+                    <tr><td colSpan={showActions ? 7 : 6} className="px-5 py-14 text-center text-sm text-stone-500">Loading business days...</td></tr>
                   ) : items.length === 0 ? (
-                    <tr><td colSpan={7} className="px-5 py-14 text-center text-sm text-stone-500">No business days found</td></tr>
+                    <tr><td colSpan={showActions ? 7 : 6} className="px-5 py-14 text-center text-sm text-stone-500">No business days found</td></tr>
                   ) : (
                     items.map((item) => {
-                      const canClose = item.status === "OPEN" && closingSubmitted[item.business_day_id] && draftStockInCounts[item.business_day_id] === 0 && (!isTodayActionOnly || item.business_date === today());
+                      const pendingStockIn = draftStockInCounts[item.business_day_id] ?? 0;
+                      const pendingAdjustment = draftStockAdjustmentCounts[item.business_day_id] ?? 0;
+                      const hasStockCount = stockCountExists[item.business_day_id] ?? false;
+                      const canClose = item.status === "OPEN" && closingSubmitted[item.business_day_id] && pendingStockIn === 0 && pendingAdjustment === 0 && (!isTodayActionOnly || item.business_date === today());
+                      const canDelete = !submitting && !hasStockCount;
+                      const closeTitle = pendingStockIn > 0
+                        ? "Submit all draft Stock In first"
+                        : pendingAdjustment > 0
+                          ? "Submit all draft Stock Adjustment first"
+                          : closingSubmitted[item.business_day_id]
+                            ? "Close business day"
+                            : "Submit closing stock first";
                       return (
                       <tr key={item.business_day_id}>
                         <td className="px-5 py-4 text-sm">{item.business_date}</td>
@@ -236,17 +287,27 @@ export default function BusinessDayPage() {
                             {item.status === "OPEN" ? "Open" : "Closed"}
                           </span>
                         </td>
-                        <td className="px-5 py-4">
-                          <div className="flex justify-end gap-2">
-                            <Link to={`/business-days/${item.business_day_id}/inventory-counts`} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold text-stone-700 hover:bg-stone-50">
-                              <ClipboardCheck size={14} />
-                              Stock Count
-                            </Link>
-                            <button type="button" onClick={() => requestClose(item)} disabled={!canClose || submitting} title={draftStockInCounts[item.business_day_id] > 0 ? "Submit all draft Stock In first" : closingSubmitted[item.business_day_id] ? "Close business day" : "Submit closing stock first"} className="rounded-lg border px-3 py-2 text-xs font-semibold text-stone-700 hover:bg-stone-50 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent">
-                              Close
-                            </button>
-                          </div>
-                        </td>
+                        {showActions && (
+                          <td className="px-5 py-4">
+                            <div className="flex justify-end gap-2">
+                              {canReadInventoryCounts && (
+                                <TableActionButton to={`/business-days/${item.business_day_id}/inventory-counts`} label="Stock Count" variant="info">
+                                  <ClipboardCheck size={16} />
+                                </TableActionButton>
+                              )}
+                              {canUpdateBusinessDay && (
+                                <TableActionButton onClick={() => requestClose(item)} disabled={!canClose || submitting} label={closeTitle}>
+                                  <Lock size={14} />
+                                </TableActionButton>
+                              )}
+                              {canDeleteBusinessDay && (
+                                <TableActionButton onClick={() => requestDelete(item)} disabled={!canDelete} label={hasStockCount ? "Delete stock count first" : "Delete business day"} variant="danger">
+                                  <Trash2 size={14} />
+                                </TableActionButton>
+                              )}
+                            </div>
+                          </td>
+                        )}
                       </tr>
                       );
                     })

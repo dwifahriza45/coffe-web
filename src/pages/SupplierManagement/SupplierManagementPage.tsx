@@ -13,7 +13,7 @@ import ConfirmDialog from "../../components/common/ConfirmDialog";
 import Navbar from "../../components/layout/Navbar";
 import Sidebar from "../../components/layout/Sidebar";
 import { useAuth } from "../../app/AuthContext";
-import { getUserRoleNames } from "../../app/roleAccess";
+import { userCan } from "../../app/roleAccess";
 
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50];
 const emptyForm: SupplierPayload = {
@@ -26,8 +26,10 @@ const emptyForm: SupplierPayload = {
 
 export default function SupplierManagementPage() {
   const { user } = useAuth();
-  const roles = getUserRoleNames(user);
-  const canWriteStockMaster = roles.some((role) => ["admin", "inventory"].includes(role));
+  const canCreateSuppliers = userCan(user, "suppliers", "create");
+  const canUpdateSuppliers = userCan(user, "suppliers", "update");
+  const canDeleteSuppliers = userCan(user, "suppliers", "delete");
+  const showActions = canUpdateSuppliers || canDeleteSuppliers;
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [searchInput, setSearchInput] = useState("");
@@ -87,7 +89,7 @@ export default function SupplierManagementPage() {
   }, [page, pageSize, search, refreshKey]);
 
   function openModal(supplier?: Supplier) {
-    if (!canWriteStockMaster || submitting) return;
+    if ((supplier ? !canUpdateSuppliers : !canCreateSuppliers) || submitting) return;
     setNotice("");
     setEditingSupplier(supplier ?? null);
     setForm(
@@ -123,7 +125,7 @@ export default function SupplierManagementPage() {
   }
 
   async function submitConfirmed() {
-    if (!canWriteStockMaster || submitting) return;
+    if ((editingSupplier ? !canUpdateSuppliers : !canCreateSuppliers) || submitting) return;
     setNotice("");
     setError("");
     setConfirm(null);
@@ -152,6 +154,7 @@ export default function SupplierManagementPage() {
   }
 
   function requestDelete(supplier: Supplier) {
+    if (!canDeleteSuppliers || submitting) return;
     setConfirm({
       title: "Delete supplier",
       message: "Delete this supplier permanently?",
@@ -162,7 +165,7 @@ export default function SupplierManagementPage() {
   }
 
   async function deleteConfirmed(supplierID: string) {
-    if (!canWriteStockMaster || submitting) return;
+    if (!canDeleteSuppliers || submitting) return;
     setNotice("");
     setError("");
     setConfirm(null);
@@ -183,6 +186,7 @@ export default function SupplierManagementPage() {
   }
 
   function requestToggleActive(supplier: Supplier) {
+    if (!canUpdateSuppliers || submitting) return;
     setConfirm({
       title: supplier.active ? "Deactivate supplier" : "Activate supplier",
       message: supplier.active
@@ -194,7 +198,7 @@ export default function SupplierManagementPage() {
   }
 
   async function toggleActiveConfirmed(supplier: Supplier) {
-    if (!canWriteStockMaster || submitting) return;
+    if (!canUpdateSuppliers || submitting) return;
     setNotice("");
     setError("");
     setConfirm(null);
@@ -220,7 +224,7 @@ export default function SupplierManagementPage() {
   }
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const columnCount = canWriteStockMaster ? 6 : 5;
+  const columnCount = showActions ? 6 : 5;
   return (
     <div className="flex min-h-screen bg-[#f8f5f0]">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
@@ -237,7 +241,7 @@ export default function SupplierManagementPage() {
                 Manage supplier contacts and availability.
               </p>
             </div>
-            {canWriteStockMaster && <button
+            {canCreateSuppliers && <button
               type="button"
               onClick={() => openModal()}
               className="flex items-center gap-2 rounded-lg bg-[#362219] px-5 py-3 text-sm font-semibold text-white"
@@ -286,7 +290,7 @@ export default function SupplierManagementPage() {
                     <th className="px-5 py-3">Email</th>
                     <th className="px-5 py-3">Address</th>
                     <th className="px-5 py-3">Status</th>
-                    {canWriteStockMaster && <th className="px-5 py-3 text-right">Action</th>}
+                    {showActions && <th className="px-5 py-3 text-right">Action</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-100">
@@ -319,32 +323,32 @@ export default function SupplierManagementPage() {
                             {supplier.active ? "Active" : "Inactive"}
                           </span>
                         </td>
-                        {canWriteStockMaster && <td className="px-5 py-4">
+                        {showActions && <td className="px-5 py-4">
                           <div className="flex justify-end gap-1.5">
-                            <button
+                            {canUpdateSuppliers && <button
                               type="button"
                               onClick={() => openModal(supplier)}
                               className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800"
                               title="Update supplier"
                             >
                               <Pencil size={15} />
-                            </button>
-                            <button
+                            </button>}
+                            {canUpdateSuppliers && <button
                               type="button"
                               onClick={() => requestToggleActive(supplier)}
                               className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent"
                               title={supplier.active ? "Deactivate supplier" : "Activate supplier"}
                             >
                               <Power size={15} />
-                            </button>
-                            <button
+                            </button>}
+                            {canDeleteSuppliers && <button
                               type="button"
                               onClick={() => requestDelete(supplier)}
                               className="grid size-8 place-items-center rounded-lg text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent"
                               title="Delete supplier"
                             >
                               <Trash2 size={15} />
-                            </button>
+                            </button>}
                           </div>
                         </td>}
                       </tr>

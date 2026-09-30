@@ -12,7 +12,7 @@ import { formatNumber } from "../../utils/numberFormat";
 
 const movementLabels: Record<string, string> = {
   STOCK_IN: "Stock In", ORDER_USAGE: "Order Usage", WASTE: "Waste",
-  ADJUSTMENT_IN: "Adjustment In", ADJUSTMENT_OUT: "Adjustment Out",
+  ADJUSTMENT_IN: "Koreksi Stok (+)", ADJUSTMENT_OUT: "Koreksi Stok (-)",
 };
 
 export default function StockMovementPage() {
@@ -20,10 +20,12 @@ export default function StockMovementPage() {
   const roles = getUserRoleNames(user);
   const todayOnly = roles.includes("inventory") && !roles.some((role) => ["admin", "leader"].includes(role));
   const [params] = useSearchParams();
-  const businessDayID = todayOnly ? "" : params.get("businessDayID") ?? "";
+  const queryBusinessDayID = params.get("businessDayID") ?? "";
+  const queryDate = params.get("date") ?? "";
+  const businessDayID = queryBusinessDayID;
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [date, setDate] = useState("");
-  const scopedDate = todayOnly ? currentBusinessDate() : businessDayID ? "" : date;
+  const scopedDate = businessDayID ? "" : todayOnly ? currentBusinessDate() : date;
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [type, setType] = useState("");
@@ -47,6 +49,7 @@ export default function StockMovementPage() {
   }, [businessDayID, scopedDate, page, limit, type, search, refresh]);
 
   const pages = Math.max(1, Math.ceil(total / limit));
+  const displayDate = businessDayID ? ((items[0]?.business_date ?? queryDate) || businessDayID) : todayOnly ? currentBusinessDate() : "Inventory quantity changes";
   return (
     <div className="flex min-h-screen bg-[#f8f5f0]">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
@@ -58,7 +61,7 @@ export default function StockMovementPage() {
             <div>
               <div className="mb-3 grid size-11 place-items-center rounded-xl bg-[#efe9df] text-[#8a5a3f]"><ArrowRightLeft size={22} /></div>
               <h1 className="font-serif text-3xl font-bold">Stock Movement</h1>
-              <p className="mt-2 text-sm text-stone-500">{todayOnly ? currentBusinessDate() : businessDayID ? items[0]?.business_date ?? businessDayID : "Inventory quantity changes"}</p>
+              <p className="mt-2 text-sm text-stone-500">{displayDate}</p>
               <p className="mt-1 text-xs text-stone-500">Submitted Stock In is recorded automatically in each ingredient’s base unit.</p>
             </div>
             <button type="button" onClick={() => setRefresh((value) => value + 1)} disabled={loading} className="rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-semibold disabled:opacity-40">Refresh</button>
@@ -84,7 +87,7 @@ export default function StockMovementPage() {
                       <td className="px-5 py-4 font-semibold">{item.ingredient_name}</td>
                       <td className="px-5 py-4"><span className="rounded-full bg-stone-100 px-2.5 py-1 text-xs font-semibold">{movementLabels[item.movement_type] ?? item.movement_type}</span></td>
                       <td className={`whitespace-nowrap px-5 py-4 font-semibold ${outgoing ? "text-red-600" : "text-emerald-700"}`}>{outgoing ? "−" : "+"}{formatNumber(item.quantity, 3)} <span className="font-normal text-stone-500">{item.unit_code}</span></td>
-                      <td className="px-5 py-4">{item.reference_type === "STOCK_RECEIPT" ? <Link className="font-semibold text-[#92502f] underline" to={`/stock-in/${item.reference_id}?${new URLSearchParams({businessDayID: item.business_day_id, date: item.business_date})}`}>{item.reference_id}</Link> : item.reference_id}<p className="mt-1 text-xs text-stone-400">{item.stock_movement_id}</p></td>
+                      <td className="px-5 py-4">{item.reference_type === "STOCK_RECEIPT" ? <Link className="font-semibold text-[#92502f] underline" to={`/stock-in/${item.reference_id}?${new URLSearchParams({businessDayID: item.business_day_id, date: item.business_date})}`}>{item.reference_id}</Link> : item.reference_type === "STOCK_ADJUSTMENT" ? <Link className="font-semibold text-[#92502f] underline" to={`/stock-adjustments/${item.reference_id}?${new URLSearchParams({businessDayID: item.business_day_id, date: item.business_date})}`}>{item.reference_id}</Link> : item.reference_id}<p className="mt-1 text-xs text-stone-400">{item.stock_movement_id}</p></td>
                       <td className="px-5 py-4">{item.created_by_name}</td>
                       <td className="max-w-xs whitespace-pre-wrap break-words px-5 py-4 text-stone-500">{item.notes || "-"}</td>
                     </tr>;

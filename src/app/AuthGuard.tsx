@@ -2,7 +2,12 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "./AuthContext";
 import { getSessionUser } from "./authSession";
-import { getHomeRoute, userHasRole } from "./roleAccess";
+import {
+  getHomeRoute,
+  userCan,
+  userHasRole,
+  type PermissionAction,
+} from "./roleAccess";
 
 type AuthState = "checking" | "authenticated" | "unauthenticated";
 
@@ -66,6 +71,23 @@ export function RequireRole({
 }) {
   const { user } = useAuth();
   return userHasRole(user, allowedRoles) ? (
+    children
+  ) : (
+    <Navigate to={getHomeRoute(user)} replace />
+  );
+}
+
+export function RequirePermission({
+  children,
+  menuKey,
+  action = "read",
+}: {
+  children: ReactNode;
+  menuKey: string;
+  action?: PermissionAction;
+}) {
+  const { user } = useAuth();
+  return userCan(user, menuKey, action) ? (
     children
   ) : (
     <Navigate to={getHomeRoute(user)} replace />

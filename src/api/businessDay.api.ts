@@ -30,3 +30,6 @@ export const openBusinessDay = async (payload: { business_date: string }) =>
 
 export const closeBusinessDay = async (businessDayID: string) =>
   (await api.patch<ApiResponse<null>>(`/business-days/${businessDayID}/close`, {})).data;
+
+export const deleteBusinessDay = async (businessDayID: string) =>
+  (await api.delete<ApiResponse<null>>(`/business-days/${businessDayID}`)).data;

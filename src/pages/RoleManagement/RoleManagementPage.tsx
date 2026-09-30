@@ -16,6 +16,7 @@ import {
   getRoles,
   updateRole,
   type Role,
+  type RolePermission,
 } from "../../api/role.api";
 import { getUsers } from "../../api/user.api";
 import {
@@ -24,6 +25,8 @@ import {
   getRoleUsers,
   type UserRole,
 } from "../../api/userRole.api";
+import { useAuth } from "../../app/AuthContext";
+import { userCan } from "../../app/roleAccess";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import Navbar from "../../components/layout/Navbar";
 import Sidebar from "../../components/layout/Sidebar";
@@ -39,8 +42,58 @@ type ConfirmRequest = {
 };
 
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50];
+const PERMISSION_MENUS = [
+  { key: "dashboard", label: "Dashboard" },
+  { key: "users", label: "Users" },
+  { key: "roles", label: "Roles" },
+  { key: "business_days", label: "Business Days" },
+  { key: "inventory_counts", label: "Stock Count" },
+  { key: "stock_receipts", label: "Stock In" },
+  { key: "stock_adjustments", label: "Stock Adjustments" },
+  { key: "stock_movements", label: "Stock Movements" },
+  { key: "units", label: "Units" },
+  { key: "ingredients", label: "Ingredients" },
+  { key: "ingredient_units", label: "Ingredient Units" },
+  { key: "suppliers", label: "Suppliers" },
+  { key: "categories", label: "Categories" },
+  { key: "products", label: "Products" },
+  { key: "recipes", label: "Recipes" },
+  { key: "recipe_items", label: "Recipe Items" },
+] as const;
+const PERMISSION_ACTIONS = [
+  { key: "can_read", label: "Read" },
+  { key: "can_create", label: "Create" },
+  { key: "can_update", label: "Update" },
+  { key: "can_delete", label: "Delete" },
+] as const;
+type PermissionFlag = (typeof PERMISSION_ACTIONS)[number]["key"];
+const WRITE_PERMISSION_FLAGS: PermissionFlag[] = [
+  "can_create",
+  "can_update",
+  "can_delete",
+];
+const READ_DEPENDENCIES: Record<string, string[]> = {
+  ingredients: ["ingredient_units"],
+  categories: ["products", "recipes", "recipe_items"],
+  products: ["categories", "recipes", "recipe_items"],
+  recipes: ["categories", "products", "recipe_items"],
+  recipe_items: ["categories", "products", "recipes"],
+};
+const LINKED_READ_GROUPS = [
+  ["categories", "products", "recipes", "recipe_items"] as const,
+  ["ingredients", "ingredient_units"],
+];
 
 export default function RoleManagementPage() {
+  const { user: currentUser } = useAuth();
+  const isCurrentUserAdmin =
+    currentUser?.roles?.some(
+      (role) => role.roles_name.trim().toLowerCase() === "admin",
+    ) ?? false;
+  const canCreateRoles = userCan(currentUser, "roles", "create");
+  const canUpdateRoles = userCan(currentUser, "roles", "update");
+  const canDeleteRoles = userCan(currentUser, "roles", "delete");
+  const showRoleActions = canUpdateRoles || canDeleteRoles;
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [roles, setRoles] = useState<Role[]>([]);
   const [roleUsage, setRoleUsage] = useState<Record<string, boolean>>({});
@@ -55,6 +108,7 @@ export default function RoleManagementPage() {
   const [modalMode, setModalMode] = useState<RoleMode | null>(null);
   const [activeRole, setActiveRole] = useState<Role | null>(null);
   const [roleName, setRoleName] = useState("");
+  const [rolePermissions, setRolePermissions] = useState<RolePermission[]>([]);
   const [fieldError, setFieldError] = useState("");
   const [actionError, setActionError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -125,6 +179,7 @@ export default function RoleManagementPage() {
     setModalMode(mode);
     setActiveRole(role ?? null);
     setRoleName(role?.name ?? "");
+    setRolePermissions(normalizeRolePermissions(role?.permissions ?? []));
     setFieldError("");
     setActionError("");
   }
@@ -133,6 +188,107 @@ export default function RoleManagementPage() {
     if (submitting) return;
     setModalMode(null);
     setActiveRole(null);
+  }
+
+  function normalizeRolePermissions(
+    permissions: RolePermission[],
+  ): RolePermission[] {
+    return applyPermissionDependencies(PERMISSION_MENUS.map((menu) => {
+      const existing = permissions.find((item) => item.menu_key === menu.key);
+      return {
+        menu_key: menu.key,
+        can_read: existing?.can_read ?? false,
+        can_create: existing?.can_create ?? false,
+        can_update: existing?.can_update ?? false,
+        can_delete: existing?.can_delete ?? false,
+      };
+    }));
+  }
+
+  function togglePermission(menuKey: string, flag: PermissionFlag) {
+    setRolePermissions((current) =>
+      applyPermissionDependencies(
+        current.map((permission) => {
+          const linkedReadGroup = linkedReadGroupFor(menuKey);
+          if (flag === "can_read" && linkedReadGroup) {
+            const target = current.find((item) => item.menu_key === menuKey);
+            const checked = !target?.can_read;
+            if (!linkedReadGroup.includes(permission.menu_key)) return permission;
+            if (!checked && hasWritePermission(permission)) return permission;
+            return { ...permission, can_read: checked };
+          }
+          if (permission.menu_key !== menuKey) return permission;
+          if (flag === "can_read" && hasWritePermission(permission)) {
+            return permission;
+          }
+          const next = { ...permission, [flag]: !permission[flag] };
+          if (flag !== "can_read" && next[flag]) {
+            next.can_read = true;
+          }
+          return next;
+        }),
+      ),
+    );
+  }
+
+  function toggleMenuPermissions(menuKey: string, checked: boolean) {
+    setRolePermissions((current) =>
+      applyPermissionDependencies(current.map((permission) =>
+        permission.menu_key === menuKey
+          ? {
+              ...permission,
+              can_read: checked,
+              can_create: checked,
+              can_update: checked,
+              can_delete: checked,
+            }
+          : permission,
+      )),
+    );
+  }
+
+  function activePermissions() {
+    return rolePermissions.filter(
+      (permission) =>
+        permission.can_read ||
+        permission.can_create ||
+        permission.can_update ||
+        permission.can_delete,
+    );
+  }
+
+  function hasWritePermission(permission?: RolePermission) {
+    if (!permission) return false;
+    return WRITE_PERMISSION_FLAGS.some((flag) => permission[flag]);
+  }
+
+  function isReadDependency(menuKey: string) {
+    return rolePermissions.some((permission) =>
+      hasWritePermission(permission) &&
+      (READ_DEPENDENCIES[permission.menu_key] ?? []).includes(menuKey),
+    );
+  }
+
+  function applyPermissionDependencies(
+    permissions: RolePermission[],
+  ): RolePermission[] {
+    const requiredReadMenus = new Set<string>();
+    permissions.forEach((permission) => {
+      if (!hasWritePermission(permission)) return;
+      (READ_DEPENDENCIES[permission.menu_key] ?? []).forEach((menuKey) =>
+        requiredReadMenus.add(menuKey),
+      );
+    });
+    return permissions.map((permission) => {
+      if (requiredReadMenus.has(permission.menu_key)) {
+        return { ...permission, can_read: true };
+      }
+      return permission;
+    });
+  }
+
+  function linkedReadGroupFor(menuKey: string) {
+    return LINKED_READ_GROUPS.find((group) => group.includes(menuKey));
   }
 
   async function submitRole(event: FormEvent) {
@@ -160,9 +316,9 @@ export default function RoleManagementPage() {
     setSubmitting(true);
     try {
       if (modalMode === "create") {
-        await createRole(roleName);
+        await createRole(roleName, activePermissions());
       } else if (activeRole) {
-        await updateRole(activeRole.role_id, roleName);
+        await updateRole(activeRole.role_id, roleName, activePermissions());
       }
       closeRoleModal();
       refreshRoles();
@@ -313,6 +469,9 @@ export default function RoleManagementPage() {
   }
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const usersRoleIsAdmin =
+    usersRole?.name.trim().toLowerCase() === "admin";
+  const canManageUsersRole = canUpdateRoles && (!usersRoleIsAdmin || isCurrentUserAdmin);
 
   return (
     <div className="flex min-h-screen bg-[#f8f5f0]">
@@ -330,14 +489,16 @@ export default function RoleManagementPage() {
                 Manage access roles and review assigned users.
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => openRoleModal("create")}
-              className="flex items-center gap-2 rounded-lg bg-[#362219] px-5 py-3 text-sm font-semibold text-white"
-            >
-              <Plus size={17} />
-              Add role
-            </button>
+            {canCreateRoles && (
+              <button
+                type="button"
+                onClick={() => openRoleModal("create")}
+                className="flex items-center gap-2 rounded-lg bg-[#362219] px-5 py-3 text-sm font-semibold text-white"
+              >
+                <Plus size={17} />
+                Add role
+              </button>
+            )}
           </header>
 
           <section className="mt-7 overflow-hidden rounded-xl border border-stone-200 bg-white">
@@ -372,14 +533,16 @@ export default function RoleManagementPage() {
                   <tr>
                     <th className="px-5 py-3">Role</th>
                     <th className="px-5 py-3">Usage</th>
-                    <th className="px-5 py-3 text-right">Action</th>
+                    {showRoleActions && (
+                      <th className="px-5 py-3 text-right">Action</th>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-100">
                   {loading ? (
                     <tr>
                       <td
-                        colSpan={3}
+                        colSpan={showRoleActions ? 3 : 2}
                         className="px-5 py-14 text-center text-sm text-stone-500"
                       >
                         <span className="mx-auto mb-3 block size-5 animate-spin rounded-full border-2 border-stone-200 border-t-[#92502f]" />
@@ -388,7 +551,10 @@ export default function RoleManagementPage() {
                     </tr>
                   ) : roles.length === 0 ? (
                     <tr>
-                      <td colSpan={3} className="px-5 py-14 text-center">
+                      <td
+                        colSpan={showRoleActions ? 3 : 2}
+                        className="px-5 py-14 text-center"
+                      >
                         <Shield className="mx-auto mb-3 text-stone-300" />
                         <p className="font-semibold">No roles found</p>
                       </td>
@@ -420,37 +586,45 @@ export default function RoleManagementPage() {
                               {hasUsers ? "Assigned" : "Unused"}
                             </span>
                           </td>
-                          <td className="px-5 py-4">
-                            <div className="flex justify-end gap-1.5">
-                              <button
-                                type="button"
-                                onClick={() => openUsers(role)}
-                                className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800"
-                                title="View users"
-                              >
-                                <Users size={15} />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => openRoleModal("edit", role)}
-                                className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800"
-                                title="Update role"
-                              >
-                                <Pencil size={15} />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => requestDelete(role)}
-                                disabled={hasUsers}
-                                className="grid size-8 place-items-center rounded-lg text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent"
-                                title={
-                                  hasUsers ? "Have assigned users" : "Delete role"
-                                }
-                              >
-                                <Trash2 size={15} />
-                              </button>
-                            </div>
-                          </td>
+                          {showRoleActions && (
+                            <td className="px-5 py-4">
+                              <div className="flex justify-end gap-1.5">
+                                {canUpdateRoles && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => openUsers(role)}
+                                      className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800"
+                                      title="Manage users"
+                                    >
+                                      <Users size={15} />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => openRoleModal("edit", role)}
+                                      className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800"
+                                      title="Update role"
+                                    >
+                                      <Pencil size={15} />
+                                    </button>
+                                  </>
+                                )}
+                                {canDeleteRoles && (
+                                  <button
+                                    type="button"
+                                    onClick={() => requestDelete(role)}
+                                    disabled={hasUsers}
+                                    className="grid size-8 place-items-center rounded-lg text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent"
+                                    title={
+                                      hasUsers ? "Have assigned users" : "Delete role"
+                                    }
+                                  >
+                                    <Trash2 size={15} />
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          )}
                         </tr>
                       );
                     })
@@ -514,7 +688,7 @@ export default function RoleManagementPage() {
         >
           <form
             onSubmit={submitRole}
-            className="w-full max-w-md rounded-2xl bg-white shadow-2xl"
+            className="w-full max-w-4xl rounded-2xl bg-white shadow-2xl"
           >
             <header className="flex items-start justify-between border-b border-stone-200 p-5">
               <div>
@@ -535,7 +709,7 @@ export default function RoleManagementPage() {
                 <X size={18} />
               </button>
             </header>
-            <div className="space-y-4 p-5">
+            <div className="max-h-[calc(100vh-12rem)] space-y-5 overflow-y-auto p-5">
               <label className="block text-sm font-semibold text-stone-700">
                 Role name
                 <input
@@ -553,6 +727,95 @@ export default function RoleManagementPage() {
                   </p>
                 )}
               </label>
+              <section>
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-bold text-stone-800">
+                      Menu permissions
+                    </h3>
+                    <p className="mt-1 text-xs text-stone-500">
+                      {activePermissions().length} menus selected
+                    </p>
+                  </div>
+                </div>
+                <div className="overflow-x-auto rounded-xl border border-stone-200">
+                  <table className="w-full min-w-[720px] text-left">
+                    <thead className="bg-stone-50 text-xs uppercase tracking-wider text-stone-500">
+                      <tr>
+                        <th className="px-4 py-3">Menu</th>
+                        {PERMISSION_ACTIONS.map((action) => (
+                          <th key={action.key} className="px-4 py-3 text-center">
+                            {action.label}
+                          </th>
+                        ))}
+                        <th className="px-4 py-3 text-center">All</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-stone-100">
+                      {PERMISSION_MENUS.map((menu) => {
+                        const permission = rolePermissions.find(
+                          (item) => item.menu_key === menu.key,
+                        );
+                        const readLocked =
+                          hasWritePermission(permission) ||
+                          isReadDependency(menu.key);
+                        const allChecked = PERMISSION_ACTIONS.every(
+                          (action) => Boolean(permission?.[action.key]),
+                        );
+                        return (
+                          <tr key={menu.key}>
+                            <td className="px-4 py-3">
+                              <span className="text-sm font-semibold text-stone-800">
+                                {menu.label}
+                              </span>
+                              <span className="mt-0.5 block text-xs text-stone-400">
+                                {menu.key}
+                              </span>
+                            </td>
+                            {PERMISSION_ACTIONS.map((action) => (
+                              <td key={action.key} className="px-4 py-3 text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={Boolean(permission?.[action.key])}
+                                  onChange={() =>
+                                    togglePermission(menu.key, action.key)
+                                  }
+                                  disabled={
+                                    submitting ||
+                                    (action.key === "can_read" && readLocked)
+                                  }
+                                  className="size-4 accent-[#92502f]"
+                                  aria-label={`${menu.label} ${action.label}`}
+                                  title={
+                                    action.key === "can_read" && readLocked
+                                      ? "Read is required by enabled permissions"
+                                      : undefined
+                                  }
+                                />
+                              </td>
+                            ))}
+                            <td className="px-4 py-3 text-center">
+                              <input
+                                type="checkbox"
+                                checked={allChecked}
+                                onChange={(event) =>
+                                  toggleMenuPermissions(
+                                    menu.key,
+                                    event.target.checked,
+                                  )
+                                }
+                                disabled={submitting}
+                                className="size-4 accent-[#92502f]"
+                                aria-label={`${menu.label} all permissions`}
+                              />
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
               {actionError && (
                 <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">
                   {actionError}
@@ -624,27 +887,42 @@ export default function RoleManagementPage() {
                           This role is not assigned to any users.
                         </p>
                       ) : (
-                        assignedUsers.map((item) => (
-                          <div
-                            key={`${item.user_id}-${item.role_id}`}
-                            className="flex items-center justify-between rounded-lg border border-stone-200 px-3.5 py-3"
-                          >
-                            <div>
-                              <p className="text-sm font-semibold text-stone-800">
-                                {item.fullname || "Unnamed user"}
-                              </p>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => requestRemoveUser(item.user_id)}
-                              disabled={usersSubmitting}
-                              className="grid size-8 place-items-center rounded-lg text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent"
-                              title="Remove user from role"
+                        assignedUsers.map((item) => {
+                          const isSelfAdminAssignment =
+                            usersRoleIsAdmin &&
+                            item.user_id === currentUser?.user_id;
+                          const removeDisabled =
+                            usersSubmitting ||
+                            !canManageUsersRole ||
+                            isSelfAdminAssignment;
+                          return (
+                            <div
+                              key={`${item.user_id}-${item.role_id}`}
+                              className="flex items-center justify-between rounded-lg border border-stone-200 px-3.5 py-3"
                             >
-                              <Trash2 size={15} />
-                            </button>
-                          </div>
-                        ))
+                              <div>
+                                <p className="text-sm font-semibold text-stone-800">
+                                  {item.fullname || "Unnamed user"}
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => requestRemoveUser(item.user_id)}
+                                disabled={removeDisabled}
+                                className="grid size-8 place-items-center rounded-lg text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent"
+                                title={
+                                  isSelfAdminAssignment
+                                    ? "You cannot remove your own admin role"
+                                    : canManageUsersRole
+                                      ? "Remove user from role"
+                                      : "Only admin can change admin role assignments"
+                                }
+                              >
+                                <Trash2 size={15} />
+                              </button>
+                            </div>
+                          );
+                        })
                       )}
                     </div>
                   </section>
@@ -679,15 +957,15 @@ export default function RoleManagementPage() {
                             >
                               <input
                                 type="checkbox"
-                                checked={selectedUserIDs.includes(
-                                  user.user_id,
-                                )}
-                                onChange={() =>
-                                  toggleSelectedUser(user.user_id)
-                                }
-                                disabled={usersSubmitting}
-                                className="size-4 accent-[#92502f]"
-                              />
+                              checked={selectedUserIDs.includes(
+                                user.user_id,
+                              )}
+                              onChange={() =>
+                                toggleSelectedUser(user.user_id)
+                              }
+                              disabled={usersSubmitting || !canManageUsersRole}
+                              className="size-4 accent-[#92502f]"
+                            />
                               <span className="min-w-0">
                                 <span className="block text-sm font-semibold text-stone-800">
                                   {user.fullname}
@@ -708,7 +986,8 @@ export default function RoleManagementPage() {
                 disabled={
                   usersLoading ||
                   usersSubmitting ||
-                  selectedUserIDs.length === 0
+                  selectedUserIDs.length === 0 ||
+                  !canManageUsersRole
                 }
                 className="rounded-lg bg-[#362219] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
               >
