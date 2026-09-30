@@ -3,6 +3,7 @@ import { useState } from "react";
 import Sidebar from "../../components/layout/Sidebar";
 import Navbar from "../../components/layout/Navbar";
 import { useAuth } from "../../app/AuthContext";
+import { useLanguage, type Language } from "../../app/LanguageContext";
 
 function getGreeting(date: Date) {
   const hour = date.getHours();
@@ -12,8 +13,8 @@ function getGreeting(date: Date) {
   return "Good night";
 }
 
-function formatCurrentDate(date: Date) {
-  return new Intl.DateTimeFormat("en-US", {
+function formatCurrentDate(date: Date, language: Language) {
+  return new Intl.DateTimeFormat(language === "id" ? "id-ID" : "en-US", {
     weekday: "long",
     day: "numeric",
     month: "long",
@@ -22,22 +23,6 @@ function formatCurrentDate(date: Date) {
     .toUpperCase();
 }
 
-const stats = [
-  {
-    icon: TrendingUp,
-    label: "Today’s revenue",
-    value: "Rp 8.420.000",
-    change: "+12.5%",
-  },
-  { icon: ShoppingBag, label: "Total orders", value: "128", change: "+8.2%" },
-  {
-    icon: Package,
-    label: "Active products",
-    value: "36",
-    change: "4 low stock",
-  },
-  { icon: Users, label: "New customers", value: "24", change: "+5.1%" },
-];
 const orders = [
   ["#KR-1028", "Cappuccino · 2", "Rp 76.000"],
   ["#KR-1027", "Iced Aren Latte · 1", "Rp 32.000"],
@@ -47,8 +32,25 @@ const orders = [
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const { language, t } = useLanguage();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const currentDate = new Date();
+  const stats = [
+    {
+      icon: TrendingUp,
+      label: t("Today’s revenue"),
+      value: "Rp 8.420.000",
+      change: "+12.5%",
+    },
+    { icon: ShoppingBag, label: t("Total orders"), value: "128", change: "+8.2%" },
+    {
+      icon: Package,
+      label: t("Active products"),
+      value: "36",
+      change: t("4 low stock"),
+    },
+    { icon: Users, label: t("New customers"), value: "24", change: "+5.1%" },
+  ];
   return (
     <div className="flex min-h-screen bg-[#f8f5f0]">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
@@ -58,17 +60,17 @@ export default function DashboardPage() {
           <header className="flex justify-between">
             <div>
               <p className="text-xs font-bold tracking-[.2em] text-[#a25e39]">
-                {formatCurrentDate(currentDate)}
+                {formatCurrentDate(currentDate, language)}
               </p>
               <h1 className="mt-2 font-serif text-3xl font-bold">
-                {getGreeting(currentDate)}, {user?.fullname || "User"}.
+                {t(getGreeting(currentDate))}, {user?.fullname || t("User")}.
               </h1>
               <p className="mt-2 text-sm text-stone-500">
-                Here’s what’s happening at your coffee shop today.
+                {t("Here’s what’s happening at your coffee shop today.")}
               </p>
             </div>
             <button className="hidden h-fit rounded-lg bg-[#362219] px-5 py-3 text-sm text-white sm:block">
-              + New order
+              {t("+ New order")}
             </button>
           </header>
           <section className="my-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -90,9 +92,9 @@ export default function DashboardPage() {
           </section>
           <section className="grid gap-4 xl:grid-cols-[1.5fr_1fr]">
             <article className="rounded-xl border border-stone-200 bg-white p-5">
-              <h2 className="font-serif text-lg font-bold">Revenue overview</h2>
+              <h2 className="font-serif text-lg font-bold">{t("Revenue overview")}</h2>
               <p className="text-xs text-stone-400">
-                Performance over the last 7 days
+                {t("Performance over the last 7 days")}
               </p>
               <div className="mt-7 flex h-56 items-end gap-[5%] border-b px-3">
                 {[50, 70, 43, 80, 62, 94, 74].map((height, index) => (
@@ -105,15 +107,15 @@ export default function DashboardPage() {
                       style={{ height: `${height}%` }}
                     />
                     <small className="text-[9px]">
-                      {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][index]}
+                      {t(["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][index])}
                     </small>
                   </div>
                 ))}
               </div>
             </article>
             <article className="rounded-xl border border-stone-200 bg-white p-5">
-              <h2 className="font-serif text-lg font-bold">Recent orders</h2>
-              <p className="text-xs text-stone-400">Latest store activity</p>
+              <h2 className="font-serif text-lg font-bold">{t("Recent orders")}</h2>
+              <p className="text-xs text-stone-400">{t("Latest store activity")}</p>
               {orders.map((order) => (
                 <div
                   className="flex items-center gap-3 border-b border-stone-100 py-3 last:border-0"
@@ -130,7 +132,7 @@ export default function DashboardPage() {
                   </span>
                   <strong className="flex flex-col text-right text-xs">
                     {order[2]}
-                    <small className="text-green-700">Paid</small>
+                    <small className="text-green-700">{t("Paid")}</small>
                   </strong>
                 </div>
               ))}

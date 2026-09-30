@@ -19,6 +19,7 @@ import {
   type RolePermission,
 } from "../../api/role.api";
 import { getUsers } from "../../api/user.api";
+import { useLanguage } from "../../app/LanguageContext";
 import {
   createUserRole,
   deleteUserRole,
@@ -48,9 +49,11 @@ const PERMISSION_MENUS = [
   { key: "roles", label: "Roles" },
   { key: "business_days", label: "Business Days" },
   { key: "inventory_counts", label: "Stock Count" },
+  { key: "inventory_opening_counts", label: "Opening Stock" },
   { key: "stock_receipts", label: "Stock In" },
   { key: "stock_adjustments", label: "Stock Adjustments" },
   { key: "stock_movements", label: "Stock Movements" },
+  { key: "inventory_closing_counts", label: "Closing Stock" },
   { key: "units", label: "Units" },
   { key: "ingredients", label: "Ingredients" },
   { key: "ingredient_units", label: "Ingredient Units" },
@@ -73,19 +76,78 @@ const WRITE_PERMISSION_FLAGS: PermissionFlag[] = [
   "can_delete",
 ];
 const READ_DEPENDENCIES: Record<string, string[]> = {
+  business_days: [
+    "inventory_counts",
+    "inventory_opening_counts",
+    "stock_receipts",
+    "stock_adjustments",
+    "stock_movements",
+    "inventory_closing_counts",
+  ],
+  inventory_counts: [
+    "inventory_opening_counts",
+    "stock_receipts",
+    "stock_adjustments",
+    "stock_movements",
+    "inventory_closing_counts",
+  ],
+  inventory_opening_counts: [
+    "inventory_counts",
+    "stock_receipts",
+    "stock_adjustments",
+    "stock_movements",
+    "inventory_closing_counts",
+  ],
+  stock_receipts: [
+    "inventory_counts",
+    "inventory_opening_counts",
+    "stock_adjustments",
+    "stock_movements",
+    "inventory_closing_counts",
+  ],
+  stock_adjustments: [
+    "inventory_counts",
+    "inventory_opening_counts",
+    "stock_receipts",
+    "stock_movements",
+    "inventory_closing_counts",
+  ],
+  stock_movements: [
+    "inventory_counts",
+    "inventory_opening_counts",
+    "stock_receipts",
+    "stock_adjustments",
+    "inventory_closing_counts",
+  ],
+  inventory_closing_counts: [
+    "inventory_counts",
+    "inventory_opening_counts",
+    "stock_receipts",
+    "stock_adjustments",
+    "stock_movements",
+  ],
   ingredients: ["ingredient_units"],
   categories: ["products", "recipes", "recipe_items"],
   products: ["categories", "recipes", "recipe_items"],
   recipes: ["categories", "products", "recipe_items"],
   recipe_items: ["categories", "products", "recipes"],
 };
-const LINKED_READ_GROUPS = [
-  ["categories", "products", "recipes", "recipe_items"] as const,
+const LINKED_READ_GROUPS: string[][] = [
+  [
+    "inventory_counts",
+    "inventory_opening_counts",
+    "stock_receipts",
+    "stock_adjustments",
+    "stock_movements",
+    "inventory_closing_counts",
+  ],
+  ["categories", "products", "recipes", "recipe_items"],
   ["ingredients", "ingredient_units"],
 ];
 
 export default function RoleManagementPage() {
   const { user: currentUser } = useAuth();
+  const { t } = useLanguage();
   const isCurrentUserAdmin =
     currentUser?.roles?.some(
       (role) => role.roles_name.trim().toLowerCase() === "admin",
@@ -154,7 +216,7 @@ export default function RoleManagementPage() {
         setRoles([]);
         setRoleUsage({});
         setTotal(0);
-        setError(response?.message || "Could not load roles.");
+        setError(response?.message || t("Could not load roles."));
       } finally {
         if (current) setLoading(false);
       }
@@ -296,16 +358,16 @@ export default function RoleManagementPage() {
     setFieldError("");
     setActionError("");
     if (roleName.trim().length < 3) {
-      setFieldError("name must be at least 3 characters");
+      setFieldError(t("name must be at least 3 characters"));
       return;
     }
     setConfirmRequest({
-      title: modalMode === "create" ? "Create role" : "Update role",
+      title: modalMode === "create" ? t("Create role") : t("Update role"),
       message:
         modalMode === "create"
-          ? "Create this role?"
-          : "Update this role name?",
-      confirmText: modalMode === "create" ? "Create role" : "Update role",
+          ? t("Create this role?")
+          : t("Update this role name?"),
+      confirmText: modalMode === "create" ? t("Create role") : t("Update role"),
       onConfirm: submitRoleConfirmed,
     });
   }
@@ -331,7 +393,7 @@ export default function RoleManagementPage() {
         : undefined;
       setFieldError(response?.valid?.name ?? "");
       setActionError(
-        response?.valid ? "" : response?.message || "Action failed.",
+        response?.valid ? "" : response?.message || t("Action failed."),
       );
     } finally {
       setSubmitting(false);
@@ -340,9 +402,9 @@ export default function RoleManagementPage() {
 
   function requestDelete(role: Role) {
     setConfirmRequest({
-      title: "Delete role",
-      message: "Delete this role permanently?",
-      confirmText: "Delete role",
+      title: t("Delete role"),
+      message: t("Delete this role permanently?"),
+      confirmText: t("Delete role"),
       tone: "danger",
       onConfirm: () => deleteRoleConfirmed(role.role_id),
     });
@@ -358,7 +420,7 @@ export default function RoleManagementPage() {
       const response = isAxiosError<{ message?: string }>(requestError)
         ? requestError.response?.data
         : undefined;
-      setError(response?.message || "Could not delete role.");
+      setError(response?.message || t("Could not delete role."));
     } finally {
       setSubmitting(false);
     }
@@ -382,7 +444,7 @@ export default function RoleManagementPage() {
       const response = isAxiosError<{ message?: string }>(requestError)
         ? requestError.response?.data
         : undefined;
-      setUsersError(response?.message || "Could not load assigned users.");
+      setUsersError(response?.message || t("Could not load assigned users."));
     } finally {
       setUsersLoading(false);
     }
@@ -410,9 +472,9 @@ export default function RoleManagementPage() {
   function requestAddSelectedUsers() {
     if (!usersRole || selectedUserIDs.length === 0) return;
     setConfirmRequest({
-      title: "Add users",
-      message: "Assign the selected users to this role?",
-      confirmText: "Add users",
+      title: t("Add users"),
+      message: t("Assign the selected users to this role?"),
+      confirmText: t("Add users"),
       onConfirm: addSelectedUsersConfirmed,
     });
   }
@@ -433,7 +495,7 @@ export default function RoleManagementPage() {
       const response = isAxiosError<{ message?: string }>(requestError)
         ? requestError.response?.data
         : undefined;
-      setUsersError(response?.message || "Could not assign selected users.");
+      setUsersError(response?.message || t("Could not assign selected users."));
     } finally {
       setUsersSubmitting(false);
     }
@@ -442,9 +504,9 @@ export default function RoleManagementPage() {
   function requestRemoveUser(userID: string) {
     if (!usersRole) return;
     setConfirmRequest({
-      title: "Remove user",
-      message: "Remove this user from the role?",
-      confirmText: "Remove user",
+      title: t("Remove user"),
+      message: t("Remove this user from the role?"),
+      confirmText: t("Remove user"),
       tone: "danger",
       onConfirm: () => removeUserConfirmed(userID),
     });
@@ -462,7 +524,7 @@ export default function RoleManagementPage() {
       const response = isAxiosError<{ message?: string }>(requestError)
         ? requestError.response?.data
         : undefined;
-      setUsersError(response?.message || "Could not remove user from role.");
+      setUsersError(response?.message || t("Could not remove user from role."));
     } finally {
       setUsersSubmitting(false);
     }
@@ -484,9 +546,9 @@ export default function RoleManagementPage() {
               <div className="mb-3 flex size-11 items-center justify-center rounded-xl bg-[#f2e2d8] text-[#92502f]">
                 <Shield size={22} />
               </div>
-              <h1 className="font-serif text-3xl font-bold">Role Management</h1>
+              <h1 className="font-serif text-3xl font-bold">{t("Role Management")}</h1>
               <p className="mt-2 text-sm text-stone-500">
-                Manage access roles and review assigned users.
+                {t("Manage access roles and review assigned users.")}
               </p>
             </div>
             {canCreateRoles && (
@@ -496,7 +558,7 @@ export default function RoleManagementPage() {
                 className="flex items-center gap-2 rounded-lg bg-[#362219] px-5 py-3 text-sm font-semibold text-white"
               >
                 <Plus size={17} />
-                Add role
+                {t("Add role")}
               </button>
             )}
           </header>
@@ -504,9 +566,9 @@ export default function RoleManagementPage() {
           <section className="mt-7 overflow-hidden rounded-xl border border-stone-200 bg-white">
             <div className="flex flex-col gap-4 border-b border-stone-200 p-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h2 className="font-semibold">All roles</h2>
+                <h2 className="font-semibold">{t("All roles")}</h2>
                 <p className="text-xs text-stone-500">
-                  {total} roles found
+                  {total} {t("roles found")}
                 </p>
               </div>
               <form
@@ -518,7 +580,7 @@ export default function RoleManagementPage() {
                   value={searchInput}
                   onChange={(event) => setSearchInput(event.target.value)}
                   className="min-w-0 flex-1 bg-transparent text-sm outline-none"
-                  placeholder="Search role..."
+                  placeholder={t("Search role...")}
                 />
               </form>
             </div>
@@ -531,10 +593,10 @@ export default function RoleManagementPage() {
               <table className="w-full min-w-150 text-left">
                 <thead className="bg-stone-50 text-xs uppercase tracking-wider text-stone-500">
                   <tr>
-                    <th className="px-5 py-3">Role</th>
-                    <th className="px-5 py-3">Usage</th>
+                    <th className="px-5 py-3">{t("Role")}</th>
+                    <th className="px-5 py-3">{t("Usage")}</th>
                     {showRoleActions && (
-                      <th className="px-5 py-3 text-right">Action</th>
+                      <th className="px-5 py-3 text-right">{t("Action")}</th>
                     )}
                   </tr>
                 </thead>
@@ -546,7 +608,7 @@ export default function RoleManagementPage() {
                         className="px-5 py-14 text-center text-sm text-stone-500"
                       >
                         <span className="mx-auto mb-3 block size-5 animate-spin rounded-full border-2 border-stone-200 border-t-[#92502f]" />
-                        Loading roles...
+                        {t("Loading roles...")}
                       </td>
                     </tr>
                   ) : roles.length === 0 ? (
@@ -556,7 +618,7 @@ export default function RoleManagementPage() {
                         className="px-5 py-14 text-center"
                       >
                         <Shield className="mx-auto mb-3 text-stone-300" />
-                        <p className="font-semibold">No roles found</p>
+                        <p className="font-semibold">{t("No roles found")}</p>
                       </td>
                     </tr>
                   ) : (
@@ -583,7 +645,7 @@ export default function RoleManagementPage() {
                               <span
                                 className={`size-1.5 rounded-full ${hasUsers ? "bg-amber-500" : "bg-stone-400"}`}
                               />
-                              {hasUsers ? "Assigned" : "Unused"}
+                              {hasUsers ? t("Assigned") : t("Unused")}
                             </span>
                           </td>
                           {showRoleActions && (
@@ -595,7 +657,7 @@ export default function RoleManagementPage() {
                                       type="button"
                                       onClick={() => openUsers(role)}
                                       className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800"
-                                      title="Manage users"
+                                      title={t("Manage users")}
                                     >
                                       <Users size={15} />
                                     </button>
@@ -603,7 +665,7 @@ export default function RoleManagementPage() {
                                       type="button"
                                       onClick={() => openRoleModal("edit", role)}
                                       className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800"
-                                      title="Update role"
+                                      title={t("Update role")}
                                     >
                                       <Pencil size={15} />
                                     </button>
@@ -616,7 +678,7 @@ export default function RoleManagementPage() {
                                     disabled={hasUsers}
                                     className="grid size-8 place-items-center rounded-lg text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent"
                                     title={
-                                      hasUsers ? "Have assigned users" : "Delete role"
+                                      hasUsers ? t("Have assigned users") : t("Delete role")
                                     }
                                   >
                                     <Trash2 size={15} />
@@ -635,10 +697,10 @@ export default function RoleManagementPage() {
             <footer className="flex items-center justify-between border-t border-stone-200 px-5 py-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                 <p className="text-xs text-stone-500">
-                  Page {page} of {totalPages}
+                  {t("Page")} {page} {t("of")} {totalPages}
                 </p>
                 <label className="flex items-center gap-2 text-xs font-semibold text-stone-500">
-                  Limit
+                  {t("Limit")}
                   <select
                     value={pageSize}
                     onChange={(event) => {
@@ -661,21 +723,21 @@ export default function RoleManagementPage() {
                   onClick={() => setPage((value) => value - 1)}
                   className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-40"
                 >
-                  Previous
+                  {t("Previous")}
                 </button>
                 <button
                   disabled={page >= totalPages || loading}
                   onClick={() => setPage((value) => value + 1)}
                   className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-40"
                 >
-                  Next
+                  {t("Next")}
                 </button>
               </div>
             </footer>
           </section>
           <div className="mt-4 flex items-center gap-2 text-xs text-stone-400">
             <ShieldCheck size={15} />
-            Only Admin and HRIS Admin can access this page.
+            {t("Only Admin and HRIS Admin can access this page.")}
           </div>
         </main>
       </section>
@@ -693,11 +755,11 @@ export default function RoleManagementPage() {
             <header className="flex items-start justify-between border-b border-stone-200 p-5">
               <div>
                 <h2 className="text-lg font-bold">
-                  {modalMode === "create" ? "Add role" : "Update role"}
+                  {modalMode === "create" ? t("Add role") : t("Update role")}
                 </h2>
                 <p className="mt-1 text-xs text-stone-500">
                   {modalMode === "create"
-                    ? "Create a new access role."
+                    ? t("Create a new access role.")
                     : activeRole?.role_id}
                 </p>
               </div>
@@ -711,7 +773,7 @@ export default function RoleManagementPage() {
             </header>
             <div className="max-h-[calc(100vh-12rem)] space-y-5 overflow-y-auto p-5">
               <label className="block text-sm font-semibold text-stone-700">
-                Role name
+                {t("Role name")}
                 <input
                   value={roleName}
                   onChange={(event) => {
@@ -731,10 +793,10 @@ export default function RoleManagementPage() {
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <div>
                     <h3 className="text-sm font-bold text-stone-800">
-                      Menu permissions
+                      {t("Menu permissions")}
                     </h3>
                     <p className="mt-1 text-xs text-stone-500">
-                      {activePermissions().length} menus selected
+                      {activePermissions().length} {t("menus selected")}
                     </p>
                   </div>
                 </div>
@@ -742,13 +804,13 @@ export default function RoleManagementPage() {
                   <table className="w-full min-w-[720px] text-left">
                     <thead className="bg-stone-50 text-xs uppercase tracking-wider text-stone-500">
                       <tr>
-                        <th className="px-4 py-3">Menu</th>
+                        <th className="px-4 py-3">{t("Menu")}</th>
                         {PERMISSION_ACTIONS.map((action) => (
                           <th key={action.key} className="px-4 py-3 text-center">
-                            {action.label}
+                            {t(action.label)}
                           </th>
                         ))}
-                        <th className="px-4 py-3 text-center">All</th>
+                        <th className="px-4 py-3 text-center">{t("All")}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-stone-100">
@@ -766,7 +828,7 @@ export default function RoleManagementPage() {
                           <tr key={menu.key}>
                             <td className="px-4 py-3">
                               <span className="text-sm font-semibold text-stone-800">
-                                {menu.label}
+                                {t(menu.label)}
                               </span>
                               <span className="mt-0.5 block text-xs text-stone-400">
                                 {menu.key}
@@ -785,10 +847,10 @@ export default function RoleManagementPage() {
                                     (action.key === "can_read" && readLocked)
                                   }
                                   className="size-4 accent-[#92502f]"
-                                  aria-label={`${menu.label} ${action.label}`}
+                                  aria-label={`${t(menu.label)} ${t(action.label)}`}
                                   title={
                                     action.key === "can_read" && readLocked
-                                      ? "Read is required by enabled permissions"
+                                      ? t("Read is required by enabled permissions")
                                       : undefined
                                   }
                                 />
@@ -806,7 +868,7 @@ export default function RoleManagementPage() {
                                 }
                                 disabled={submitting}
                                 className="size-4 accent-[#92502f]"
-                                aria-label={`${menu.label} all permissions`}
+                                aria-label={`${t(menu.label)} ${t("All")}`}
                               />
                             </td>
                           </tr>
@@ -829,14 +891,14 @@ export default function RoleManagementPage() {
                 disabled={submitting}
                 className="rounded-lg border border-stone-300 px-4 py-2.5 text-sm font-semibold hover:bg-stone-50"
               >
-                Cancel
+                {t("Cancel")}
               </button>
               <button
                 type="submit"
                 disabled={submitting}
                 className="rounded-lg bg-[#362219] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
               >
-                {submitting ? "Saving..." : "Save"}
+                {submitting ? t("Saving...") : t("Save")}
               </button>
             </footer>
           </form>
@@ -852,7 +914,7 @@ export default function RoleManagementPage() {
           <section className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl">
             <header className="flex items-start justify-between border-b border-stone-200 p-5">
               <div>
-                <h2 className="text-lg font-bold">Assigned users</h2>
+                <h2 className="text-lg font-bold">{t("Assigned users")}</h2>
                 <p className="mt-1 text-xs text-stone-500">
                   {usersRole.name}
                 </p>
@@ -869,7 +931,7 @@ export default function RoleManagementPage() {
               {usersLoading ? (
                 <div className="py-8 text-center text-sm text-stone-500">
                   <span className="mx-auto mb-3 block size-5 animate-spin rounded-full border-2 border-stone-200 border-t-[#92502f]" />
-                  Loading users...
+                  {t("Loading users...")}
                 </div>
               ) : usersError ? (
                 <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">
@@ -879,12 +941,12 @@ export default function RoleManagementPage() {
                 <>
                   <section>
                     <h3 className="text-sm font-bold text-stone-800">
-                      Assigned users
+                      {t("Assigned users")}
                     </h3>
                     <div className="mt-3 space-y-2">
                       {assignedUsers.length === 0 ? (
                         <p className="rounded-lg bg-stone-50 p-4 text-sm text-stone-500">
-                          This role is not assigned to any users.
+                          {t("This role is not assigned to any users.")}
                         </p>
                       ) : (
                         assignedUsers.map((item) => {
@@ -902,7 +964,7 @@ export default function RoleManagementPage() {
                             >
                               <div>
                                 <p className="text-sm font-semibold text-stone-800">
-                                  {item.fullname || "Unnamed user"}
+                                  {item.fullname || t("Unnamed user")}
                                 </p>
                               </div>
                               <button
@@ -912,10 +974,10 @@ export default function RoleManagementPage() {
                                 className="grid size-8 place-items-center rounded-lg text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent"
                                 title={
                                   isSelfAdminAssignment
-                                    ? "You cannot remove your own admin role"
+                                    ? t("You cannot remove your own admin role")
                                     : canManageUsersRole
-                                      ? "Remove user from role"
-                                      : "Only admin can change admin role assignments"
+                                      ? t("Remove user from role")
+                                      : t("Only admin can change admin role assignments")
                                 }
                               >
                                 <Trash2 size={15} />
@@ -929,7 +991,7 @@ export default function RoleManagementPage() {
 
                   <section>
                     <h3 className="text-sm font-bold text-stone-800">
-                      Add users
+                      {t("Add users")}
                     </h3>
                     <div className="mt-3 space-y-2">
                       {allUsers.filter(
@@ -939,7 +1001,7 @@ export default function RoleManagementPage() {
                           ),
                       ).length === 0 ? (
                         <p className="rounded-lg bg-stone-50 p-4 text-sm text-stone-500">
-                          All users are already assigned.
+                          {t("All users are already assigned.")}
                         </p>
                       ) : (
                         allUsers
@@ -991,7 +1053,7 @@ export default function RoleManagementPage() {
                 }
                 className="rounded-lg bg-[#362219] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
               >
-                {usersSubmitting ? "Saving..." : "Add selected"}
+                {usersSubmitting ? t("Saving...") : t("Add selected")}
               </button>
               <button
                 type="button"
@@ -999,7 +1061,7 @@ export default function RoleManagementPage() {
                 disabled={usersSubmitting}
                 className="rounded-lg border border-stone-300 px-4 py-2.5 text-sm font-semibold hover:bg-stone-50 disabled:opacity-50"
               >
-                Close
+                {t("Close")}
               </button>
             </footer>
           </section>
@@ -1010,7 +1072,7 @@ export default function RoleManagementPage() {
         open={Boolean(confirmRequest)}
         title={confirmRequest?.title ?? ""}
         message={confirmRequest?.message ?? ""}
-        confirmText={confirmRequest?.confirmText ?? "Confirm"}
+        confirmText={confirmRequest?.confirmText ?? t("Confirm")}
         tone={confirmRequest?.tone}
         submitting={submitting || usersSubmitting}
         onCancel={() => setConfirmRequest(null)}

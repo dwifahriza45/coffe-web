@@ -28,6 +28,7 @@ import {
 } from "../../api/userRole.api";
 import { getRoles, type Role } from "../../api/role.api";
 import { useAuth } from "../../app/AuthContext";
+import { useLanguage } from "../../app/LanguageContext";
 import { userCan } from "../../app/roleAccess";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import Navbar from "../../components/layout/Navbar";
@@ -56,6 +57,7 @@ const emptyEditForm: UpdateUserRequest = {
 
 export default function UserManagementPage() {
   const { user: currentUser } = useAuth();
+  const { t } = useLanguage();
   const canCreateUsers = userCan(currentUser, "users", "create");
   const canUpdateUsers = userCan(currentUser, "users", "update");
   const canDeleteUsers = userCan(currentUser, "users", "delete");
@@ -128,7 +130,7 @@ export default function UserManagementPage() {
             : undefined;
           setError(
             message ||
-              "Could not connect to the user service. Please try again.",
+              t("Could not connect to the user service. Please try again."),
           );
         }
       } finally {
@@ -186,7 +188,7 @@ export default function UserManagementPage() {
       const response = isAxiosError<{ message?: string }>(requestError)
         ? requestError.response?.data
         : undefined;
-      setRolesError(response?.message || "Could not load user roles.");
+      setRolesError(response?.message || t("Could not load user roles."));
     } finally {
       setRolesLoading(false);
     }
@@ -214,9 +216,9 @@ export default function UserManagementPage() {
   async function addSelectedRoles() {
     if (!rolesUser || selectedRoleIDs.length === 0) return;
     setConfirmRequest({
-      title: "Add roles",
-      message: "Add the selected roles to this user?",
-      confirmText: "Add roles",
+      title: t("Add roles"),
+      message: t("Add the selected roles to this user?"),
+      confirmText: t("Add roles"),
       onConfirm: addSelectedRolesConfirmed,
     });
   }
@@ -237,7 +239,7 @@ export default function UserManagementPage() {
       const response = isAxiosError<{ message?: string }>(requestError)
         ? requestError.response?.data
         : undefined;
-      setRolesError(response?.message || "Could not add selected roles.");
+      setRolesError(response?.message || t("Could not add selected roles."));
     } finally {
       setRolesSubmitting(false);
     }
@@ -246,9 +248,9 @@ export default function UserManagementPage() {
   async function removeUserRole(roleID: string) {
     if (!rolesUser) return;
     setConfirmRequest({
-      title: "Delete role",
-      message: "Remove this role from the user?",
-      confirmText: "Delete role",
+      title: t("Delete role"),
+      message: t("Remove this role from the user?"),
+      confirmText: t("Delete role"),
       tone: "danger",
       onConfirm: () => removeUserRoleConfirmed(roleID),
     });
@@ -266,7 +268,7 @@ export default function UserManagementPage() {
       const response = isAxiosError<{ message?: string }>(requestError)
         ? requestError.response?.data
         : undefined;
-      setRolesError(response?.message || "Could not delete role.");
+      setRolesError(response?.message || t("Could not delete role."));
     } finally {
       setRolesSubmitting(false);
     }
@@ -304,41 +306,41 @@ export default function UserManagementPage() {
     setActionFieldErrors({});
     if (actionMode === "password" && newPassword !== confirmPassword) {
       setActionFieldErrors({
-        confirm_password: "Confirm password must match password",
+        confirm_password: t("Confirm password must match password"),
       });
       return;
     }
     setConfirmRequest({
       title:
         actionMode === "edit"
-          ? "Update user"
+          ? t("Update user")
           : actionMode === "password"
-            ? "Change password"
+            ? t("Change password")
             : actionMode === "active"
               ? actionUser.active
-                ? "Deactivate user"
-                : "Activate user"
-              : "Delete user",
+                ? t("Deactivate user")
+                : t("Activate user")
+              : t("Delete user"),
       message:
         actionMode === "edit"
-          ? "Update this user data?"
+          ? t("Update this user data?")
           : actionMode === "password"
-            ? "Change this user password?"
+            ? t("Change this user password?")
             : actionMode === "active"
               ? actionUser.active
-                ? "Deactivate this user account?"
-                : "Activate this user account?"
-              : "Delete this user permanently?",
+                ? t("Deactivate this user account?")
+                : t("Activate this user account?")
+              : t("Delete this user permanently?"),
       confirmText:
         actionMode === "edit"
-          ? "Update"
+          ? t("Update")
           : actionMode === "password"
-            ? "Change password"
+            ? t("Change password")
             : actionMode === "active"
               ? actionUser.active
-                ? "Deactivate"
-                : "Activate"
-              : "Delete user",
+                ? t("Deactivate")
+                : t("Activate")
+              : t("Delete user"),
       tone: actionMode === "delete" ? "danger" : "default",
       onConfirm: submitActionConfirmed,
     });
@@ -381,7 +383,7 @@ export default function UserManagementPage() {
       setActionError(
         response?.valid
           ? ""
-          : response?.message || "Action failed. Please try again.",
+          : response?.message || t("Action failed. Please try again."),
       );
     } finally {
       setActionSubmitting(false);
@@ -404,9 +406,9 @@ export default function UserManagementPage() {
               <div className="mb-3 flex size-11 items-center justify-center rounded-xl bg-[#f2e2d8] text-[#92502f]">
                 <UserCog size={22} />
               </div>
-              <h1 className="font-serif text-3xl font-bold">User Management</h1>
+              <h1 className="font-serif text-3xl font-bold">{t("User Management")}</h1>
               <p className="mt-2 text-sm text-stone-500">
-                Manage people who have access to C.R.E.M.A.
+                {t("Manage people who have access to C.R.E.M.A.")}
               </p>
             </div>
             {canCreateUsers && (
@@ -414,7 +416,7 @@ export default function UserManagementPage() {
                 onClick={() => setFormOpen(true)}
                 className="rounded-lg bg-[#362219] px-5 py-3 text-sm font-semibold text-white"
               >
-                + Add user
+                + {t("Add user")}
               </button>
             )}
           </header>
@@ -422,9 +424,9 @@ export default function UserManagementPage() {
           <section className="mt-7 overflow-hidden rounded-xl border border-stone-200 bg-white">
             <div className="flex flex-col gap-4 border-b border-stone-200 p-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h2 className="font-semibold">All users</h2>
+                <h2 className="font-semibold">{t("All users")}</h2>
                 <p className="text-xs text-stone-500">
-                  {total} registered users
+                  {total} {t("registered users")}
                 </p>
               </div>
               <form
@@ -436,7 +438,7 @@ export default function UserManagementPage() {
                   value={searchInput}
                   onChange={(event) => setSearchInput(event.target.value)}
                   className="min-w-0 flex-1 bg-transparent text-sm outline-none"
-                  placeholder="Search by name..."
+                  placeholder={t("Search by name...")}
                 />
               </form>
             </div>
@@ -450,12 +452,12 @@ export default function UserManagementPage() {
               <table className="w-full min-w-180 text-left">
                 <thead className="bg-stone-50 text-xs uppercase tracking-wider text-stone-500">
                   <tr>
-                    <th className="px-5 py-3">User</th>
-                    <th className="px-5 py-3">Contact</th>
-                    <th className="px-5 py-3">Position</th>
-                    <th className="px-5 py-3">Status</th>
+                    <th className="px-5 py-3">{t("User")}</th>
+                    <th className="px-5 py-3">{t("Contact")}</th>
+                    <th className="px-5 py-3">{t("Position")}</th>
+                    <th className="px-5 py-3">{t("Status")}</th>
                     {showUserActions && (
-                      <th className="px-5 py-3 text-right">Action</th>
+                      <th className="px-5 py-3 text-right">{t("Action")}</th>
                     )}
                   </tr>
                 </thead>
@@ -467,7 +469,7 @@ export default function UserManagementPage() {
                         className="px-5 py-14 text-center text-sm text-stone-500"
                       >
                         <span className="mx-auto mb-3 block size-5 animate-spin rounded-full border-2 border-stone-200 border-t-[#92502f]" />
-                        Loading users...
+                        {t("Loading users...")}
                       </td>
                     </tr>
                   ) : users.length === 0 ? (
@@ -477,9 +479,9 @@ export default function UserManagementPage() {
                         className="px-5 py-14 text-center"
                       >
                         <Users className="mx-auto mb-3 text-stone-300" />
-                        <p className="font-semibold">No users found</p>
+                        <p className="font-semibold">{t("No users found")}</p>
                         <p className="text-sm text-stone-500">
-                          Try another search keyword.
+                          {t("Try another search keyword.")}
                         </p>
                       </td>
                     </tr>
@@ -517,7 +519,7 @@ export default function UserManagementPage() {
                               <span
                                 className={`size-1.5 rounded-full ${user.active ? "bg-green-500" : "bg-stone-400"}`}
                               />
-                              {user.active ? "Active" : "Inactive"}
+                              {user.active ? t("Active") : t("Inactive")}
                             </span>
                           </td>
                           {showUserActions && (
@@ -528,7 +530,7 @@ export default function UserManagementPage() {
                                   type="button"
                                   onClick={() => openRoles(user)}
                                   className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800"
-                                  title="Manage roles"
+                                  title={t("Manage roles")}
                                 >
                                   <Shield size={15} />
                                 </button>
@@ -539,7 +541,7 @@ export default function UserManagementPage() {
                                     type="button"
                                     onClick={() => openAction("edit", user)}
                                     className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800"
-                                    title="Update data"
+                                    title={t("Update data")}
                                   >
                                     <Pencil size={15} />
                                   </button>
@@ -547,7 +549,7 @@ export default function UserManagementPage() {
                                     type="button"
                                     onClick={() => openAction("password", user)}
                                     className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800"
-                                    title="Change password"
+                                    title={t("Change password")}
                                   >
                                     <KeyRound size={15} />
                                   </button>
@@ -558,10 +560,10 @@ export default function UserManagementPage() {
                                     className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent"
                                     title={
                                       isCurrentUser
-                                        ? "Cannot change your own account status"
+                                        ? t("Cannot change your own account status")
                                         : user.active
-                                          ? "Deactivate user"
-                                          : "Activate user"
+                                          ? t("Deactivate user")
+                                          : t("Activate user")
                                     }
                                   >
                                     <Power size={15} />
@@ -576,10 +578,10 @@ export default function UserManagementPage() {
                                   className="grid size-8 place-items-center rounded-lg text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent"
                                   title={
                                     isCurrentUser
-                                      ? "Cannot delete your own account"
+                                      ? t("Cannot delete your own account")
                                       : hasUserRole
-                                        ? "Have user role"
-                                        : "Delete user"
+                                        ? t("Have user role")
+                                        : t("Delete user")
                                   }
                                 >
                                   <Trash2 size={15} />
@@ -598,10 +600,10 @@ export default function UserManagementPage() {
             <footer className="flex items-center justify-between border-t border-stone-200 px-5 py-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                 <p className="text-xs text-stone-500">
-                  Page {page} of {totalPages}
+                  {t("Page")} {page} {t("of")} {totalPages}
                 </p>
                 <label className="flex items-center gap-2 text-xs font-semibold text-stone-500">
-                  Limit
+                  {t("Limit")}
                   <select
                     value={pageSize}
                     onChange={(event) => {
@@ -624,21 +626,21 @@ export default function UserManagementPage() {
                   onClick={() => setPage((value) => value - 1)}
                   className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-40"
                 >
-                  Previous
+                  {t("Previous")}
                 </button>
                 <button
                   disabled={page >= totalPages || loading}
                   onClick={() => setPage((value) => value + 1)}
                   className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-40"
                 >
-                  Next
+                  {t("Next")}
                 </button>
               </div>
             </footer>
           </section>
           <div className="mt-4 flex items-center gap-2 text-xs text-stone-400">
             <ShieldCheck size={15} />
-            Only Admin and HRIS Admin can access this page.
+            {t("Only Admin and HRIS Admin can access this page.")}
           </div>
         </main>
       </section>
@@ -665,11 +667,11 @@ export default function UserManagementPage() {
             <header className="flex items-start justify-between border-b border-stone-200 p-5">
               <div>
                 <h2 className="text-lg font-bold">
-                  {actionMode === "edit" && "Update data"}
-                  {actionMode === "password" && "Change password"}
+                  {actionMode === "edit" && t("Update data")}
+                  {actionMode === "password" && t("Change password")}
                   {actionMode === "active" &&
-                    (actionUser.active ? "Deactivate user" : "Activate user")}
-                  {actionMode === "delete" && "Delete user"}
+                    (actionUser.active ? t("Deactivate user") : t("Activate user"))}
+                  {actionMode === "delete" && t("Delete user")}
                 </h2>
                 <p className="mt-1 text-xs text-stone-500">
                   {actionUser.fullname}
@@ -693,12 +695,12 @@ export default function UserManagementPage() {
                         className="block text-sm font-semibold text-stone-700"
                       >
                         {field === "fullname"
-                          ? "Full name"
+                          ? t("Full name")
                           : field === "email"
-                            ? "Email address"
+                            ? t("Email address")
                             : field === "phone"
-                              ? "Phone number"
-                              : "Position"}
+                              ? t("Phone number")
+                              : t("Position")}
                         <input
                           value={editForm[field]}
                           onChange={(event) =>
@@ -720,7 +722,7 @@ export default function UserManagementPage() {
                     ),
                   )}
                   <label className="block text-sm font-semibold text-stone-700">
-                    Address
+                    {t("Address")}
                     <textarea
                       value={editForm.address}
                       onChange={(event) =>
@@ -743,7 +745,7 @@ export default function UserManagementPage() {
               )}
               {(actionMode === "password" || actionMode === "active") && (
                 <label className="block text-sm font-semibold text-stone-700">
-                  Current password
+                  {t("Current password")}
                   <input
                     type="password"
                     value={currentPassword}
@@ -764,7 +766,7 @@ export default function UserManagementPage() {
               {actionMode === "password" && (
                 <>
                   <label className="block text-sm font-semibold text-stone-700">
-                    New password
+                    {t("New password")}
                     <input
                       type="password"
                       value={newPassword}
@@ -782,7 +784,7 @@ export default function UserManagementPage() {
                     )}
                   </label>
                   <label className="block text-sm font-semibold text-stone-700">
-                    Confirm password
+                    {t("Confirm password")}
                     <input
                       type="password"
                       value={confirmPassword}
@@ -803,7 +805,7 @@ export default function UserManagementPage() {
               )}
               {actionMode === "delete" && (
                 <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">
-                  Delete this user permanently?
+                  {t("Delete this user permanently?")}
                 </p>
               )}
               {actionError && (
@@ -819,14 +821,14 @@ export default function UserManagementPage() {
                 disabled={actionSubmitting}
                 className="rounded-lg border border-stone-300 px-4 py-2.5 text-sm font-semibold hover:bg-stone-50"
               >
-                Cancel
+                {t("Cancel")}
               </button>
               <button
                 type="submit"
                 disabled={actionSubmitting}
                 className={`rounded-lg px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60 ${actionMode === "delete" ? "bg-red-700" : "bg-[#362219]"}`}
               >
-                {actionSubmitting ? "Saving..." : "Save"}
+                {actionSubmitting ? t("Saving...") : t("Save")}
               </button>
             </footer>
           </form>
@@ -841,7 +843,7 @@ export default function UserManagementPage() {
           <section className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl">
             <header className="flex items-start justify-between border-b border-stone-200 p-5">
               <div>
-                <h2 className="text-lg font-bold">User roles</h2>
+                <h2 className="text-lg font-bold">{t("User roles")}</h2>
                 <p className="mt-1 text-xs text-stone-500">
                   {rolesUser.fullname}
                 </p>
@@ -858,7 +860,7 @@ export default function UserManagementPage() {
               {rolesLoading ? (
                 <div className="py-8 text-center text-sm text-stone-500">
                   <span className="mx-auto mb-3 block size-5 animate-spin rounded-full border-2 border-stone-200 border-t-[#92502f]" />
-                  Loading roles...
+                  {t("Loading roles...")}
                 </div>
               ) : rolesError ? (
                 <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">
@@ -868,12 +870,12 @@ export default function UserManagementPage() {
                 <>
                   <section>
                     <h3 className="text-sm font-bold text-stone-800">
-                      Assigned roles
+                      {t("Assigned roles")}
                     </h3>
                     <div className="mt-3 space-y-2">
                       {roles.length === 0 ? (
                         <p className="rounded-lg bg-stone-50 p-4 text-sm text-stone-500">
-                          This user does not have any roles.
+                          {t("This user does not have any roles.")}
                         </p>
                       ) : (
                         roles.map((role) => (
@@ -883,7 +885,7 @@ export default function UserManagementPage() {
                           >
                             <div>
                               <p className="text-sm font-semibold text-stone-800">
-                                {role.role_name || "Unnamed role"}
+                                {role.role_name || t("Unnamed role")}
                               </p>
                             </div>
                             {canUpdateUsers && (
@@ -892,7 +894,7 @@ export default function UserManagementPage() {
                                 onClick={() => removeUserRole(role.role_id)}
                                 disabled={rolesSubmitting}
                                 className="grid size-8 place-items-center rounded-lg text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent"
-                                title="Delete role from user"
+                                title={t("Delete role from user")}
                               >
                                 <Trash2 size={15} />
                               </button>
@@ -906,12 +908,12 @@ export default function UserManagementPage() {
                   {canUpdateUsers && (
                     <section>
                       <h3 className="text-sm font-bold text-stone-800">
-                        Add roles
+                        {t("Add roles")}
                       </h3>
                       <div className="mt-3 space-y-2">
                         {addableRoles.length === 0 ? (
                           <p className="rounded-lg bg-stone-50 p-4 text-sm text-stone-500">
-                            All roles are already assigned.
+                            {t("All roles are already assigned.")}
                           </p>
                         ) : (
                           addableRoles.map((role) => (
@@ -952,7 +954,7 @@ export default function UserManagementPage() {
                   }
                   className="rounded-lg bg-[#362219] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
                 >
-                  {rolesSubmitting ? "Saving..." : "Add selected"}
+                  {rolesSubmitting ? t("Saving...") : t("Add selected")}
                 </button>
               )}
               <button
@@ -961,7 +963,7 @@ export default function UserManagementPage() {
                 disabled={rolesSubmitting}
                 className="rounded-lg border border-stone-300 px-4 py-2.5 text-sm font-semibold hover:bg-stone-50 disabled:opacity-50"
               >
-                Close
+                {t("Close")}
               </button>
             </footer>
           </section>
@@ -971,7 +973,7 @@ export default function UserManagementPage() {
         open={Boolean(confirmRequest)}
         title={confirmRequest?.title ?? ""}
         message={confirmRequest?.message ?? ""}
-        confirmText={confirmRequest?.confirmText ?? "Confirm"}
+        confirmText={confirmRequest?.confirmText ?? t("Confirm")}
         tone={confirmRequest?.tone}
         submitting={actionSubmitting || rolesSubmitting}
         onCancel={() => setConfirmRequest(null)}

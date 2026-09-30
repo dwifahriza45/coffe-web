@@ -2,6 +2,7 @@ import { isAxiosError } from "axios";
 import { Eye, EyeOff, UserPlus, X } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { createUser } from "../../api/user.api";
+import { useLanguage } from "../../app/LanguageContext";
 import ConfirmDialog from "../common/ConfirmDialog";
 import type { ApiResponse } from "../../types/auth";
 import type { CreateUserRequest } from "../../types/user";
@@ -24,6 +25,7 @@ export default function UserFormModal({
   onClose: () => void;
   onCreated: () => void;
 }) {
+  const { t } = useLanguage();
   const [form, setForm] = useState(initialForm);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [error, setError] = useState("");
@@ -39,18 +41,18 @@ export default function UserFormModal({
   function validate() {
     const next: FieldErrors = {};
     if (form.fullname.trim().length < 3)
-      next.fullname = "Fullname must be at least 3 characters";
+      next.fullname = t("Fullname must be at least 3 characters");
     if (!/^\S+@\S+\.\S+$/.test(form.email))
-      next.email = "Enter a valid email address";
-    if (!form.phone.trim()) next.phone = "Phone is required";
+      next.email = t("Enter a valid email address");
+    if (!form.phone.trim()) next.phone = t("Phone is required");
     if (form.address.trim().length < 3)
-      next.address = "Address must be at least 3 characters";
+      next.address = t("Address must be at least 3 characters");
     if (form.position.trim().length < 2)
-      next.position = "Position must be at least 2 characters";
+      next.position = t("Position must be at least 2 characters");
     if (form.password.length < 8)
-      next.password = "Password must be at least 8 characters";
+      next.password = t("Password must be at least 8 characters");
     if (form.confirm_password !== form.password)
-      next.confirm_password = "Confirm password must match password";
+      next.confirm_password = t("Confirm password must match password");
     setErrors(next);
     return Object.keys(next).length === 0;
   }
@@ -81,7 +83,7 @@ export default function UserFormModal({
       setError(
         response?.valid
           ? ""
-          : response?.message || "Could not create user. Please try again.",
+          : response?.message || t("Could not create user. Please try again."),
       );
     } finally {
       setSubmitting(false);
@@ -133,7 +135,7 @@ export default function UserFormModal({
           type="button"
           onClick={() => setShowPassword((value) => !value)}
           className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400"
-          aria-label={showPassword ? "Hide password" : "Show password"}
+          aria-label={showPassword ? t("Hide password") : t("Show password")}
         >
           {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
         </button>
@@ -164,10 +166,10 @@ export default function UserFormModal({
             </span>
             <div>
               <h2 id="add-user-title" className="text-xl font-bold">
-                Add new user
+                {t("Add new user")}
               </h2>
               <p className="mt-1 text-xs text-stone-500">
-                Create an account and provide their workspace details.
+                {t("Create an account and provide their workspace details.")}
               </p>
             </div>
           </div>
@@ -182,17 +184,17 @@ export default function UserFormModal({
         </header>
         <div className="max-h-[calc(100vh-12rem)] overflow-y-auto p-5 sm:p-6">
           <div className="grid gap-5 sm:grid-cols-2">
-            {field("fullname", "Full name", "text", "Muhammad Dwi Fahriza")}
-            {field("email", "Email address", "email", "name@crema.id")}
-            {field("phone", "Phone number", "tel", "08xxxxxxxxxx")}
-            {field("position", "Position", "text", "Store Manager")}
+            {field("fullname", t("Full name"), "text", "Muhammad Dwi Fahriza")}
+            {field("email", t("Email address"), "email", "name@crema.id")}
+            {field("phone", t("Phone number"), "tel", "08xxxxxxxxxx")}
+            {field("position", t("Position"), "text", "Store Manager")}
             <label className="block text-sm font-semibold text-stone-700 sm:col-span-2">
-              Address
+              {t("Address")}
               <textarea
                 value={form.address}
                 onChange={(event) => update("address", event.target.value)}
                 className={`${inputClass("address")} min-h-24 resize-y`}
-                placeholder="User address"
+                placeholder={t("User address")}
                 disabled={submitting}
               />
               {errors.address && (
@@ -201,11 +203,11 @@ export default function UserFormModal({
                 </p>
               )}
             </label>
-            {passwordField("password", "Password", "Minimum 8 characters")}
+            {passwordField("password", t("Password"), t("Minimum 8 characters"))}
             {passwordField(
               "confirm_password",
-              "Confirm password",
-              "Repeat password",
+              t("Confirm password"),
+              t("Repeat password"),
             )}
           </div>
           {error && (
@@ -221,22 +223,22 @@ export default function UserFormModal({
             disabled={submitting}
             className="rounded-lg border border-stone-300 px-5 py-2.5 text-sm font-semibold hover:bg-stone-50 disabled:opacity-50"
           >
-            Cancel
+            {t("Cancel")}
           </button>
           <button
             type="submit"
             disabled={submitting}
             className="rounded-lg bg-[#362219] px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
           >
-            {submitting ? "Creating user..." : "Create user"}
+            {submitting ? t("Creating user...") : t("Create user")}
           </button>
         </footer>
       </form>
       <ConfirmDialog
         open={confirmOpen}
-        title="Create user"
-        message="Create this user account with the details you entered?"
-        confirmText="Create user"
+        title={t("Create user")}
+        message={t("Create this user account with the details you entered?")}
+        confirmText={t("Create user")}
         submitting={submitting}
         onCancel={() => setConfirmOpen(false)}
         onConfirm={createConfirmedUser}

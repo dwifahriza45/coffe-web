@@ -16,6 +16,7 @@ import ConfirmDialog from "../../components/common/ConfirmDialog";
 import Navbar from "../../components/layout/Navbar";
 import Sidebar from "../../components/layout/Sidebar";
 import { useAuth } from "../../app/AuthContext";
+import { useLanguage } from "../../app/LanguageContext";
 import { userCan } from "../../app/roleAccess";
 import { formatNumber, normalizeNumberInput } from "../../utils/numberFormat";
 
@@ -29,6 +30,7 @@ const emptyForm: IngredientPayload = {
 
 export default function IngredientManagementPage() {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const canCreateIngredients = userCan(user, "ingredients", "create");
   const canUpdateIngredients = userCan(user, "ingredients", "update");
   const canDeleteIngredients = userCan(user, "ingredients", "delete");
@@ -91,7 +93,7 @@ export default function IngredientManagementPage() {
           : undefined;
         setIngredients([]);
         setIngredientUsage({});
-        setError(response?.message || "Could not load ingredients.");
+        setError(response?.message || t("Could not load ingredients."));
       } finally {
         if (current) setLoading(false);
       }
@@ -142,16 +144,16 @@ export default function IngredientManagementPage() {
     setActionError("");
     if (!form.name.trim() || !form.base_unit.trim() || !form.minimum_stock) {
       setFieldErrors({
-        name: !form.name.trim() ? "name is required" : "",
-        base_unit: !form.base_unit.trim() ? "base unit is required" : "",
-        minimum_stock: !form.minimum_stock ? "minimum stock is required" : "",
+        name: !form.name.trim() ? t("name is required") : "",
+        base_unit: !form.base_unit.trim() ? t("base unit is required") : "",
+        minimum_stock: !form.minimum_stock ? t("minimum stock is required") : "",
       });
       return;
     }
     setConfirm({
-      title: editingIngredient ? "Update ingredient" : "Create ingredient",
-      message: editingIngredient ? "Update this ingredient?" : "Create this ingredient?",
-      confirmText: editingIngredient ? "Update ingredient" : "Create ingredient",
+      title: editingIngredient ? t("Update ingredient") : t("Create ingredient"),
+      message: editingIngredient ? t("Update this ingredient?") : t("Create this ingredient?"),
+      confirmText: editingIngredient ? t("Update ingredient") : t("Create ingredient"),
       onConfirm: submitConfirmed,
     });
   }
@@ -172,7 +174,7 @@ export default function IngredientManagementPage() {
         ? requestError.response?.data
         : undefined;
       setFieldErrors(response?.valid ?? {});
-      setActionError(response?.valid ? "" : response?.message || "Action failed.");
+      setActionError(response?.valid ? "" : response?.message || t("Action failed."));
     } finally {
       setSubmitting(false);
     }
@@ -181,9 +183,9 @@ export default function IngredientManagementPage() {
   function requestDelete(ingredient: Ingredient) {
     if (ingredientUsage[ingredient.ingredient_id]) return;
     setConfirm({
-      title: "Delete ingredient",
-      message: "Delete this ingredient permanently?",
-      confirmText: "Delete ingredient",
+      title: t("Delete ingredient"),
+      message: t("Delete this ingredient permanently?"),
+      confirmText: t("Delete ingredient"),
       tone: "danger",
       onConfirm: () => deleteConfirmed(ingredient.ingredient_id),
     });
@@ -199,7 +201,7 @@ export default function IngredientManagementPage() {
       const response = isAxiosError<{ message?: string }>(requestError)
         ? requestError.response?.data
         : undefined;
-      setError(response?.message || "Could not delete ingredient.");
+      setError(response?.message || t("Could not delete ingredient."));
     } finally {
       setSubmitting(false);
     }
@@ -208,9 +210,9 @@ export default function IngredientManagementPage() {
   function requestToggleActive(ingredient: Ingredient) {
     if (ingredient.active && ingredientUsage[ingredient.ingredient_id]) return;
     setConfirm({
-      title: ingredient.active ? "Deactivate ingredient" : "Activate ingredient",
-      message: ingredient.active ? "Deactivate this ingredient?" : "Activate this ingredient?",
-      confirmText: ingredient.active ? "Deactivate" : "Activate",
+      title: ingredient.active ? t("Deactivate ingredient") : t("Activate ingredient"),
+      message: ingredient.active ? t("Deactivate this ingredient?") : t("Activate this ingredient?"),
+      confirmText: ingredient.active ? t("Deactivate") : t("Activate"),
       onConfirm: () => toggleActiveConfirmed(ingredient),
     });
   }
@@ -230,7 +232,7 @@ export default function IngredientManagementPage() {
       const response = isAxiosError<{ message?: string }>(requestError)
         ? requestError.response?.data
         : undefined;
-      setError(response?.message || "Could not update ingredient status.");
+      setError(response?.message || t("Could not update ingredient status."));
     } finally {
       setSubmitting(false);
     }
@@ -250,20 +252,20 @@ export default function IngredientManagementPage() {
               <div className="mb-3 flex size-11 items-center justify-center rounded-xl bg-[#e8efe5] text-[#547144]">
                 <Boxes size={22} />
               </div>
-              <h1 className="font-serif text-3xl font-bold">Ingredient Management</h1>
-              <p className="mt-2 text-sm text-stone-500">Manage stock ingredients and base units.</p>
+              <h1 className="font-serif text-3xl font-bold">{t("Ingredient Management")}</h1>
+              <p className="mt-2 text-sm text-stone-500">{t("Manage stock ingredients and base units.")}</p>
             </div>
             {canCreateIngredients && <button type="button" onClick={() => openModal()} className="flex items-center gap-2 rounded-lg bg-[#362219] px-5 py-3 text-sm font-semibold text-white">
               <Plus size={17} />
-              Add ingredient
+              {t("Add ingredient")}
             </button>}
           </header>
 
           <section className="mt-7 overflow-hidden rounded-xl border border-stone-200 bg-white">
             <div className="flex flex-col gap-4 border-b border-stone-200 p-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h2 className="font-semibold">All ingredients</h2>
-                <p className="text-xs text-stone-500">{total} ingredients found</p>
+                <h2 className="font-semibold">{t("All ingredients")}</h2>
+                <p className="text-xs text-stone-500">{total} {t("ingredients found")}</p>
               </div>
               <form
                 onSubmit={(event) => {
@@ -274,7 +276,7 @@ export default function IngredientManagementPage() {
                 className="flex w-full max-w-sm items-center gap-2 rounded-lg border border-stone-200 px-3 py-2.5 focus-within:border-[#b86b42] focus-within:ring-4 focus-within:ring-[#b86b42]/10"
               >
                 <Search size={17} className="text-stone-400" />
-                <input value={searchInput} onChange={(event) => setSearchInput(event.target.value)} className="min-w-0 flex-1 bg-transparent text-sm outline-none" placeholder="Search ingredient..." />
+                <input value={searchInput} onChange={(event) => setSearchInput(event.target.value)} className="min-w-0 flex-1 bg-transparent text-sm outline-none" placeholder={t("Search ingredient...")} />
               </form>
             </div>
             {error && <div className="m-4 rounded-lg bg-red-50 p-4 text-sm text-red-700">{error}</div>}
@@ -282,19 +284,19 @@ export default function IngredientManagementPage() {
               <table className="w-full min-w-190 text-left">
                 <thead className="bg-stone-50 text-xs uppercase tracking-wider text-stone-500">
                   <tr>
-                    <th className="px-5 py-3">Ingredient</th>
-                    <th className="px-5 py-3">Base unit</th>
-                    <th className="px-5 py-3">Min stock</th>
-                    <th className="px-5 py-3">Usage</th>
-                    <th className="px-5 py-3">Status</th>
-                    {showActions && <th className="px-5 py-3 text-right">Action</th>}
+                    <th className="px-5 py-3">{t("Ingredient")}</th>
+                    <th className="px-5 py-3">{t("Base unit")}</th>
+                    <th className="px-5 py-3">{t("Min stock")}</th>
+                    <th className="px-5 py-3">{t("Usage")}</th>
+                    <th className="px-5 py-3">{t("Status")}</th>
+                    {showActions && <th className="px-5 py-3 text-right">{t("Action")}</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-100">
                   {loading ? (
-                    <tr><td colSpan={columnCount} className="px-5 py-14 text-center text-sm text-stone-500">Loading ingredients...</td></tr>
+                    <tr><td colSpan={columnCount} className="px-5 py-14 text-center text-sm text-stone-500">{t("Loading ingredients...")}</td></tr>
                   ) : ingredients.length === 0 ? (
-                    <tr><td colSpan={columnCount} className="px-5 py-14 text-center text-sm text-stone-500">No ingredients found</td></tr>
+                    <tr><td colSpan={columnCount} className="px-5 py-14 text-center text-sm text-stone-500">{t("No ingredients found")}</td></tr>
                   ) : (
                     ingredients.map((ingredient) => {
                       const inUse = Boolean(ingredientUsage[ingredient.ingredient_id]);
@@ -308,19 +310,19 @@ export default function IngredientManagementPage() {
                         <td className="px-5 py-4">
                           <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${inUse ? "bg-amber-50 text-amber-700" : "bg-stone-100 text-stone-500"}`}>
                             <span className={`size-1.5 rounded-full ${inUse ? "bg-amber-500" : "bg-stone-400"}`} />
-                            {inUse ? "Used" : "Unused"}
+                            {inUse ? t("Used") : t("Unused")}
                           </span>
                         </td>
                         <td className="px-5 py-4">
                           <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${ingredient.active ? "bg-green-50 text-green-700" : "bg-stone-100 text-stone-500"}`}>
-                            {ingredient.active ? "Active" : "Inactive"}
+                            {ingredient.active ? t("Active") : t("Inactive")}
                           </span>
                         </td>
                         {showActions && <td className="px-5 py-4">
                           <div className="flex justify-end gap-1.5">
-                            {canUpdateIngredients && <button type="button" onClick={(event) => { event.stopPropagation(); openModal(ingredient); }} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800" title="Update ingredient"><Pencil size={15} /></button>}
-                            {canUpdateIngredients && <button type="button" onClick={(event) => { event.stopPropagation(); requestToggleActive(ingredient); }} disabled={ingredient.active && inUse} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent" title={ingredient.active && inUse ? "Ingredient is used by ingredient units" : ingredient.active ? "Deactivate ingredient" : "Activate ingredient"}><Power size={15} /></button>}
-                            {canDeleteIngredients && <button type="button" onClick={(event) => { event.stopPropagation(); requestDelete(ingredient); }} disabled={inUse} className="grid size-8 place-items-center rounded-lg text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent" title={inUse ? "Ingredient is used by ingredient units" : "Delete ingredient"}><Trash2 size={15} /></button>}
+                            {canUpdateIngredients && <button type="button" onClick={(event) => { event.stopPropagation(); openModal(ingredient); }} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800" title={t("Update ingredient")}><Pencil size={15} /></button>}
+                            {canUpdateIngredients && <button type="button" onClick={(event) => { event.stopPropagation(); requestToggleActive(ingredient); }} disabled={ingredient.active && inUse} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent" title={ingredient.active && inUse ? t("Ingredient is used by ingredient units") : ingredient.active ? t("Deactivate ingredient") : t("Activate ingredient")}><Power size={15} /></button>}
+                            {canDeleteIngredients && <button type="button" onClick={(event) => { event.stopPropagation(); requestDelete(ingredient); }} disabled={inUse} className="grid size-8 place-items-center rounded-lg text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent" title={inUse ? t("Ingredient is used by ingredient units") : t("Delete ingredient")}><Trash2 size={15} /></button>}
                           </div>
                         </td>}
                       </tr>
@@ -332,9 +334,9 @@ export default function IngredientManagementPage() {
             </div>
             <footer className="flex items-center justify-between border-t border-stone-200 px-5 py-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                <p className="text-xs text-stone-500">Page {page} of {totalPages}</p>
+                <p className="text-xs text-stone-500">{t("Page")} {page} {t("of")} {totalPages}</p>
                 <label className="flex items-center gap-2 text-xs font-semibold text-stone-500">
-                  Limit
+                  {t("Limit")}
                   <select
                     value={pageSize}
                     onChange={(event) => {
@@ -350,8 +352,8 @@ export default function IngredientManagementPage() {
                 </label>
               </div>
               <div className="flex gap-2">
-                <button disabled={page === 1 || loading} onClick={() => setPage((value) => value - 1)} className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-40">Previous</button>
-                <button disabled={page >= totalPages || loading} onClick={() => setPage((value) => value + 1)} className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-40">Next</button>
+                <button disabled={page === 1 || loading} onClick={() => setPage((value) => value - 1)} className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-40">{t("Previous")}</button>
+                <button disabled={page >= totalPages || loading} onClick={() => setPage((value) => value + 1)} className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-40">{t("Next")}</button>
               </div>
             </footer>
           </section>
@@ -362,41 +364,41 @@ export default function IngredientManagementPage() {
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
           <form onSubmit={submitForm} className="w-full max-w-md rounded-2xl bg-white shadow-2xl">
             <header className="flex items-start justify-between border-b border-stone-200 p-5">
-              <h2 className="text-lg font-bold">{editingIngredient ? "Update ingredient" : "Add ingredient"}</h2>
+              <h2 className="text-lg font-bold">{editingIngredient ? t("Update ingredient") : t("Add ingredient")}</h2>
               <button type="button" onClick={() => setModalOpen(false)} className="grid size-9 place-items-center rounded-lg hover:bg-stone-100"><X size={18} /></button>
             </header>
             <div className="space-y-4 p-5">
               <label className="block text-sm font-semibold text-stone-700">
-                Name
+                {t("Name")}
                 <input value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} className="mt-2 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10" disabled={submitting} />
                 {fieldErrors.name && <p className="mt-1.5 text-xs font-medium text-red-600">{fieldErrors.name}</p>}
               </label>
               <label className="block text-sm font-semibold text-stone-700">
-                Base unit
+                {t("Base unit")}
                 <select value={form.base_unit} onChange={(event) => setForm((current) => ({ ...current, base_unit: event.target.value }))} className="mt-2 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10" disabled={submitting}>
-                  <option value="">Select unit</option>
+                  <option value="">{t("Select unit")}</option>
                   {unitOptions.map((unit) => (
-                    <option key={unit.unit_id} value={unit.unit_id} disabled={!unit.active}>{unit.name} ({unit.code}){unit.active ? "" : " - Inactive"}</option>
+                    <option key={unit.unit_id} value={unit.unit_id} disabled={!unit.active}>{unit.name} ({unit.code}){unit.active ? "" : ` - ${t("Inactive")}`}</option>
                   ))}
                 </select>
                 {fieldErrors.base_unit && <p className="mt-1.5 text-xs font-medium text-red-600">{fieldErrors.base_unit}</p>}
               </label>
               <label className="block text-sm font-semibold text-stone-700">
-                Minimum stock
+                {t("Minimum stock")}
                 <input inputMode="decimal" placeholder="0" value={formatNumber(form.minimum_stock, 3)} onChange={(event) => setForm((current) => ({ ...current, minimum_stock: normalizeNumberInput(event.target.value) }))} className="mt-2 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10" disabled={submitting} />
                 {fieldErrors.minimum_stock && <p className="mt-1.5 text-xs font-medium text-red-600">{fieldErrors.minimum_stock}</p>}
               </label>
               {actionError && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{actionError}</p>}
             </div>
             <footer className="flex justify-end gap-3 border-t border-stone-200 p-5">
-              <button type="button" onClick={() => setModalOpen(false)} className="rounded-lg border border-stone-300 px-4 py-2.5 text-sm font-semibold hover:bg-stone-50">Cancel</button>
-              <button type="submit" disabled={submitting} className="rounded-lg bg-[#362219] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">{submitting ? "Saving..." : "Save"}</button>
+              <button type="button" onClick={() => setModalOpen(false)} className="rounded-lg border border-stone-300 px-4 py-2.5 text-sm font-semibold hover:bg-stone-50">{t("Cancel")}</button>
+              <button type="submit" disabled={submitting} className="rounded-lg bg-[#362219] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">{submitting ? t("Saving...") : t("Save")}</button>
             </footer>
           </form>
         </div>
       )}
 
-      <ConfirmDialog open={Boolean(confirm)} title={confirm?.title ?? ""} message={confirm?.message ?? ""} confirmText={confirm?.confirmText ?? "Confirm"} tone={confirm?.tone} submitting={submitting} onCancel={() => setConfirm(null)} onConfirm={() => void confirm?.onConfirm()} />
+      <ConfirmDialog open={Boolean(confirm)} title={confirm?.title ?? ""} message={confirm?.message ?? ""} confirmText={confirm?.confirmText ?? t("Confirm")} tone={confirm?.tone} submitting={submitting} onCancel={() => setConfirm(null)} onConfirm={() => void confirm?.onConfirm()} />
     </div>
   );
 }

@@ -16,6 +16,7 @@ import ConfirmDialog from "../../components/common/ConfirmDialog";
 import Navbar from "../../components/layout/Navbar";
 import Sidebar from "../../components/layout/Sidebar";
 import { useAuth } from "../../app/AuthContext";
+import { useLanguage } from "../../app/LanguageContext";
 import { userCan } from "../../app/roleAccess";
 import { formatNumber, normalizeNumberInput } from "../../utils/numberFormat";
 
@@ -32,6 +33,7 @@ function formatFactor(value: string) {
 
 export default function IngredientDetailPage() {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const canCreateIngredientUnits = userCan(user, "ingredient_units", "create");
   const canReadIngredientUnits = userCan(user, "ingredient_units", "read");
   const canUpdateIngredientUnits = userCan(user, "ingredient_units", "update");
@@ -94,7 +96,7 @@ export default function IngredientDetailPage() {
         setIngredient(null);
         setUnits([]);
         setItems([]);
-        setError(response?.message || "Could not load ingredient detail.");
+        setError(response?.message || t("Could not load ingredient detail."));
       } finally {
         if (current) setLoading(false);
       }
@@ -128,15 +130,15 @@ export default function IngredientDetailPage() {
     setActionError("");
     if (!form.unit_id || !form.conversion_factor) {
       setFieldErrors({
-        unit_id: !form.unit_id ? "unit is required" : "",
-        conversion_factor: !form.conversion_factor ? "conversion factor is required" : "",
+        unit_id: !form.unit_id ? t("unit is required") : "",
+        conversion_factor: !form.conversion_factor ? t("conversion factor is required") : "",
       });
       return;
     }
     setConfirm({
-      title: editingItem ? "Update ingredient unit" : "Create ingredient unit",
-      message: editingItem ? "Update this ingredient unit?" : "Create this ingredient unit?",
-      confirmText: editingItem ? "Update ingredient unit" : "Create ingredient unit",
+      title: editingItem ? t("Update ingredient unit") : t("Create ingredient unit"),
+      message: editingItem ? t("Update this ingredient unit?") : t("Create this ingredient unit?"),
+      confirmText: editingItem ? t("Update ingredient unit") : t("Create ingredient unit"),
       onConfirm: submitConfirmed,
     });
   }
@@ -158,7 +160,7 @@ export default function IngredientDetailPage() {
         ? requestError.response?.data
         : undefined;
       setFieldErrors(response?.valid ?? {});
-      setActionError(response?.valid ? "" : response?.message || "Action failed.");
+      setActionError(response?.valid ? "" : response?.message || t("Action failed."));
     } finally {
       setSubmitting(false);
     }
@@ -166,9 +168,9 @@ export default function IngredientDetailPage() {
 
   function requestToggleActive(item: IngredientUnit) {
     setConfirm({
-      title: item.active ? "Deactivate ingredient unit" : "Activate ingredient unit",
-      message: item.active ? "Deactivate this ingredient unit?" : "Activate this ingredient unit?",
-      confirmText: item.active ? "Deactivate" : "Activate",
+      title: item.active ? t("Deactivate ingredient unit") : t("Activate ingredient unit"),
+      message: item.active ? t("Deactivate this ingredient unit?") : t("Activate this ingredient unit?"),
+      confirmText: item.active ? t("Deactivate") : t("Activate"),
       onConfirm: async () => {
         setConfirm(null);
         setSubmitting(true);
@@ -184,7 +186,7 @@ export default function IngredientDetailPage() {
           const response = isAxiosError<{ message?: string }>(requestError)
             ? requestError.response?.data
             : undefined;
-          setError(response?.message || "Could not update ingredient unit status.");
+          setError(response?.message || t("Could not update ingredient unit status."));
         } finally {
           setSubmitting(false);
         }
@@ -194,9 +196,9 @@ export default function IngredientDetailPage() {
 
   function requestDelete(item: IngredientUnit) {
     setConfirm({
-      title: "Delete ingredient unit",
-      message: "Delete this ingredient unit permanently?",
-      confirmText: "Delete ingredient unit",
+      title: t("Delete ingredient unit"),
+      message: t("Delete this ingredient unit permanently?"),
+      confirmText: t("Delete ingredient unit"),
       tone: "danger",
       onConfirm: async () => {
         setConfirm(null);
@@ -208,7 +210,7 @@ export default function IngredientDetailPage() {
           const response = isAxiosError<{ message?: string }>(requestError)
             ? requestError.response?.data
             : undefined;
-          setError(response?.message || "Could not delete ingredient unit.");
+          setError(response?.message || t("Could not delete ingredient unit."));
         } finally {
           setSubmitting(false);
         }
@@ -226,19 +228,19 @@ export default function IngredientDetailPage() {
         <main className="p-5 sm:p-8">
           <Link to="/ingredient-management" className="mb-5 inline-flex items-center gap-2 text-sm font-semibold text-stone-600 hover:text-stone-900">
             <ArrowLeft size={16} />
-            Ingredient Management
+            {t("Ingredient Management")}
           </Link>
 
           <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
             <div>
-              <h1 className="font-serif text-3xl font-bold">{ingredient?.name ?? "Ingredient Detail"}</h1>
+              <h1 className="font-serif text-3xl font-bold">{ingredient?.name ?? t("Ingredient Detail")}</h1>
               <p className="mt-2 text-sm text-stone-500">
-                Base unit: {ingredient?.base_unit_info?.code ?? ingredient?.base_unit ?? "-"} · Minimum stock: {ingredient ? formatNumber(ingredient.minimum_stock, 3) : "-"}
+                {t("Base unit")}: {ingredient?.base_unit_info?.code ?? ingredient?.base_unit ?? "-"} · {t("Minimum stock")}: {ingredient ? formatNumber(ingredient.minimum_stock, 3) : "-"}
               </p>
             </div>
             {canCreateIngredientUnits && <button type="button" onClick={() => openModal()} className="flex items-center gap-2 rounded-lg bg-[#362219] px-5 py-3 text-sm font-semibold text-white">
               <ListPlus size={17} />
-              Add unit conversion
+              {t("Add unit conversion")}
             </button>}
           </header>
 
@@ -247,25 +249,25 @@ export default function IngredientDetailPage() {
           <section className="mt-7 overflow-hidden rounded-xl border border-stone-200 bg-white">
             <div className="flex items-center justify-between border-b border-stone-200 p-4">
               <div>
-                <h2 className="font-semibold">Unit Conversions</h2>
-                <p className="text-xs text-stone-500">{items.length} conversions</p>
+                <h2 className="font-semibold">{t("Unit Conversions")}</h2>
+                <p className="text-xs text-stone-500">{items.length} {t("conversions")}</p>
               </div>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full min-w-150 text-left">
                 <thead className="bg-stone-50 text-xs uppercase tracking-wider text-stone-500">
                   <tr>
-                    <th className="px-5 py-3">Unit</th>
-                    <th className="px-5 py-3">Conversion</th>
-                    <th className="px-5 py-3">Status</th>
-                    {showActions && <th className="px-5 py-3 text-right">Action</th>}
+                    <th className="px-5 py-3">{t("Unit")}</th>
+                    <th className="px-5 py-3">{t("Conversion")}</th>
+                    <th className="px-5 py-3">{t("Status")}</th>
+                    {showActions && <th className="px-5 py-3 text-right">{t("Action")}</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-100">
                   {loading ? (
-                    <tr><td colSpan={columnCount} className="px-5 py-14 text-center text-sm text-stone-500">Loading unit conversions...</td></tr>
+                    <tr><td colSpan={columnCount} className="px-5 py-14 text-center text-sm text-stone-500">{t("Loading unit conversions...")}</td></tr>
                   ) : items.length === 0 ? (
-                    <tr><td colSpan={columnCount} className="px-5 py-14 text-center text-sm text-stone-500">No unit conversions found</td></tr>
+                    <tr><td colSpan={columnCount} className="px-5 py-14 text-center text-sm text-stone-500">{t("No unit conversions found")}</td></tr>
                   ) : (
                     items.map((item) => (
                       <tr key={item.ingredient_unit_id}>
@@ -276,14 +278,14 @@ export default function IngredientDetailPage() {
                         <td className="px-5 py-4 text-sm font-semibold">{formatFactor(item.conversion_factor)}</td>
                         <td className="px-5 py-4">
                           <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${item.active ? "bg-green-50 text-green-700" : "bg-stone-100 text-stone-500"}`}>
-                            {item.active ? "Active" : "Inactive"}
+                            {item.active ? t("Active") : t("Inactive")}
                           </span>
                         </td>
                         {showActions && <td className="px-5 py-4">
                           <div className="flex justify-end gap-1.5">
-                            {canUpdateIngredientUnits && <button type="button" onClick={() => openModal(item)} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800" title="Update ingredient unit"><Pencil size={15} /></button>}
-                            {canUpdateIngredientUnits && <button type="button" onClick={() => requestToggleActive(item)} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800" title={item.active ? "Deactivate ingredient unit" : "Activate ingredient unit"}><Power size={15} /></button>}
-                            {canDeleteIngredientUnits && <button type="button" onClick={() => requestDelete(item)} className="grid size-8 place-items-center rounded-lg text-red-600 hover:bg-red-50" title="Delete ingredient unit"><Trash2 size={15} /></button>}
+                            {canUpdateIngredientUnits && <button type="button" onClick={() => openModal(item)} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800" title={t("Update ingredient unit")}><Pencil size={15} /></button>}
+                            {canUpdateIngredientUnits && <button type="button" onClick={() => requestToggleActive(item)} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800" title={item.active ? t("Deactivate ingredient unit") : t("Activate ingredient unit")}><Power size={15} /></button>}
+                            {canDeleteIngredientUnits && <button type="button" onClick={() => requestDelete(item)} className="grid size-8 place-items-center rounded-lg text-red-600 hover:bg-red-50" title={t("Delete ingredient unit")}><Trash2 size={15} /></button>}
                           </div>
                         </td>}
                       </tr>
@@ -300,36 +302,36 @@ export default function IngredientDetailPage() {
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
           <form onSubmit={submitForm} className="w-full max-w-md rounded-2xl bg-white shadow-2xl">
             <header className="flex items-start justify-between border-b border-stone-200 p-5">
-              <h2 className="text-lg font-bold">{editingItem ? "Update unit conversion" : "Add unit conversion"}</h2>
+              <h2 className="text-lg font-bold">{editingItem ? t("Update unit conversion") : t("Add unit conversion")}</h2>
               <button type="button" onClick={() => setModalOpen(false)} className="grid size-9 place-items-center rounded-lg hover:bg-stone-100"><X size={18} /></button>
             </header>
             <div className="space-y-4 p-5">
               <label className="block text-sm font-semibold text-stone-700">
-                Unit
+                {t("Unit")}
                 <select value={form.unit_id} onChange={(event) => setForm((current) => ({ ...current, unit_id: event.target.value }))} className="mt-2 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10" disabled={submitting}>
-                  <option value="">Select unit</option>
+                  <option value="">{t("Select unit")}</option>
                   {units.map((unit) => (
-                    <option key={unit.unit_id} value={unit.unit_id} disabled={!unit.active}>{unit.name} ({unit.code}){unit.active ? "" : " - Inactive"}</option>
+                    <option key={unit.unit_id} value={unit.unit_id} disabled={!unit.active}>{unit.name} ({unit.code}){unit.active ? "" : ` - ${t("Inactive")}`}</option>
                   ))}
                 </select>
                 {fieldErrors.unit_id && <p className="mt-1.5 text-xs font-medium text-red-600">{fieldErrors.unit_id}</p>}
               </label>
               <label className="block text-sm font-semibold text-stone-700">
-                Conversion factor
+                {t("Conversion factor")}
                 <input inputMode="decimal" placeholder="1" value={formatFactor(form.conversion_factor)} onChange={(event) => setForm((current) => ({ ...current, conversion_factor: normalizeNumberInput(event.target.value) }))} className="mt-2 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10" disabled={submitting} />
                 {fieldErrors.conversion_factor && <p className="mt-1.5 text-xs font-medium text-red-600">{fieldErrors.conversion_factor}</p>}
               </label>
               {actionError && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{actionError}</p>}
             </div>
             <footer className="flex justify-end gap-3 border-t border-stone-200 p-5">
-              <button type="button" onClick={() => setModalOpen(false)} className="rounded-lg border border-stone-300 px-4 py-2.5 text-sm font-semibold hover:bg-stone-50">Cancel</button>
-              <button type="submit" disabled={submitting} className="rounded-lg bg-[#362219] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">{submitting ? "Saving..." : "Save"}</button>
+              <button type="button" onClick={() => setModalOpen(false)} className="rounded-lg border border-stone-300 px-4 py-2.5 text-sm font-semibold hover:bg-stone-50">{t("Cancel")}</button>
+              <button type="submit" disabled={submitting} className="rounded-lg bg-[#362219] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">{submitting ? t("Saving...") : t("Save")}</button>
             </footer>
           </form>
         </div>
       )}
 
-      <ConfirmDialog open={Boolean(confirm)} title={confirm?.title ?? ""} message={confirm?.message ?? ""} confirmText={confirm?.confirmText ?? "Confirm"} tone={confirm?.tone} submitting={submitting} onCancel={() => setConfirm(null)} onConfirm={() => void confirm?.onConfirm()} />
+      <ConfirmDialog open={Boolean(confirm)} title={confirm?.title ?? ""} message={confirm?.message ?? ""} confirmText={confirm?.confirmText ?? t("Confirm")} tone={confirm?.tone} submitting={submitting} onCancel={() => setConfirm(null)} onConfirm={() => void confirm?.onConfirm()} />
     </div>
   );
 }

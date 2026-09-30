@@ -14,13 +14,21 @@ import {
   X,
   UserCog,
 } from "lucide-react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import { useRef, useState } from "react";
 import { logout as logoutRequest } from "../../api/auth.api";
 import { useAuth } from "../../app/AuthContext";
 import { invalidateSession } from "../../app/authSession";
+import { useLanguage } from "../../app/LanguageContext";
 import { userCan } from "../../app/roleAccess";
 import Brand from "./Brand";
+
+type SidebarLink = {
+  label: string;
+  to: string;
+  icon: typeof LayoutDashboard;
+};
+
 export default function Sidebar({
   isOpen,
   onClose,
@@ -29,6 +37,8 @@ export default function Sidebar({
   onClose: () => void;
 }) {
   const { user, setUser } = useAuth();
+  const { t } = useLanguage();
+  const location = useLocation();
   const [menuSearch, setMenuSearch] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
@@ -38,104 +48,116 @@ export default function Sidebar({
   const canReadRoles = userCan(user, "roles");
   const canReadBusinessDays = userCan(user, "business_days");
   const canReadInventoryCounts = userCan(user, "inventory_counts");
+  const canReadOpeningCounts =
+    userCan(user, "inventory_opening_counts") || canReadInventoryCounts;
   const canReadStockReceipts = userCan(user, "stock_receipts");
   const canReadStockAdjustments = userCan(user, "stock_adjustments");
   const canReadStockMovements = userCan(user, "stock_movements");
+  const canReadClosingCounts =
+    userCan(user, "inventory_closing_counts") || canReadInventoryCounts;
   const canReadUnits = userCan(user, "units");
   const canReadIngredients = userCan(user, "ingredients");
   const canReadSuppliers = userCan(user, "suppliers");
   const canReadCategories = userCan(user, "categories");
   const canReadProducts = userCan(user, "products");
-  const links: Array<{
-    label: string;
-    to: string;
-    icon: typeof LayoutDashboard;
-  }> = [];
-  const hrisLinks: Array<{
-    label: string;
-    to: string;
-    icon: typeof LayoutDashboard;
-  }> = [];
-  const inventoryMasterLinks: Array<{
-    label: string;
-    to: string;
-    icon: typeof LayoutDashboard;
-  }> = [];
-  const inventoryOperationLinks: Array<{
-    label: string;
-    to: string;
-    icon: typeof LayoutDashboard;
-  }> = [];
-  const inventoryMenuLinks: Array<{
-    label: string;
-    to: string;
-    icon: typeof LayoutDashboard;
-  }> = [];
+  const links: SidebarLink[] = [];
+  const hrisLinks: SidebarLink[] = [];
+  const inventoryMasterLinks: SidebarLink[] = [];
+  const inventoryOperationLinks: SidebarLink[] = [];
+  const stockOpnameChildLinks: SidebarLink[] = [];
+  const inventoryMenuLinks: SidebarLink[] = [];
+  const activeParams = new URLSearchParams(location.search);
+  const activeStockDate = activeParams.get("date") ?? "";
+  const activeBusinessDayID =
+    activeParams.get("businessDayID") ??
+    location.pathname.match(/^\/business-days\/([^/]+)\/inventory-counts/)?.[1] ??
+    "";
+  const stockOpnameContextQuery =
+    activeBusinessDayID || activeStockDate
+      ? `?${new URLSearchParams({
+          ...(activeBusinessDayID ? { businessDayID: activeBusinessDayID } : {}),
+          ...(activeStockDate ? { date: activeStockDate } : {}),
+        })}`
+      : "";
+  const stockCountOpeningPath = `/stock-count${stockOpnameContextQuery}${stockOpnameContextQuery ? "&" : "?"}focus=opening`;
+  const stockCountClosingPath = `/stock-count${stockOpnameContextQuery}${stockOpnameContextQuery ? "&" : "?"}focus=closing`;
   if (canReadDashboard) {
-    links.push({ label: "Overview", to: "/dashboard", icon: LayoutDashboard });
+    links.push({ label: t("Overview"), to: "/dashboard", icon: LayoutDashboard });
   }
   if (canReadBusinessDays) {
-    links.push({ label: "Business Days", to: "/business-days", icon: CalendarDays });
+    links.push({ label: t("Business Days"), to: "/business-days", icon: CalendarDays });
   }
   if (canReadUsers)
     hrisLinks.push({
-      label: "User Management",
+      label: t("User Management"),
       to: "/user-management",
       icon: UserCog,
     });
   if (canReadRoles)
     hrisLinks.push({
-      label: "Role Management",
+      label: t("Role Management"),
       to: "/role-management",
       icon: Shield,
     });
   if (canReadUnits)
     inventoryMasterLinks.push({
-      label: "Unit Management",
+      label: t("Unit Management"),
       to: "/unit-management",
       icon: Ruler,
     });
   if (canReadIngredients)
     inventoryMasterLinks.push({
-      label: "Ingredient Management",
+      label: t("Ingredient Management"),
       to: "/ingredient-management",
       icon: PackageOpen,
     });
   if (canReadSuppliers)
-    inventoryMasterLinks.push({ label: "Suppliers", to: "/supplier-management", icon: Truck });
+    inventoryMasterLinks.push({ label: t("Suppliers"), to: "/supplier-management", icon: Truck });
   if (canReadInventoryCounts)
     inventoryOperationLinks.push({
-      label: "Stock Count",
+      label: t("Stock Count"),
       to: "/stock-count",
       icon: ClipboardCheck,
     });
+  if (canReadOpeningCounts)
+    stockOpnameChildLinks.push({
+      label: t("Opening Stock"),
+      to: stockCountOpeningPath,
+      icon: ClipboardCheck,
+    });
   if (canReadStockReceipts)
-    inventoryOperationLinks.push({
-      label: "Stock In",
-      to: "/stock-in",
+    stockOpnameChildLinks.push({
+      label: t("Stock In"),
+      to: `/stock-in${stockOpnameContextQuery}`,
       icon: Truck,
     });
   if (canReadStockAdjustments)
-    inventoryOperationLinks.push({
-      label: "Stock Adjustments",
-      to: "/stock-adjustments",
+    stockOpnameChildLinks.push({
+      label: t("Stock Adjustments"),
+      to: `/stock-adjustments${stockOpnameContextQuery}`,
       icon: ClipboardCheck,
     });
   if (canReadStockMovements)
-    inventoryOperationLinks.push({
-      label: "Stock Movements",
-      to: "/stock-movements",
+    stockOpnameChildLinks.push({
+      label: t("Stock Movements"),
+      to: `/stock-movements${stockOpnameContextQuery}`,
       icon: PackageOpen,
+    });
+  if (canReadClosingCounts)
+    stockOpnameChildLinks.push({
+      label: t("Closing Stock"),
+      to: stockCountClosingPath,
+      icon: ClipboardCheck,
     });
   if (canReadCategories)
     inventoryMenuLinks.push({
-      label: "Menu Items",
+      label: t("Menu Items"),
       to: "/category-management",
       icon: FolderTree,
     });
   if (canReadProducts && !canReadCategories)
     inventoryMenuLinks.push({
-      label: "Menu Items",
+      label: t("Menu Items"),
       to: "/menu-items",
       icon: CupSoda,
     });
@@ -146,11 +168,17 @@ export default function Sidebar({
   }
   const filteredLinks = links.filter((link) => matchesMenu(link.label, ""));
   const filteredHrisLinks = hrisLinks.filter((link) => matchesMenu(link.label, "HRIS"));
-  const filteredInventoryMasterLinks = inventoryMasterLinks.filter((link) => matchesMenu(link.label, "Master Data"));
-  const filteredInventoryOperationLinks = inventoryOperationLinks.filter((link) => matchesMenu(link.label, "Inventory"));
-  const filteredInventoryMenuLinks = inventoryMenuLinks.filter((link) => matchesMenu(link.label, "Menu"));
-  const hasMenus = [links, hrisLinks, inventoryMasterLinks, inventoryOperationLinks, inventoryMenuLinks].some((group) => group.length > 0);
-  const resultCount = [filteredLinks, filteredHrisLinks, filteredInventoryMasterLinks, filteredInventoryOperationLinks, filteredInventoryMenuLinks].reduce((total, group) => total + group.length, 0);
+  const filteredInventoryMasterLinks = inventoryMasterLinks.filter((link) => matchesMenu(link.label, t("Master Data")));
+  const filteredInventoryOperationLinks = inventoryOperationLinks.filter((link) => matchesMenu(link.label, t("Inventory")));
+  const filteredStockOpnameChildLinks = stockOpnameChildLinks.filter((link) => matchesMenu(link.label, t("Inventory")));
+  const filteredInventoryMenuLinks = inventoryMenuLinks.filter((link) => matchesMenu(link.label, t("Menu")));
+  const showStockOpnameGroup =
+    filteredInventoryOperationLinks.length > 0 ||
+    filteredStockOpnameChildLinks.length > 0;
+  const stockOpnameLink = inventoryOperationLinks[0];
+  const hasMenus = [links, hrisLinks, inventoryMasterLinks, inventoryOperationLinks, stockOpnameChildLinks, inventoryMenuLinks].some((group) => group.length > 0);
+  const resultCount = [filteredLinks, filteredHrisLinks, filteredInventoryMasterLinks, filteredInventoryOperationLinks, filteredStockOpnameChildLinks, filteredInventoryMenuLinks].reduce((total, group) => total + group.length, 0);
+  const StockOpnameIcon = stockOpnameLink?.icon;
   async function logout() {
     setIsLoggingOut(true);
     try {
@@ -165,7 +193,7 @@ export default function Sidebar({
   return (
     <>
       <button
-        aria-label="Close menu"
+        aria-label={t("Close menu")}
         onClick={onClose}
         className={`fixed inset-0 z-40 bg-black/50 lg:hidden ${isOpen ? "" : "hidden"}`}
       />
@@ -174,13 +202,13 @@ export default function Sidebar({
       >
         <Brand />
         {hasMenus && (
-          <div role="search" aria-label="Search sidebar menus" className="mt-7 flex shrink-0 items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-stone-400 transition focus-within:border-[#b86b42] focus-within:ring-2 focus-within:ring-[#b86b42]/20">
+          <div role="search" aria-label={t("Search sidebar menus")} className="mt-7 flex shrink-0 items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-stone-400 transition focus-within:border-[#b86b42] focus-within:ring-2 focus-within:ring-[#b86b42]/20">
             <Search size={16} className="shrink-0" aria-hidden="true" />
             <input
               ref={searchInputRef}
               type="text"
-              aria-label="Search menus"
-              placeholder="Search menus..."
+              aria-label={t("Search menus")}
+              placeholder={t("Search menus...")}
               value={menuSearch}
               onChange={(event) => setMenuSearch(event.target.value)}
               onKeyDown={(event) => {
@@ -192,13 +220,13 @@ export default function Sidebar({
               className="min-w-0 flex-1 bg-transparent text-sm text-stone-100 outline-none placeholder:text-stone-500"
             />
             {menuSearch && (
-              <button type="button" aria-label="Clear menu search" onClick={() => { setMenuSearch(""); searchInputRef.current?.focus(); }} className="grid size-6 shrink-0 place-items-center rounded text-stone-400 transition hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-[#b86b42]">
+              <button type="button" aria-label={t("Clear menu search")} onClick={() => { setMenuSearch(""); searchInputRef.current?.focus(); }} className="grid size-6 shrink-0 place-items-center rounded text-stone-400 transition hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-[#b86b42]">
                 <X size={14} />
               </button>
             )}
           </div>
         )}
-        <nav aria-label="Main navigation" className="sidebar-scroll mt-4 -mr-2 min-h-0 flex-1 space-y-2 overflow-y-auto pb-5 pr-2">
+        <nav aria-label={t("Main navigation")} className="sidebar-scroll mt-4 -mr-2 min-h-0 flex-1 space-y-2 overflow-y-auto pb-5 pr-2">
           {filteredLinks.map(({ label, to, icon: Icon }) => (
             <NavLink
               key={label}
@@ -212,30 +240,47 @@ export default function Sidebar({
               {label}
             </NavLink>
           ))}
-          {(filteredInventoryMasterLinks.length > 0 || filteredInventoryOperationLinks.length > 0 || filteredInventoryMenuLinks.length > 0) && (
+          {(filteredInventoryMasterLinks.length > 0 || showStockOpnameGroup || filteredInventoryMenuLinks.length > 0) && (
             <div className="pt-5">
-              {filteredInventoryOperationLinks.length > 0 && (
+              {showStockOpnameGroup && (
                 <div>
                   <div className="mb-3 flex items-center gap-3 px-3">
                     <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500">
-                      Inventory
+                      {t("Inventory")}
                     </span>
                     <span className="h-px flex-1 bg-white/10" />
                   </div>
                   <div className="space-y-2">
-                    {filteredInventoryOperationLinks.map(({ label, to, icon: Icon }) => (
+                    {stockOpnameLink && StockOpnameIcon && (
                       <NavLink
-                        key={label}
-                        to={to}
+                        key={stockOpnameLink.label}
+                        to={stockOpnameLink.to}
                         onClick={onClose}
                         className={({ isActive }) =>
                           `flex items-center gap-3 rounded-lg p-3 text-sm ${isActive ? "bg-[#4b3023] text-white" : "text-stone-300 hover:bg-white/5"}`
                         }
                       >
-                        <Icon size={18} />
-                        {label}
+                        <StockOpnameIcon size={18} />
+                        {stockOpnameLink.label}
                       </NavLink>
-                    ))}
+                    )}
+                    {filteredStockOpnameChildLinks.length > 0 && (
+                      <div className="ml-5 space-y-1 border-l border-white/10 pl-3">
+                        {filteredStockOpnameChildLinks.map(({ label, to, icon: Icon }) => (
+                          <NavLink
+                            key={label}
+                            to={to}
+                            onClick={onClose}
+                            className={({ isActive }) =>
+                              `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm ${isActive ? "bg-[#4b3023] text-white" : "text-stone-300 hover:bg-white/5"}`
+                            }
+                          >
+                            <Icon size={16} />
+                            {label}
+                          </NavLink>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -243,7 +288,7 @@ export default function Sidebar({
                 <div className="pt-5">
                   <div className="mb-3 flex items-center gap-3 px-3">
                     <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500">
-                      Menu
+                      {t("Menu")}
                     </span>
                     <span className="h-px flex-1 bg-white/10" />
                   </div>
@@ -268,7 +313,7 @@ export default function Sidebar({
                 <div className="pt-5">
                   <div className="mb-3 flex items-center gap-3 px-3">
                     <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500">
-                      Master Data
+                      {t("Master Data")}
                     </span>
                     <span className="h-px flex-1 bg-white/10" />
                   </div>
@@ -319,8 +364,8 @@ export default function Sidebar({
           {hasMenus && resultCount === 0 && (
             <div role="status" className="rounded-xl border border-white/10 bg-white/5 px-3 py-6 text-center">
               <Search size={22} className="mx-auto mb-3 text-stone-500" />
-              <p className="text-sm font-medium text-stone-300">No menus found</p>
-              <p className="mt-1 text-xs text-stone-400">Try another keyword.</p>
+              <p className="text-sm font-medium text-stone-300">{t("No menus found")}</p>
+              <p className="mt-1 text-xs text-stone-400">{t("Try another keyword.")}</p>
             </div>
           )}
         </nav>
@@ -328,6 +373,7 @@ export default function Sidebar({
           hrisLinks.length === 0 &&
           inventoryMasterLinks.length === 0 &&
           inventoryOperationLinks.length === 0 &&
+          stockOpnameChildLinks.length === 0 &&
           inventoryMenuLinks.length === 0 && (
           <div className="relative flex flex-1 items-center justify-center">
             <span className="absolute h-36 w-36 rounded-full bg-[#b86b42]/20 blur-2xl" />
@@ -344,10 +390,10 @@ export default function Sidebar({
             <b className="text-xs text-white">
               {user?.fullname || "C.R.E.M.A"}
             </b>
-            <small>{user?.position || "Team Member"}</small>
+            <small>{user?.position || t("Team Member")}</small>
           </span>
           <button
-            aria-label="Logout"
+            aria-label={t("Logout")}
             onClick={() => setShowLogoutConfirm(true)}
             className="grid size-9 place-items-center rounded-lg transition hover:bg-white/10 hover:text-white"
           >
@@ -371,10 +417,10 @@ export default function Sidebar({
               id="logout-title"
               className="mt-5 text-xl font-bold text-stone-900"
             >
-              Confirm logout?
+              {t("Confirm logout?")}
             </h2>
             <p className="mt-2 text-sm leading-6 text-stone-500">
-              You’ll need to sign in again to access the C.R.E.M.A dashboard.
+              {t("You’ll need to sign in again to access the C.R.E.M.A dashboard.")}
             </p>
             <div className="mt-7 flex gap-3">
               <button
@@ -383,7 +429,7 @@ export default function Sidebar({
                 disabled={isLoggingOut}
                 className="flex-1 rounded-lg border border-stone-300 px-4 py-3 text-sm font-semibold text-stone-700 transition hover:bg-stone-50 disabled:opacity-60"
               >
-                Cancel
+                {t("Cancel")}
               </button>
               <button
                 type="button"
@@ -391,7 +437,7 @@ export default function Sidebar({
                 disabled={isLoggingOut}
                 className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-[#a94732] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#8f3929] disabled:opacity-60"
               >
-                {isLoggingOut ? "Logging out..." : "Logout"}
+                {isLoggingOut ? t("Logging out...") : t("Logout")}
               </button>
             </div>
           </div>

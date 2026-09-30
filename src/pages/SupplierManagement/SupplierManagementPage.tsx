@@ -13,6 +13,7 @@ import ConfirmDialog from "../../components/common/ConfirmDialog";
 import Navbar from "../../components/layout/Navbar";
 import Sidebar from "../../components/layout/Sidebar";
 import { useAuth } from "../../app/AuthContext";
+import { useLanguage } from "../../app/LanguageContext";
 import { userCan } from "../../app/roleAccess";
 
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50];
@@ -26,6 +27,7 @@ const emptyForm: SupplierPayload = {
 
 export default function SupplierManagementPage() {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const canCreateSuppliers = userCan(user, "suppliers", "create");
   const canUpdateSuppliers = userCan(user, "suppliers", "update");
   const canDeleteSuppliers = userCan(user, "suppliers", "delete");
@@ -77,7 +79,7 @@ export default function SupplierManagementPage() {
           ? requestError.response?.data
           : undefined;
         setSuppliers([]);
-        setError(response?.message || "Could not load suppliers.");
+        setError(response?.message || t("Could not load suppliers."));
       } finally {
         if (current) setLoading(false);
       }
@@ -113,13 +115,13 @@ export default function SupplierManagementPage() {
     setFieldErrors({});
     setActionError("");
     if (!form.name.trim()) {
-      setFieldErrors({ name: "Name is required" });
+      setFieldErrors({ name: t("Name is required") });
       return;
     }
     setConfirm({
-      title: editingSupplier ? "Update supplier" : "Create supplier",
-      message: editingSupplier ? "Update this supplier?" : "Create this supplier?",
-      confirmText: editingSupplier ? "Update supplier" : "Create supplier",
+      title: editingSupplier ? t("Update supplier") : t("Create supplier"),
+      message: editingSupplier ? t("Update this supplier?") : t("Create this supplier?"),
+      confirmText: editingSupplier ? t("Update supplier") : t("Create supplier"),
       onConfirm: submitConfirmed,
     });
   }
@@ -136,7 +138,7 @@ export default function SupplierManagementPage() {
       } else {
         await createSupplier(form);
       }
-      setNotice("Supplier saved successfully.");
+      setNotice(t("Supplier saved successfully."));
       setModalOpen(false);
       setRefreshKey((value) => value + 1);
     } catch (requestError) {
@@ -147,7 +149,7 @@ export default function SupplierManagementPage() {
         ? requestError.response?.data
         : undefined;
       setFieldErrors(response?.valid ?? {});
-      setActionError(response?.valid ? "" : response?.message || "Action failed.");
+      setActionError(response?.valid ? "" : response?.message || t("Action failed."));
     } finally {
       setSubmitting(false);
     }
@@ -156,9 +158,9 @@ export default function SupplierManagementPage() {
   function requestDelete(supplier: Supplier) {
     if (!canDeleteSuppliers || submitting) return;
     setConfirm({
-      title: "Delete supplier",
-      message: "Delete this supplier permanently?",
-      confirmText: "Delete supplier",
+      title: t("Delete supplier"),
+      message: t("Delete this supplier permanently?"),
+      confirmText: t("Delete supplier"),
       tone: "danger",
       onConfirm: () => deleteConfirmed(supplier.supplier_id),
     });
@@ -172,14 +174,14 @@ export default function SupplierManagementPage() {
     setSubmitting(true);
     try {
       await deleteSupplier(supplierID);
-      setNotice("Supplier deleted successfully.");
+      setNotice(t("Supplier deleted successfully."));
       if (suppliers.length === 1 && page > 1) setPage((value) => value - 1);
       setRefreshKey((value) => value + 1);
     } catch (requestError) {
       const response = isAxiosError<{ message?: string }>(requestError)
         ? requestError.response?.data
         : undefined;
-      setError(response?.message || "Could not delete supplier.");
+      setError(response?.message || t("Could not delete supplier."));
     } finally {
       setSubmitting(false);
     }
@@ -188,11 +190,11 @@ export default function SupplierManagementPage() {
   function requestToggleActive(supplier: Supplier) {
     if (!canUpdateSuppliers || submitting) return;
     setConfirm({
-      title: supplier.active ? "Deactivate supplier" : "Activate supplier",
+      title: supplier.active ? t("Deactivate supplier") : t("Activate supplier"),
       message: supplier.active
-        ? "Deactivate this supplier?"
-        : "Activate this supplier?",
-      confirmText: supplier.active ? "Deactivate" : "Activate",
+        ? t("Deactivate this supplier?")
+        : t("Activate this supplier?"),
+      confirmText: supplier.active ? t("Deactivate") : t("Activate"),
       onConfirm: () => toggleActiveConfirmed(supplier),
     });
   }
@@ -211,13 +213,13 @@ export default function SupplierManagementPage() {
         address: supplier.address,
         active: !supplier.active,
       });
-      setNotice("Supplier status updated successfully.");
+      setNotice(t("Supplier status updated successfully."));
       setRefreshKey((value) => value + 1);
     } catch (requestError) {
       const response = isAxiosError<{ message?: string }>(requestError)
         ? requestError.response?.data
         : undefined;
-      setError(response?.message || "Could not update supplier status.");
+      setError(response?.message || t("Could not update supplier status."));
     } finally {
       setSubmitting(false);
     }
@@ -236,9 +238,9 @@ export default function SupplierManagementPage() {
               <div className="mb-3 flex size-11 items-center justify-center rounded-xl bg-[#f2e2d8] text-[#92502f]">
                 <Truck size={22} />
               </div>
-              <h1 className="font-serif text-3xl font-bold">Suppliers</h1>
+              <h1 className="font-serif text-3xl font-bold">{t("Suppliers")}</h1>
               <p className="mt-2 text-sm text-stone-500">
-                Manage supplier contacts and availability.
+                {t("Manage supplier contacts and availability.")}
               </p>
             </div>
             {canCreateSuppliers && <button
@@ -247,7 +249,7 @@ export default function SupplierManagementPage() {
               className="flex items-center gap-2 rounded-lg bg-[#362219] px-5 py-3 text-sm font-semibold text-white"
             >
               <Plus size={17} />
-              Add supplier
+              {t("Add supplier")}
             </button>}
           </header>
 
@@ -256,8 +258,8 @@ export default function SupplierManagementPage() {
           <section className="mt-7 overflow-hidden rounded-xl border border-stone-200 bg-white">
             <div className="flex flex-col gap-4 border-b border-stone-200 p-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h2 className="font-semibold">All suppliers</h2>
-                <p className="text-xs text-stone-500">{total} suppliers found</p>
+                <h2 className="font-semibold">{t("All suppliers")}</h2>
+                <p className="text-xs text-stone-500">{total} {t("suppliers found")}</p>
               </div>
               <form
                 onSubmit={(event) => {
@@ -272,7 +274,7 @@ export default function SupplierManagementPage() {
                   value={searchInput}
                   onChange={(event) => setSearchInput(event.target.value)}
                   className="min-w-0 flex-1 bg-transparent text-sm outline-none"
-                  placeholder="Search supplier..."
+                  placeholder={t("Search supplier...")}
                 />
               </form>
             </div>
@@ -285,25 +287,25 @@ export default function SupplierManagementPage() {
               <table className="w-full min-w-170 text-left">
                 <thead className="bg-stone-50 text-xs uppercase tracking-wider text-stone-500">
                   <tr>
-                    <th className="px-5 py-3">Supplier</th>
-                    <th className="px-5 py-3">Phone</th>
-                    <th className="px-5 py-3">Email</th>
-                    <th className="px-5 py-3">Address</th>
-                    <th className="px-5 py-3">Status</th>
-                    {showActions && <th className="px-5 py-3 text-right">Action</th>}
+                    <th className="px-5 py-3">{t("Supplier")}</th>
+                    <th className="px-5 py-3">{t("Phone")}</th>
+                    <th className="px-5 py-3">{t("Email")}</th>
+                    <th className="px-5 py-3">{t("Address")}</th>
+                    <th className="px-5 py-3">{t("Status")}</th>
+                    {showActions && <th className="px-5 py-3 text-right">{t("Action")}</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-100">
                   {loading ? (
                     <tr>
                       <td colSpan={columnCount} className="px-5 py-14 text-center text-sm text-stone-500">
-                        Loading suppliers...
+                        {t("Loading suppliers...")}
                       </td>
                     </tr>
                   ) : suppliers.length === 0 ? (
                     <tr>
                       <td colSpan={columnCount} className="px-5 py-14 text-center text-sm text-stone-500">
-                        No suppliers found
+                        {t("No suppliers found")}
                       </td>
                     </tr>
                   ) : (
@@ -320,7 +322,7 @@ export default function SupplierManagementPage() {
 
                         <td className="px-5 py-4">
                           <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${supplier.active ? "bg-green-50 text-green-700" : "bg-stone-100 text-stone-500"}`}>
-                            {supplier.active ? "Active" : "Inactive"}
+                            {supplier.active ? t("Active") : t("Inactive")}
                           </span>
                         </td>
                         {showActions && <td className="px-5 py-4">
@@ -329,7 +331,7 @@ export default function SupplierManagementPage() {
                               type="button"
                               onClick={() => openModal(supplier)}
                               className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800"
-                              title="Update supplier"
+                              title={t("Update supplier")}
                             >
                               <Pencil size={15} />
                             </button>}
@@ -337,7 +339,7 @@ export default function SupplierManagementPage() {
                               type="button"
                               onClick={() => requestToggleActive(supplier)}
                               className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent"
-                              title={supplier.active ? "Deactivate supplier" : "Activate supplier"}
+                              title={supplier.active ? t("Deactivate supplier") : t("Activate supplier")}
                             >
                               <Power size={15} />
                             </button>}
@@ -345,7 +347,7 @@ export default function SupplierManagementPage() {
                               type="button"
                               onClick={() => requestDelete(supplier)}
                               className="grid size-8 place-items-center rounded-lg text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent"
-                              title="Delete supplier"
+                              title={t("Delete supplier")}
                             >
                               <Trash2 size={15} />
                             </button>}
@@ -361,10 +363,10 @@ export default function SupplierManagementPage() {
             <footer className="flex items-center justify-between border-t border-stone-200 px-5 py-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                 <p className="text-xs text-stone-500">
-                  Page {page} of {totalPages}
+                  {t("Page")} {page} {t("of")} {totalPages}
                 </p>
                 <label className="flex items-center gap-2 text-xs font-semibold text-stone-500">
-                  Limit
+                  {t("Limit")}
                   <select
                     value={pageSize}
                     onChange={(event) => {
@@ -387,14 +389,14 @@ export default function SupplierManagementPage() {
                   onClick={() => setPage((value) => value - 1)}
                   className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-40"
                 >
-                  Previous
+                  {t("Previous")}
                 </button>
                 <button
                   disabled={page >= totalPages || loading}
                   onClick={() => setPage((value) => value + 1)}
                   className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-40"
                 >
-                  Next
+                  {t("Next")}
                 </button>
               </div>
             </footer>
@@ -406,7 +408,7 @@ export default function SupplierManagementPage() {
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
           <form onSubmit={submitForm} className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-2xl">
             <header className="flex items-start justify-between border-b border-stone-200 p-5">
-              <h2 className="text-lg font-bold">{editingSupplier ? "Update supplier" : "Add supplier"}</h2>
+              <h2 className="text-lg font-bold">{editingSupplier ? t("Update supplier") : t("Add supplier")}</h2>
               <button type="button" onClick={() => setModalOpen(false)} className="grid size-9 place-items-center rounded-lg hover:bg-stone-100">
                 <X size={18} />
               </button>
@@ -414,7 +416,7 @@ export default function SupplierManagementPage() {
             <div className="space-y-4 p-5">
               {(["name", "phone", "email", "address"] as const).map((field) => (
                 <label key={field} className="block text-sm font-semibold text-stone-700">
-                  {({ name: "Name", phone: "Phone", email: "Email", address: "Address" })[field]}{field === "name" ? " *" : ""}
+                  {({ name: t("Name"), phone: t("Phone"), email: t("Email"), address: t("Address") })[field]}{field === "name" ? " *" : ""}
                   <input
                     type={field === "email" ? "email" : field === "phone" ? "tel" : "text"}
                     required={field === "name"}
@@ -437,10 +439,10 @@ export default function SupplierManagementPage() {
             </div>
             <footer className="flex justify-start gap-3 border-t border-stone-200 p-5">
               <button type="button" onClick={() => setModalOpen(false)} className="rounded-lg border border-stone-300 px-4 py-2.5 text-sm font-semibold hover:bg-stone-50">
-                Cancel
+                {t("Cancel")}
               </button>
               <button type="submit" disabled={submitting} className="rounded-lg bg-[#362219] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">
-                {submitting ? "Saving..." : "Save"}
+                {submitting ? t("Saving...") : t("Save")}
               </button>
             </footer>
           </form>
@@ -451,7 +453,7 @@ export default function SupplierManagementPage() {
         open={Boolean(confirm)}
         title={confirm?.title ?? ""}
         message={confirm?.message ?? ""}
-        confirmText={confirm?.confirmText ?? "Confirm"}
+        confirmText={confirm?.confirmText ?? t("Confirm")}
         tone={confirm?.tone}
         submitting={submitting}
         onCancel={() => setConfirm(null)}

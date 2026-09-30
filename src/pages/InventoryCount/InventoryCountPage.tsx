@@ -1,21 +1,18 @@
-import { Activity, ArrowLeft, ArrowRight, CheckCircle2, ClipboardCheck, PackagePlus, SlidersHorizontal } from "lucide-react";
+import { Activity, ArrowLeft, ArrowRight, ClipboardCheck, PackagePlus, SlidersHorizontal } from "lucide-react";
 import { isAxiosError } from "axios";
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { getBusinessDays, type BusinessDay } from "../../api/businessDay.api";
 import { getInventoryCounts, type InventoryCount } from "../../api/inventoryCount.api";
 import Navbar from "../../components/layout/Navbar";
 import Sidebar from "../../components/layout/Sidebar";
 import { useAuth } from "../../app/AuthContext";
+import { useLanguage, type Language } from "../../app/LanguageContext";
 import { getUserRoleNames } from "../../app/roleAccess";
 
-function formatDateTime(value?: string) {
-  return value ? new Date(value).toLocaleString("en-GB") : "-";
-}
-
-function formatBusinessDate(value?: string) {
+function formatBusinessDate(value: string | undefined, language: Language) {
   if (!value) return "";
-  return new Date(`${value}T00:00:00`).toLocaleDateString("en-GB", {
+  return new Date(`${value}T00:00:00`).toLocaleDateString(language === "id" ? "id-ID" : "en-GB", {
     day: "2-digit",
     month: "long",
     year: "numeric",
@@ -30,26 +27,30 @@ function today() {
   return `${year}-${month}-${day}`;
 }
 
-function countTitle(type: InventoryCount["count_type"]) {
-  return type === "OPENING" ? "Opening Stock" : "Closing Stock";
-}
-
-function countDescription(type: InventoryCount["count_type"]) {
-  return type === "OPENING"
-    ? "Physical stock before operational activities"
-    : "Physical stock after operational activities";
-}
-
 export default function InventoryCountPage() {
   const { user } = useAuth();
+  const { language, t } = useLanguage();
   const roles = getUserRoleNames(user);
   const inventoryOnly = roles.includes("inventory") && !roles.some((role) => ["admin", "leader"].includes(role));
   const { businessDayID = "" } = useParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const queryDate = searchParams.get("date") ?? "";
+  const focusStep = searchParams.get("focus") ?? "";
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [items, setItems] = useState<InventoryCount[]>([]);
   const [businessDay, setBusinessDay] = useState<BusinessDay | null>(null);
+  const [selectedDate, setSelectedDate] = useState(queryDate || today());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!businessDayID && !queryDate) {
+      setSearchParams({ date: selectedDate }, { replace: true });
+    }
+    if (!businessDayID && queryDate && queryDate !== selectedDate) {
+      setSelectedDate(queryDate);
+    }
+  }, [businessDayID, queryDate, selectedDate, setSearchParams]);
 
   useEffect(() => {
     let current = true;
@@ -68,7 +69,7 @@ export default function InventoryCountPage() {
         if (!current) return;
         const nextItems = businessDayID
           ? response.data ?? []
-          : (response.data ?? []).filter((item) => item.business_day_info?.business_date === today());
+          : (response.data ?? []).filter((item) => item.business_day_info?.business_date === selectedDate);
         setItems(nextItems);
       } catch (requestError) {
         if (!current) return;
@@ -76,7 +77,7 @@ export default function InventoryCountPage() {
           ? requestError.response?.data
           : undefined;
         setItems([]);
-        setError(response?.message || "Could not load inventory counts.");
+        setError(response?.message || t("Could not load inventory counts."));
       } finally {
         if (current) setLoading(false);
       }
@@ -85,14 +86,14 @@ export default function InventoryCountPage() {
     return () => {
       current = false;
     };
-  }, [businessDayID]);
+  }, [businessDayID, selectedDate, t]);
 
   useEffect(() => {
     let current = true;
     async function loadBusinessDay() {
       if (!businessDayID) {
         try {
-          const response = await getBusinessDays({ start: 0, limit: 1, status: "OPEN", business_date: today() });
+          const response = await getBusinessDays({ start: 0, limit: 1, status: "", business_date: selectedDate });
           if (current) setBusinessDay(response.data?.[0] ?? null);
         } catch {
           if (current) setBusinessDay(null);
@@ -111,7 +112,7 @@ export default function InventoryCountPage() {
     return () => {
       current = false;
     };
-  }, [businessDayID]);
+  }, [businessDayID, selectedDate]);
 
   const orderedItems = [...items].sort((first, second) => {
     const order = { OPENING: 0, CLOSING: 1 };
@@ -123,13 +124,20 @@ export default function InventoryCountPage() {
   const closingSubmitted = closingCount?.status === "SUBMITTED";
   const showWorkflow = !loading && items.length > 0;
   const scopedBusinessDayID = businessDayID || businessDay?.business_day_id || "";
-  const scopedBusinessDate = businessDay?.business_date || today();
+  const scopedBusinessDate = businessDay?.business_date || selectedDate;
+  const workflowQuery = new URLSearchParams({
+    ...(scopedBusinessDayID ? { businessDayID: scopedBusinessDayID } : {}),
+    date: scopedBusinessDate,
+  });
   const stockInPath = scopedBusinessDayID
-    ? `/stock-in?businessDayID=${encodeURIComponent(scopedBusinessDayID)}&date=${scopedBusinessDate}`
-    : "/stock-in";
+    ? `/stock-in?${workflowQuery}`
+    : `/stock-in?date=${encodeURIComponent(scopedBusinessDate)}`;
+  const adjustmentPath = scopedBusinessDayID
+    ? `/stock-adjustments?${workflowQuery}`
+    : `/stock-adjustments?date=${encodeURIComponent(scopedBusinessDate)}`;
   const movementPath = scopedBusinessDayID
-    ? `/stock-movements?businessDayID=${encodeURIComponent(scopedBusinessDayID)}&date=${scopedBusinessDate}`
-    : "/stock-movements";
+    ? `/stock-movements?${workflowQuery}`
+    : `/stock-movements?date=${encodeURIComponent(scopedBusinessDate)}`;
 
   function countPath(item: InventoryCount) {
     return businessDayID
@@ -138,42 +146,14 @@ export default function InventoryCountPage() {
   }
 
   function nextAction() {
-    if (!openingCount) return { label: "Waiting for stock count", path: "", disabled: true };
-    if (!openingSubmitted) return { label: "Submit opening stock", path: countPath(openingCount), disabled: false };
-    if (closingCount && !closingSubmitted) return { label: "Submit closing stock", path: countPath(closingCount), disabled: false };
-    if (closingSubmitted) return { label: "View closing stock", path: countPath(closingCount), disabled: false };
-    return { label: "Review stock movement", path: movementPath, disabled: false };
+    if (!openingCount) return { label: t("Waiting for stock count"), path: "", disabled: true };
+    if (!openingSubmitted) return { label: t("Submit opening stock"), path: countPath(openingCount), disabled: false };
+    if (closingCount && !closingSubmitted) return { label: t("Submit closing stock"), path: countPath(closingCount), disabled: false };
+    if (closingSubmitted) return { label: t("View closing stock"), path: countPath(closingCount), disabled: false };
+    return { label: t("Review stock movement"), path: movementPath, disabled: false };
   }
 
   const action = nextAction();
-
-  function renderCount(item: InventoryCount) {
-    const submitted = item.status === "SUBMITTED";
-    return (
-      <Link key={item.inventory_count_id} to={countPath(item)} className="group grid gap-4 border-t border-stone-100 bg-white px-5 py-4 transition hover:bg-stone-50/70 sm:grid-cols-[44px_minmax(0,1fr)_auto] sm:items-center">
-        <div className={`grid size-10 place-items-center rounded-lg ${submitted ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
-          {submitted ? <CheckCircle2 size={20} /> : <ClipboardCheck size={20} />}
-        </div>
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-base font-semibold transition-colors group-hover:text-[#92502f]">{countTitle(item.count_type)}</h2>
-            <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${submitted ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
-              {submitted ? "Done" : "Draft"}
-            </span>
-          </div>
-          <p className="mt-1 text-sm text-stone-500">{countDescription(item.count_type)}</p>
-          <div className="mt-3 flex flex-wrap gap-x-8 gap-y-1 text-sm">
-            <span className="text-stone-500">Counted by <b className="font-semibold text-stone-800">{item.counted_by_info?.fullname ?? item.counted_by ?? "-"}</b></span>
-            <span className="text-stone-500">Submitted <b className="font-semibold text-stone-800">{formatDateTime(item.counted_at)}</b></span>
-          </div>
-        </div>
-        <span className="inline-flex w-fit items-center justify-center gap-2 rounded-lg border border-stone-300 px-4 py-2 text-sm font-semibold text-stone-700 transition group-hover:border-[#92502f] group-hover:text-[#92502f]">
-          {submitted ? "View" : "Open"}
-          <ArrowRight size={15} />
-        </span>
-      </Link>
-    );
-  }
 
   return (
     <div className="flex min-h-screen bg-[#f8f5f0]">
@@ -185,30 +165,55 @@ export default function InventoryCountPage() {
             {businessDayID && (
               <Link to="/business-days" className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-stone-600 hover:text-stone-900">
                 <ArrowLeft size={17} />
-                Business Days
+                {t("Business Days")}
               </Link>
             )}
             <div className="mb-3 flex size-11 items-center justify-center rounded-xl bg-[#e8efe5] text-[#547144]">
               <ClipboardCheck size={22} />
             </div>
-            <h1 className="font-serif text-3xl font-bold">Stock Count</h1>
-            <p className="mt-2 text-sm text-stone-500">{formatBusinessDate(businessDay?.business_date) || (businessDayID ? businessDayID : formatBusinessDate(today()))}</p>
+            <h1 className="font-serif text-3xl font-bold">{t("Stock Count")}</h1>
+            <div className="mt-2 flex flex-wrap items-center gap-3">
+              <p className="text-sm text-stone-500">{formatBusinessDate(businessDay?.business_date, language) || (businessDayID ? businessDayID : formatBusinessDate(selectedDate, language))}</p>
+              {!businessDayID && (
+                <label className="inline-flex items-center gap-2 text-xs font-semibold text-stone-500">
+                  {t("Business Date")}
+                  <input
+                    type="date"
+                    value={selectedDate}
+                    onChange={(event) => {
+                      const nextDate = event.target.value || today();
+                      setSelectedDate(nextDate);
+                      setSearchParams({ date: nextDate });
+                    }}
+                    className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm font-normal text-stone-700 outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10"
+                  />
+                </label>
+              )}
+            </div>
           </header>
 
-          {showWorkflow && (
-            <section className="mt-7 max-w-7xl rounded-xl border border-stone-200 bg-white">
+          <section className="mt-7 max-w-7xl overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
+            {error && <div className="m-5 rounded-lg bg-red-50 p-4 text-sm text-red-700">{error}</div>}
+            {loading ? (
+              <div className="p-6 text-sm text-stone-500">{t("Loading stock counts...")}</div>
+            ) : !showWorkflow ? (
+              <div className="p-6 text-sm text-stone-500">
+                {businessDay ? t("No stock counts found for this date") : t("No business day found for this date")}
+              </div>
+            ) : (
+              <>
               <div className="grid gap-4 p-5 lg:grid-cols-[1fr_auto] lg:items-center">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">{inventoryOnly ? "Today" : "Daily workflow"}</p>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">{inventoryOnly ? t("Today") : t("Daily workflow")}</p>
                   <h2 className="mt-1 text-xl font-bold text-stone-950">
-                    {openingSubmitted ? closingSubmitted ? "Stock count complete" : "Continue daily inventory" : "Start with Opening Stock"}
+                    {openingSubmitted ? closingSubmitted ? t("Stock count complete") : t("Continue daily inventory") : t("Start with Opening Stock")}
                   </h2>
                   <p className="mt-1 text-sm text-stone-500">
                     {openingSubmitted
                       ? closingSubmitted
-                        ? "Opening and Closing Stock have been submitted."
-                        : "Record Stock In or Adjustment when needed. If there is none, continue to Closing Stock."
-                      : "Count physical stock before operational activities begin."}
+                        ? t("Opening and Closing Stock have been submitted.")
+                        : t("Record Stock In or Adjustment when needed. If there is none, continue to Closing Stock.")
+                      : t("Count physical stock before operational activities begin.")}
                   </p>
                 </div>
                 {action.path ? (
@@ -220,65 +225,100 @@ export default function InventoryCountPage() {
                   <button disabled className="rounded-lg bg-stone-200 px-5 py-3 text-sm font-semibold text-stone-500">{action.label}</button>
                 )}
               </div>
-              <div className="grid border-t border-stone-100 text-sm md:grid-cols-2 xl:grid-cols-5">
-                <div className="flex gap-3 px-5 py-4">
+              <div className="divide-y divide-stone-100 border-t border-stone-100 text-sm">
+                {openingCount ? (
+                <Link to={countPath(openingCount)} className={`flex gap-4 px-5 py-4 transition hover:bg-stone-50 ${focusStep === "opening" ? "bg-amber-50/60 ring-1 ring-inset ring-amber-200" : ""}`}>
                   <span className={`grid size-8 shrink-0 place-items-center rounded-full text-xs font-bold ${openingSubmitted ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>1</span>
-                  <div>
-                    <p className="font-semibold text-stone-900">Opening Stock</p>
-                    <p className="mt-1 text-stone-500">Count beginning stock.</p>
-                    <p className={openingSubmitted ? "mt-2 font-semibold text-emerald-700" : "mt-2 font-semibold text-amber-700"}>{openingSubmitted ? "Submitted" : "Not submitted"}</p>
+                  <div className="min-w-0 flex-1 sm:flex sm:items-center sm:justify-between sm:gap-5">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-semibold text-stone-900">{t("Opening Stock")}</p>
+                        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${openingSubmitted ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
+                          {openingSubmitted ? t("Done") : t("Draft")}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-stone-500">{t("Count beginning stock.")}</p>
+                    </div>
+                    <p className={openingSubmitted ? "mt-2 shrink-0 font-semibold text-emerald-700 sm:mt-0" : "mt-2 shrink-0 font-semibold text-amber-700 sm:mt-0"}>{openingSubmitted ? t("Submitted") : t("Not submitted")}</p>
+                  </div>
+                </Link>
+                ) : (
+                <div className={`flex gap-4 px-5 py-4 ${focusStep === "opening" ? "bg-amber-50/60 ring-1 ring-inset ring-amber-200" : ""}`}>
+                  <span className="grid size-8 shrink-0 place-items-center rounded-full bg-stone-100 text-xs font-bold text-stone-600">1</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-semibold text-stone-900">{t("Opening Stock")}</p>
+                      <span className="rounded-full bg-stone-100 px-2.5 py-1 text-xs font-semibold text-stone-500">
+                        {t("Draft")}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-stone-500">{t("Count beginning stock.")}</p>
                   </div>
                 </div>
-                <Link to={stockInPath} className="flex gap-3 border-t border-stone-100 px-5 py-4 hover:bg-stone-50 md:border-l md:border-t-0">
+                )}
+                <Link to={stockInPath} className="flex gap-4 px-5 py-4 hover:bg-stone-50">
                   <span className="grid size-8 shrink-0 place-items-center rounded-full bg-stone-100 text-xs font-bold text-stone-600">2</span>
-                  <div>
-                    <p className="flex items-center gap-2 font-semibold text-stone-900"><PackagePlus size={16} /> Stock In</p>
-                    <p className="mt-1 text-stone-500">Use only when goods arrive.</p>
-                    <p className="mt-2 font-semibold text-stone-700">Optional</p>
+                  <div className="min-w-0 flex-1 sm:flex sm:items-center sm:justify-between sm:gap-5">
+                    <div>
+                      <p className="flex items-center gap-2 font-semibold text-stone-900"><PackagePlus size={16} /> {t("Stock In")}</p>
+                      <p className="mt-1 text-stone-500">{t("Use only when goods arrive.")}</p>
+                    </div>
+                    <p className="mt-2 shrink-0 font-semibold text-stone-700 sm:mt-0">{t("Optional")}</p>
                   </div>
                 </Link>
-                <Link to={scopedBusinessDayID ? `/stock-adjustments?${new URLSearchParams({ businessDayID: scopedBusinessDayID, date: scopedBusinessDate })}` : "/stock-adjustments"} className="flex gap-3 border-t border-stone-100 px-5 py-4 hover:bg-stone-50 xl:border-l xl:border-t-0">
+                <Link to={adjustmentPath} className="flex gap-4 px-5 py-4 hover:bg-stone-50">
                   <span className="grid size-8 shrink-0 place-items-center rounded-full bg-stone-100 text-xs font-bold text-stone-600">3</span>
-                  <div>
-                    <p className="flex items-center gap-2 font-semibold text-stone-900"><SlidersHorizontal size={16} /> Adjustment</p>
-                    <p className="mt-1 text-stone-500">Correct stock when needed.</p>
-                    <p className="mt-2 font-semibold text-stone-700">Optional</p>
+                  <div className="min-w-0 flex-1 sm:flex sm:items-center sm:justify-between sm:gap-5">
+                    <div>
+                      <p className="flex items-center gap-2 font-semibold text-stone-900"><SlidersHorizontal size={16} /> {t("Adjustment")}</p>
+                      <p className="mt-1 text-stone-500">{t("Correct stock when needed.")}</p>
+                    </div>
+                    <p className="mt-2 shrink-0 font-semibold text-stone-700 sm:mt-0">{t("Optional")}</p>
                   </div>
                 </Link>
-                <Link to={movementPath} className="flex gap-3 border-t border-stone-100 px-5 py-4 hover:bg-stone-50 md:border-l xl:border-t-0">
+                <Link to={movementPath} className="flex gap-4 px-5 py-4 hover:bg-stone-50">
                   <span className="grid size-8 shrink-0 place-items-center rounded-full bg-stone-100 text-xs font-bold text-stone-600">4</span>
-                  <div>
-                    <p className="flex items-center gap-2 font-semibold text-stone-900"><Activity size={16} /> Movement</p>
-                    <p className="mt-1 text-stone-500">Review the ledger.</p>
-                    <p className="mt-2 font-semibold text-stone-700">Review</p>
+                  <div className="min-w-0 flex-1 sm:flex sm:items-center sm:justify-between sm:gap-5">
+                    <div>
+                      <p className="flex items-center gap-2 font-semibold text-stone-900"><Activity size={16} /> {t("Movement")}</p>
+                      <p className="mt-1 text-stone-500">{t("Review the ledger.")}</p>
+                    </div>
+                    <p className="mt-2 shrink-0 font-semibold text-stone-700 sm:mt-0">{t("Review")}</p>
                   </div>
                 </Link>
-                <div className="flex gap-3 border-t border-stone-100 px-5 py-4 xl:border-l xl:border-t-0">
+                {closingCount ? (
+                <Link to={countPath(closingCount)} className={`flex gap-4 px-5 py-4 transition hover:bg-stone-50 ${focusStep === "closing" ? "bg-amber-50/60 ring-1 ring-inset ring-amber-200" : ""}`}>
                   <span className={`grid size-8 shrink-0 place-items-center rounded-full text-xs font-bold ${closingSubmitted ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>5</span>
-                  <div>
-                    <p className="font-semibold text-stone-900">Closing Stock</p>
-                    <p className="mt-1 text-stone-500">Count ending stock.</p>
-                    <p className={closingSubmitted ? "mt-2 font-semibold text-emerald-700" : "mt-2 font-semibold text-amber-700"}>{closingSubmitted ? "Submitted" : "Not submitted"}</p>
+                  <div className="min-w-0 flex-1 sm:flex sm:items-center sm:justify-between sm:gap-5">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-semibold text-stone-900">{t("Closing Stock")}</p>
+                        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${closingSubmitted ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
+                          {closingSubmitted ? t("Done") : t("Draft")}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-stone-500">{t("Count ending stock.")}</p>
+                    </div>
+                    <p className={closingSubmitted ? "mt-2 shrink-0 font-semibold text-emerald-700 sm:mt-0" : "mt-2 shrink-0 font-semibold text-amber-700 sm:mt-0"}>{closingSubmitted ? t("Submitted") : t("Not submitted")}</p>
+                  </div>
+                </Link>
+                ) : (
+                <div className={`flex gap-4 px-5 py-4 ${focusStep === "closing" ? "bg-amber-50/60 ring-1 ring-inset ring-amber-200" : ""}`}>
+                  <span className="grid size-8 shrink-0 place-items-center rounded-full bg-stone-100 text-xs font-bold text-stone-600">5</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-semibold text-stone-900">{t("Closing Stock")}</p>
+                      <span className="rounded-full bg-stone-100 px-2.5 py-1 text-xs font-semibold text-stone-500">
+                        {t("Draft")}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-stone-500">{t("Count ending stock.")}</p>
                   </div>
                 </div>
+                )}
               </div>
-            </section>
-          )}
-
-          <section className="mt-7 max-w-7xl overflow-hidden rounded-xl border border-stone-200 bg-white">
-            <div className="border-b border-stone-100 px-5 py-4">
-              <h2 className="font-semibold text-stone-950">Stock count tasks</h2>
-              <p className="mt-1 text-sm text-stone-500">Opening and closing counts for this business day.</p>
-            </div>
-            {error && <div className="rounded-lg bg-red-50 p-4 text-sm text-red-700">{error}</div>}
-            {loading ? (
-              <div className="p-6 text-sm text-stone-500">Loading stock counts...</div>
-            ) : items.length === 0 ? (
-              <div className="p-6 text-sm text-stone-500">No stock counts found for this date</div>
-            ) : (
-              orderedItems.filter((item) => item.count_type === "OPENING").map(renderCount)
+              </>
             )}
-            {!loading && orderedItems.filter((item) => item.count_type === "CLOSING").map(renderCount)}
           </section>
 
         </main>

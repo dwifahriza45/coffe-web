@@ -23,6 +23,7 @@ import ConfirmDialog from "../../components/common/ConfirmDialog";
 import Navbar from "../../components/layout/Navbar";
 import Sidebar from "../../components/layout/Sidebar";
 import { useAuth } from "../../app/AuthContext";
+import { useLanguage } from "../../app/LanguageContext";
 import { getUserRoleNames } from "../../app/roleAccess";
 import { formatNumber, normalizeNumberInput } from "../../utils/numberFormat";
 
@@ -35,6 +36,7 @@ function formatQuantity(value: string) {
 
 export default function ProductDetailPage() {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const roles = getUserRoleNames(user);
   const canWriteRecipes = roles.includes("admin");
   const { categoryID = "", productID = "" } = useParams();
@@ -96,7 +98,7 @@ export default function ProductDetailPage() {
         const response = isAxiosError<{ message?: string }>(requestError)
           ? requestError.response?.data
           : undefined;
-        setError(response?.message || "Could not load product detail.");
+        setError(response?.message || t("Could not load product detail."));
       } finally {
         if (current) setLoading(false);
       }
@@ -130,7 +132,7 @@ export default function ProductDetailPage() {
           ? requestError.response?.data
           : undefined;
         setItems([]);
-        setError(response?.message || "Could not load recipe items.");
+        setError(response?.message || t("Could not load recipe items."));
       } finally {
         if (current) setItemsLoading(false);
       }
@@ -161,13 +163,13 @@ export default function ProductDetailPage() {
     event.preventDefault();
     setFieldErrors({});
     if (!recipeForm.version) {
-      setFieldErrors({ version: "version is required" });
+      setFieldErrors({ version: t("version is required") });
       return;
     }
     setConfirm({
-      title: editingRecipe ? "Update recipe" : "Create recipe",
-      message: editingRecipe ? "Update this recipe version?" : "Create a new recipe version?",
-      confirmText: editingRecipe ? "Update recipe" : "Create recipe",
+      title: editingRecipe ? t("Update recipe") : t("Create recipe"),
+      message: editingRecipe ? t("Update this recipe version?") : t("Create a new recipe version?"),
+      confirmText: editingRecipe ? t("Update recipe") : t("Create recipe"),
       onConfirm: submitRecipeConfirmed,
     });
   }
@@ -189,7 +191,7 @@ export default function ProductDetailPage() {
         ? requestError.response?.data
         : undefined;
       setFieldErrors(response?.valid ?? {});
-      setActionError(response?.valid ? "" : response?.message || "Action failed.");
+      setActionError(response?.valid ? "" : response?.message || t("Action failed."));
     } finally {
       setSubmitting(false);
     }
@@ -200,16 +202,16 @@ export default function ProductDetailPage() {
     setFieldErrors({});
     if (!itemForm.recipe_id || !itemForm.ingredient_id || !itemForm.quantity) {
       setFieldErrors({
-        recipe_id: !itemForm.recipe_id ? "recipe is required" : "",
-        ingredient_id: !itemForm.ingredient_id ? "ingredient is required" : "",
-        quantity: !itemForm.quantity ? "quantity is required" : "",
+        recipe_id: !itemForm.recipe_id ? t("recipe is required") : "",
+        ingredient_id: !itemForm.ingredient_id ? t("ingredient is required") : "",
+        quantity: !itemForm.quantity ? t("quantity is required") : "",
       });
       return;
     }
     setConfirm({
-      title: editingItem ? "Update recipe item" : "Create recipe item",
-      message: editingItem ? "Update this recipe item?" : "Create this recipe item?",
-      confirmText: editingItem ? "Update item" : "Create item",
+      title: editingItem ? t("Update recipe item") : t("Create recipe item"),
+      message: editingItem ? t("Update this recipe item?") : t("Create this recipe item?"),
+      confirmText: editingItem ? t("Update item") : t("Create item"),
       onConfirm: submitItemConfirmed,
     });
   }
@@ -230,7 +232,7 @@ export default function ProductDetailPage() {
         ? requestError.response?.data
         : undefined;
       setFieldErrors(response?.valid ?? {});
-      setActionError(response?.valid ? "" : response?.message || "Action failed.");
+      setActionError(response?.valid ? "" : response?.message || t("Action failed."));
     } finally {
       setSubmitting(false);
     }
@@ -238,9 +240,9 @@ export default function ProductDetailPage() {
 
   function requestDeleteRecipe(recipe: Recipe) {
     setConfirm({
-      title: "Delete recipe",
-      message: "Delete this recipe version?",
-      confirmText: "Delete recipe",
+      title: t("Delete recipe"),
+      message: t("Delete this recipe version?"),
+      confirmText: t("Delete recipe"),
       tone: "danger",
       onConfirm: async () => {
         setConfirm(null);
@@ -253,9 +255,9 @@ export default function ProductDetailPage() {
 
   function requestToggleRecipeActive(recipe: Recipe) {
     setConfirm({
-      title: recipe.active ? "Deactivate recipe" : "Activate recipe",
-      message: recipe.active ? "Deactivate this recipe version?" : "Activate this recipe version?",
-      confirmText: recipe.active ? "Deactivate" : "Activate",
+      title: recipe.active ? t("Deactivate recipe") : t("Activate recipe"),
+      message: recipe.active ? t("Deactivate this recipe version?") : t("Activate this recipe version?"),
+      confirmText: recipe.active ? t("Deactivate") : t("Activate"),
       onConfirm: async () => {
         setConfirm(null);
         setSubmitting(true);
@@ -270,7 +272,7 @@ export default function ProductDetailPage() {
           const response = isAxiosError<{ message?: string }>(requestError)
             ? requestError.response?.data
             : undefined;
-          setError(response?.message || "Could not update recipe status.");
+          setError(response?.message || t("Could not update recipe status."));
         } finally {
           setSubmitting(false);
         }
@@ -280,9 +282,9 @@ export default function ProductDetailPage() {
 
   function requestDeleteItem(item: RecipeItem) {
     setConfirm({
-      title: "Delete recipe item",
-      message: "Delete this ingredient from the recipe?",
-      confirmText: "Delete item",
+      title: t("Delete recipe item"),
+      message: t("Delete this ingredient from the recipe?"),
+      confirmText: t("Delete item"),
       tone: "danger",
       onConfirm: async () => {
         setConfirm(null);
@@ -296,7 +298,7 @@ export default function ProductDetailPage() {
   const backCategoryID = product?.category_id ?? categoryID;
   const hasCategoryContext = Boolean(categoryID);
   const backPath = hasCategoryContext && backCategoryID ? `/category-management/${backCategoryID}` : "/menu-items";
-  const backLabel = hasCategoryContext ? product?.category_info?.name ?? "Menu Categories" : "Menu Items";
+  const backLabel = hasCategoryContext ? product?.category_info?.name ?? t("Menu Categories") : t("Menu Items");
   const productRecipes = recipes.filter((recipe) => recipe.product_id === currentProductID);
   const activeRecipes = productRecipes.filter((recipe) => recipe.active);
   const inactiveRecipes = productRecipes.filter((recipe) => !recipe.active);
@@ -315,12 +317,12 @@ export default function ProductDetailPage() {
 
           <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
             <div>
-              <h1 className="font-serif text-3xl font-bold">{product?.name ?? "Product Detail"}</h1>
-              <p className="mt-2 text-sm text-stone-500">{product?.category_info?.name ?? "No category"}</p>
+              <h1 className="font-serif text-3xl font-bold">{product?.name ?? t("Product Detail")}</h1>
+              <p className="mt-2 text-sm text-stone-500">{product?.category_info?.name ?? t("No category")}</p>
             </div>
             {canWriteRecipes && <button type="button" onClick={() => openRecipeModal()} className="flex items-center gap-2 rounded-lg bg-[#362219] px-5 py-3 text-sm font-semibold text-white">
               <Plus size={17} />
-              Add recipe version
+              {t("Add recipe version")}
             </button>}
           </header>
 
@@ -331,26 +333,26 @@ export default function ProductDetailPage() {
               <div className="overflow-hidden rounded-xl border border-stone-200 bg-white">
                 <div className="flex items-center justify-between border-b border-stone-200 p-4">
                   <div>
-                    <h2 className="font-semibold">Recipe Versions</h2>
-                    <p className="text-xs text-stone-500">{productRecipes.length} versions</p>
+                    <h2 className="font-semibold">{t("Recipe Versions")}</h2>
+                    <p className="text-xs text-stone-500">{productRecipes.length} {t("versions")}</p>
                   </div>
                   <BookOpen size={19} className="text-stone-400" />
                 </div>
                 <div className="divide-y divide-stone-100">
                   {loading ? (
-                    <p className="p-5 text-sm text-stone-500">Loading recipes...</p>
+                    <p className="p-5 text-sm text-stone-500">{t("Loading recipes...")}</p>
                   ) : productRecipes.length === 0 ? (
-                    <p className="p-5 text-sm text-stone-500">No recipe version yet</p>
+                    <p className="p-5 text-sm text-stone-500">{t("No recipe version yet")}</p>
                   ) : activeRecipes.length === 0 ? (
-                    <p className="p-5 text-sm text-stone-500">No active recipe</p>
+                    <p className="p-5 text-sm text-stone-500">{t("No active recipe")}</p>
                   ) : (
                     activeRecipes.map((recipe) => (
                       <button key={recipe.recipe_id} type="button" onClick={() => setSelectedRecipeID(recipe.recipe_id)} className={`flex w-full items-center justify-between bg-white p-4 text-left hover:bg-stone-50 ${selectedRecipeID === recipe.recipe_id ? "ring-1 ring-inset ring-stone-300" : ""}`}>
                         <span>
-                          <b className="block text-sm">Version {recipe.version}</b>
-                          <small className="text-stone-500">Active recipe</small>
+                          <b className="block text-sm">{t("Version")} {recipe.version}</b>
+                          <small className="text-stone-500">{t("Active recipe")}</small>
                         </span>
-                        <span className="rounded-full bg-green-50 px-2 py-1 text-[11px] font-semibold text-green-700">Active</span>
+                        <span className="rounded-full bg-green-50 px-2 py-1 text-[11px] font-semibold text-green-700">{t("Active")}</span>
                       </button>
                     ))
                   )}
@@ -360,17 +362,17 @@ export default function ProductDetailPage() {
               {!loading && inactiveRecipes.length > 0 && (
                 <div className="overflow-hidden rounded-xl border border-stone-200 bg-white">
                   <div className="border-b border-stone-200 p-4">
-                    <h2 className="font-semibold">Inactive Versions</h2>
-                    <p className="text-xs text-stone-500">{inactiveRecipes.length} inactive</p>
+                    <h2 className="font-semibold">{t("Inactive Versions")}</h2>
+                    <p className="text-xs text-stone-500">{inactiveRecipes.length} {t("inactive")}</p>
                   </div>
                   <div className="divide-y divide-stone-100">
                     {inactiveRecipes.map((recipe) => (
                       <button key={recipe.recipe_id} type="button" onClick={() => setSelectedRecipeID(recipe.recipe_id)} className={`flex w-full items-center justify-between bg-white p-4 text-left hover:bg-stone-50 ${selectedRecipeID === recipe.recipe_id ? "ring-1 ring-inset ring-stone-300" : ""}`}>
                         <span>
-                          <b className="block text-sm">Version {recipe.version}</b>
-                          <small className="text-stone-500">Inactive recipe</small>
+                          <b className="block text-sm">{t("Version")} {recipe.version}</b>
+                          <small className="text-stone-500">{t("Inactive recipe")}</small>
                         </span>
-                        <span className="rounded-full bg-white px-2 py-1 text-[11px] font-semibold text-stone-500">Inactive</span>
+                        <span className="rounded-full bg-white px-2 py-1 text-[11px] font-semibold text-stone-500">{t("Inactive")}</span>
                       </button>
                     ))}
                   </div>
@@ -381,16 +383,16 @@ export default function ProductDetailPage() {
             <div className="overflow-hidden rounded-xl border border-stone-200 bg-white">
               <div className="flex flex-col gap-3 border-b border-stone-200 p-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <h2 className="font-semibold">{selectedRecipe ? `Version ${selectedRecipe.version} Items` : "Recipe Items"}</h2>
-                  <p className="text-xs text-stone-500">{selectedRecipe ? "Selected recipe version" : "Select recipe version"}</p>
+                  <h2 className="font-semibold">{selectedRecipe ? `${t("Version")} ${selectedRecipe.version} ${t("Recipe Items")}` : t("Recipe Items")}</h2>
+                  <p className="text-xs text-stone-500">{selectedRecipe ? t("Selected recipe version") : t("Select recipe version")}</p>
                 </div>
                 <div className="flex gap-2">
-                  {canWriteRecipes && selectedRecipe && <button type="button" onClick={() => openRecipeModal(selectedRecipe)} className="grid size-9 place-items-center rounded-lg border text-stone-600 hover:bg-stone-50" title="Update recipe"><Pencil size={16} /></button>}
-                  {canWriteRecipes && selectedRecipe && <button type="button" onClick={() => requestToggleRecipeActive(selectedRecipe)} className="grid size-9 place-items-center rounded-lg border text-stone-600 hover:bg-stone-50" title={selectedRecipe.active ? "Deactivate recipe" : "Activate recipe"}><Power size={16} /></button>}
-                  {canWriteRecipes && selectedRecipe && items.length === 0 && <button type="button" onClick={() => requestDeleteRecipe(selectedRecipe)} className="grid size-9 place-items-center rounded-lg border text-red-600 hover:bg-red-50" title="Delete recipe"><Trash2 size={16} /></button>}
+                  {canWriteRecipes && selectedRecipe && <button type="button" onClick={() => openRecipeModal(selectedRecipe)} className="grid size-9 place-items-center rounded-lg border text-stone-600 hover:bg-stone-50" title={t("Update recipe")}><Pencil size={16} /></button>}
+                  {canWriteRecipes && selectedRecipe && <button type="button" onClick={() => requestToggleRecipeActive(selectedRecipe)} className="grid size-9 place-items-center rounded-lg border text-stone-600 hover:bg-stone-50" title={selectedRecipe.active ? t("Deactivate recipe") : t("Activate recipe")}><Power size={16} /></button>}
+                  {canWriteRecipes && selectedRecipe && items.length === 0 && <button type="button" onClick={() => requestDeleteRecipe(selectedRecipe)} className="grid size-9 place-items-center rounded-lg border text-red-600 hover:bg-red-50" title={t("Delete recipe")}><Trash2 size={16} /></button>}
                   {canWriteRecipes && <button type="button" onClick={() => openItemModal()} disabled={!selectedRecipeID} className="flex items-center gap-2 rounded-lg bg-[#362219] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
                     <ListPlus size={16} />
-                    Add item
+                    {t("Add item")}
                   </button>}
                 </div>
               </div>
@@ -398,17 +400,17 @@ export default function ProductDetailPage() {
                 <table className="w-full min-w-150 text-left">
                   <thead className="bg-stone-50 text-xs uppercase tracking-wider text-stone-500">
                     <tr>
-                      <th className="px-5 py-3">Ingredient</th>
-                      <th className="px-5 py-3">Quantity</th>
-                      <th className="px-5 py-3">Base Unit</th>
-                      {canWriteRecipes && <th className="px-5 py-3 text-right">Action</th>}
+                      <th className="px-5 py-3">{t("Ingredient")}</th>
+                      <th className="px-5 py-3">{t("Quantity")}</th>
+                      <th className="px-5 py-3">{t("Base Unit")}</th>
+                      {canWriteRecipes && <th className="px-5 py-3 text-right">{t("Action")}</th>}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-stone-100">
                     {itemsLoading ? (
-                      <tr><td colSpan={canWriteRecipes ? 4 : 3} className="px-5 py-14 text-center text-sm text-stone-500">Loading items...</td></tr>
+                      <tr><td colSpan={canWriteRecipes ? 4 : 3} className="px-5 py-14 text-center text-sm text-stone-500">{t("Loading items...")}</td></tr>
                     ) : items.length === 0 ? (
-                      <tr><td colSpan={canWriteRecipes ? 4 : 3} className="px-5 py-14 text-center text-sm text-stone-500">No items found</td></tr>
+                      <tr><td colSpan={canWriteRecipes ? 4 : 3} className="px-5 py-14 text-center text-sm text-stone-500">{t("No items found")}</td></tr>
                     ) : (
                       items.map((item) => (
                         <tr key={item.recipe_item_id}>
@@ -419,8 +421,8 @@ export default function ProductDetailPage() {
                           <td className="px-5 py-4 text-sm">{item.ingredient_info?.base_unit_info?.code ?? item.ingredient_info?.base_unit ?? "-"}</td>
                           {canWriteRecipes && <td className="px-5 py-4">
                             <div className="flex justify-end gap-1.5">
-                              {canWriteRecipes && <button type="button" onClick={() => openItemModal(item)} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800" title="Update item"><Pencil size={15} /></button>}
-                              {canWriteRecipes && <button type="button" onClick={() => requestDeleteItem(item)} className="grid size-8 place-items-center rounded-lg text-red-600 hover:bg-red-50" title="Delete item"><Trash2 size={15} /></button>}
+                              {canWriteRecipes && <button type="button" onClick={() => openItemModal(item)} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800" title={t("Update item")}><Pencil size={15} /></button>}
+                              {canWriteRecipes && <button type="button" onClick={() => requestDeleteItem(item)} className="grid size-8 place-items-center rounded-lg text-red-600 hover:bg-red-50" title={t("Delete item")}><Trash2 size={15} /></button>}
                             </div>
                           </td>}
                         </tr>
@@ -438,20 +440,20 @@ export default function ProductDetailPage() {
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
           <form onSubmit={submitRecipe} className="w-full max-w-md rounded-2xl bg-white shadow-2xl">
             <header className="flex items-start justify-between border-b border-stone-200 p-5">
-              <h2 className="text-lg font-bold">{editingRecipe ? "Update recipe" : "Add recipe version"}</h2>
+              <h2 className="text-lg font-bold">{editingRecipe ? t("Update recipe") : t("Add recipe version")}</h2>
               <button type="button" onClick={() => setRecipeModalOpen(false)} className="grid size-9 place-items-center rounded-lg hover:bg-stone-100"><X size={18} /></button>
             </header>
             <div className="space-y-4 p-5">
               <label className="block text-sm font-semibold text-stone-700">
-                Version
-                <input inputMode="numeric" placeholder="Enter version" value={formatNumber(recipeForm.version, 0)} onChange={(event) => setRecipeForm((current) => ({ ...current, version: normalizeNumberInput(event.target.value, false) }))} className="mt-2 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10" disabled={submitting} />
+                {t("Version")}
+                <input inputMode="numeric" placeholder={t("Enter version")} value={formatNumber(recipeForm.version, 0)} onChange={(event) => setRecipeForm((current) => ({ ...current, version: normalizeNumberInput(event.target.value, false) }))} className="mt-2 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10" disabled={submitting} />
                 {fieldErrors.version && <p className="mt-1.5 text-xs font-medium text-red-600">{fieldErrors.version}</p>}
               </label>
               {actionError && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{actionError}</p>}
             </div>
             <footer className="flex justify-end gap-3 border-t border-stone-200 p-5">
-              <button type="button" onClick={() => setRecipeModalOpen(false)} className="rounded-lg border border-stone-300 px-4 py-2.5 text-sm font-semibold hover:bg-stone-50">Cancel</button>
-              <button type="submit" disabled={submitting} className="rounded-lg bg-[#362219] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">{submitting ? "Saving..." : "Save"}</button>
+              <button type="button" onClick={() => setRecipeModalOpen(false)} className="rounded-lg border border-stone-300 px-4 py-2.5 text-sm font-semibold hover:bg-stone-50">{t("Cancel")}</button>
+              <button type="submit" disabled={submitting} className="rounded-lg bg-[#362219] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">{submitting ? t("Saving...") : t("Save")}</button>
             </footer>
           </form>
         </div>
@@ -461,36 +463,36 @@ export default function ProductDetailPage() {
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
           <form onSubmit={submitItem} className="w-full max-w-md rounded-2xl bg-white shadow-2xl">
             <header className="flex items-start justify-between border-b border-stone-200 p-5">
-              <h2 className="text-lg font-bold">{editingItem ? "Update item" : "Add item"}</h2>
+              <h2 className="text-lg font-bold">{editingItem ? t("Update item") : t("Add item")}</h2>
               <button type="button" onClick={() => setItemModalOpen(false)} className="grid size-9 place-items-center rounded-lg hover:bg-stone-100"><X size={18} /></button>
             </header>
             <div className="space-y-4 p-5">
               <label className="block text-sm font-semibold text-stone-700">
-                Ingredient
+                {t("Ingredient")}
                 <select value={itemForm.ingredient_id} onChange={(event) => setItemForm((current) => ({ ...current, ingredient_id: event.target.value }))} className="mt-2 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10" disabled={submitting}>
-                  <option value="">Select ingredient</option>
+                  <option value="">{t("Select ingredient")}</option>
                   {ingredients.map((ingredient) => (
-                    <option key={ingredient.ingredient_id} value={ingredient.ingredient_id} disabled={!ingredient.active}>{ingredient.name}{ingredient.active ? "" : " - Inactive"}</option>
+                    <option key={ingredient.ingredient_id} value={ingredient.ingredient_id} disabled={!ingredient.active}>{ingredient.name}{ingredient.active ? "" : ` - ${t("Inactive")}`}</option>
                   ))}
                 </select>
                 {fieldErrors.ingredient_id && <p className="mt-1.5 text-xs font-medium text-red-600">{fieldErrors.ingredient_id}</p>}
               </label>
               <label className="block text-sm font-semibold text-stone-700">
-                Quantity
+                {t("Quantity")}
                 <input inputMode="decimal" placeholder="0" value={formatQuantity(itemForm.quantity)} onChange={(event) => setItemForm((current) => ({ ...current, quantity: normalizeNumberInput(event.target.value) }))} className="mt-2 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10" disabled={submitting} />
                 {fieldErrors.quantity && <p className="mt-1.5 text-xs font-medium text-red-600">{fieldErrors.quantity}</p>}
               </label>
               {actionError && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{actionError}</p>}
             </div>
             <footer className="flex justify-end gap-3 border-t border-stone-200 p-5">
-              <button type="button" onClick={() => setItemModalOpen(false)} className="rounded-lg border border-stone-300 px-4 py-2.5 text-sm font-semibold hover:bg-stone-50">Cancel</button>
-              <button type="submit" disabled={submitting} className="rounded-lg bg-[#362219] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">{submitting ? "Saving..." : "Save"}</button>
+              <button type="button" onClick={() => setItemModalOpen(false)} className="rounded-lg border border-stone-300 px-4 py-2.5 text-sm font-semibold hover:bg-stone-50">{t("Cancel")}</button>
+              <button type="submit" disabled={submitting} className="rounded-lg bg-[#362219] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">{submitting ? t("Saving...") : t("Save")}</button>
             </footer>
           </form>
         </div>
       )}
 
-      <ConfirmDialog open={Boolean(confirm)} title={confirm?.title ?? ""} message={confirm?.message ?? ""} confirmText={confirm?.confirmText ?? "Confirm"} tone={confirm?.tone} submitting={submitting} onCancel={() => setConfirm(null)} onConfirm={() => void confirm?.onConfirm()} />
+      <ConfirmDialog open={Boolean(confirm)} title={confirm?.title ?? ""} message={confirm?.message ?? ""} confirmText={confirm?.confirmText ?? t("Confirm")} tone={confirm?.tone} submitting={submitting} onCancel={() => setConfirm(null)} onConfirm={() => void confirm?.onConfirm()} />
     </div>
   );
 }
