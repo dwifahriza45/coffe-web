@@ -30,3 +30,6 @@ export const updateUserActive = async (
 
 export const deleteUser = async (userID: string) =>
   (await api.delete<ApiResponse<null>>(`/users/${userID}`)).data;
+
+export const checkUserDelete = async (userID: string) =>
+  (await api.get<ApiResponse<null>>(`/users/${userID}/delete-check`)).data;

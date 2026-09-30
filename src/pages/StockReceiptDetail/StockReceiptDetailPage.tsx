@@ -21,13 +21,10 @@ import { formatNumber, normalizeNumberInput } from "../../utils/numberFormat";
 
 import { useAuth } from "../../app/AuthContext";
 import { getUserRoleNames } from "../../app/roleAccess";
-import { currentBusinessDate } from "../../utils/businessDate";
+import { currentBusinessDate, formatBusinessDate as formatDate } from "../../utils/businessDate";
 
 const emptyForm: StockReceiptItemPayload = { stock_receipt_id: "", ingredient_id: "", quantity: "", notes: "" };
 
-function formatDate(value?: string) {
-  return value ? new Date(`${value}T00:00:00`).toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" }) : "-";
-}
 
 export default function StockReceiptDetailPage() {
   const { user } = useAuth();

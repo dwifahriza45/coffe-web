@@ -338,7 +338,7 @@ export default function UnitManagementPage() {
                                   onClick={() => requestToggleActive(unit)}
                                   disabled={unit.active && inUse}
                                   className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent"
-                                  title={unit.active && inUse ? t("Unit is used by ingredients") : unit.active ? t("Deactivate unit") : t("Activate unit")}
+                                  title={unit.active && inUse ? t("Unit is used by ingredients, unit conversions, or stock movements") : unit.active ? t("Deactivate unit") : t("Activate unit")}
                                 >
                                   <Power size={15} />
                                 </button>
@@ -350,7 +350,7 @@ export default function UnitManagementPage() {
                                 onClick={() => requestDelete(unit)}
                                 disabled={inUse}
                                 className="grid size-8 place-items-center rounded-lg text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent"
-                                title={inUse ? t("Unit is used by ingredients") : t("Delete unit")}
+                                title={inUse ? t("Unit is used by ingredients, unit conversions, or stock movements") : t("Delete unit")}
                               >
                                 <Trash2 size={15} />
                               </button>

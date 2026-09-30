@@ -1,3 +1,4 @@
+import InventoryCountEntryPage from "../pages/InventoryCount/InventoryCountEntryPage";
 import StockMovementPage from "../pages/StockMovement/StockMovementPage";
 import SupplierManagementPage from "../pages/SupplierManagement/SupplierManagementPage";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
@@ -107,6 +108,8 @@ export default function AppRouter() {
             </RequireAuth>
           }
         />
+        <Route path="/stock-count/opening" element={<RequireAuth><RequirePermission menuKey="inventory_opening_counts"><InventoryCountEntryPage type="OPENING" /></RequirePermission></RequireAuth>} />
+        <Route path="/stock-count/closing" element={<RequireAuth><RequirePermission menuKey="inventory_closing_counts"><InventoryCountEntryPage type="CLOSING" /></RequirePermission></RequireAuth>} />
         <Route
           path="/stock-count/:inventoryCountID"
           element={

@@ -49,12 +49,12 @@ export default function Sidebar({
   const canReadBusinessDays = userCan(user, "business_days");
   const canReadInventoryCounts = userCan(user, "inventory_counts");
   const canReadOpeningCounts =
-    userCan(user, "inventory_opening_counts") || canReadInventoryCounts;
+    userCan(user, "inventory_opening_counts");
   const canReadStockReceipts = userCan(user, "stock_receipts");
   const canReadStockAdjustments = userCan(user, "stock_adjustments");
   const canReadStockMovements = userCan(user, "stock_movements");
   const canReadClosingCounts =
-    userCan(user, "inventory_closing_counts") || canReadInventoryCounts;
+    userCan(user, "inventory_closing_counts");
   const canReadUnits = userCan(user, "units");
   const canReadIngredients = userCan(user, "ingredients");
   const canReadSuppliers = userCan(user, "suppliers");
@@ -79,8 +79,8 @@ export default function Sidebar({
           ...(activeStockDate ? { date: activeStockDate } : {}),
         })}`
       : "";
-  const stockCountOpeningPath = `/stock-count${stockOpnameContextQuery}${stockOpnameContextQuery ? "&" : "?"}focus=opening`;
-  const stockCountClosingPath = `/stock-count${stockOpnameContextQuery}${stockOpnameContextQuery ? "&" : "?"}focus=closing`;
+  const stockCountOpeningPath = `/stock-count/opening${stockOpnameContextQuery}`;
+  const stockCountClosingPath = `/stock-count/closing${stockOpnameContextQuery}`;
   if (canReadDashboard) {
     links.push({ label: t("Overview"), to: "/dashboard", icon: LayoutDashboard });
   }
@@ -116,7 +116,7 @@ export default function Sidebar({
   if (canReadInventoryCounts)
     inventoryOperationLinks.push({
       label: t("Stock Count"),
-      to: "/stock-count",
+      to: `/stock-count${stockOpnameContextQuery}`,
       icon: ClipboardCheck,
     });
   if (canReadOpeningCounts)
@@ -170,7 +170,7 @@ export default function Sidebar({
   const filteredHrisLinks = hrisLinks.filter((link) => matchesMenu(link.label, "HRIS"));
   const filteredInventoryMasterLinks = inventoryMasterLinks.filter((link) => matchesMenu(link.label, t("Master Data")));
   const filteredInventoryOperationLinks = inventoryOperationLinks.filter((link) => matchesMenu(link.label, t("Inventory")));
-  const filteredStockOpnameChildLinks = stockOpnameChildLinks.filter((link) => matchesMenu(link.label, t("Inventory")));
+  const filteredStockOpnameChildLinks = stockOpnameChildLinks.filter((link) => matchesMenu(link.label, `${t("Inventory")} ${t("Stock Count")}`));
   const filteredInventoryMenuLinks = inventoryMenuLinks.filter((link) => matchesMenu(link.label, t("Menu")));
   const showStockOpnameGroup =
     filteredInventoryOperationLinks.length > 0 ||
@@ -179,6 +179,13 @@ export default function Sidebar({
   const hasMenus = [links, hrisLinks, inventoryMasterLinks, inventoryOperationLinks, stockOpnameChildLinks, inventoryMenuLinks].some((group) => group.length > 0);
   const resultCount = [filteredLinks, filteredHrisLinks, filteredInventoryMasterLinks, filteredInventoryOperationLinks, filteredStockOpnameChildLinks, filteredInventoryMenuLinks].reduce((total, group) => total + group.length, 0);
   const StockOpnameIcon = stockOpnameLink?.icon;
+  function isStockChildActive(to: string, pathActive: boolean) {
+    const path = to.split("?")[0];
+    const focus = path === "/stock-count/opening" ? "opening" : path === "/stock-count/closing" ? "closing" : null;
+    return focus
+      ? pathActive || ((location.pathname.startsWith("/stock-count/") || location.pathname.includes("/inventory-counts/")) && activeParams.get("focus") === focus)
+      : pathActive;
+  }
   async function logout() {
     setIsLoggingOut(true);
     try {
@@ -272,7 +279,7 @@ export default function Sidebar({
                             to={to}
                             onClick={onClose}
                             className={({ isActive }) =>
-                              `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm ${isActive ? "bg-[#4b3023] text-white" : "text-stone-300 hover:bg-white/5"}`
+                              `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm ${isStockChildActive(to, isActive) ? "bg-[#4b3023] text-white" : "text-stone-300 hover:bg-white/5"}`
                             }
                           >
                             <Icon size={16} />

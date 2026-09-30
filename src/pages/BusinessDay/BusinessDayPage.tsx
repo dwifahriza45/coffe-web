@@ -1,3 +1,4 @@
+import { useSearchParams } from "react-router-dom";
 import { getDraftStockReceiptCount } from "../../api/stockReceipt.api";
 import { CalendarDays, CheckCircle2, ClipboardCheck, Lock, Plus, Search, Trash2 } from "lucide-react";
 import { isAxiosError } from "axios";
@@ -35,6 +36,8 @@ function formatDateTime(value: string | undefined, language: Language) {
 
 export default function BusinessDayPage() {
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const filterDate = searchParams.get("date") || "";
   const { language, t } = useLanguage();
   const roles = getUserRoleNames(user);
   const isTodayActionOnly = !roles.includes("admin") && roles.includes("leader");
@@ -55,6 +58,10 @@ export default function BusinessDayPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [selectedDayCheck, setSelectedDayCheck] = useState<{ date: string; day: BusinessDay | null } | null>(null);
+  const [openDay, setOpenDay] = useState<BusinessDay | null>(null);
+  const [checkingOpenDay, setCheckingOpenDay] = useState(true);
+  const [openDayCheckFailed, setOpenDayCheckFailed] = useState(false);
   const [businessDate, setBusinessDate] = useState(today());
   const [submitting, setSubmitting] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -76,7 +83,7 @@ export default function BusinessDayPage() {
           start: (page - 1) * pageSize,
           limit: pageSize,
           status,
-          business_date: "",
+          business_date: filterDate,
         });
         if (!current) return;
         const nextItems = response.data ?? [];
@@ -121,14 +128,38 @@ export default function BusinessDayPage() {
     return () => {
       current = false;
     };
-  }, [page, pageSize, status, refreshKey]);
+  }, [page, pageSize, status, filterDate, refreshKey]);
 
   useEffect(() => {
     if (isTodayActionOnly) setBusinessDate(today());
   }, [isTodayActionOnly]);
 
+  useEffect(() => {
+    let current = true;
+    setCheckingOpenDay(true);
+    setOpenDayCheckFailed(false);
+    setSelectedDayCheck(null);
+    if (!businessDate) {
+      setCheckingOpenDay(false);
+      return;
+    }
+    void Promise.all([
+      getBusinessDays({ start: 0, limit: 1, status: "OPEN", business_date: "" }),
+      getBusinessDays({ start: 0, limit: 1, status: "", business_date: businessDate }),
+    ])
+      .then(([openResponse, selectedResponse]) => {
+        if (!current) return;
+        setOpenDay(openResponse.data?.[0] ?? null);
+        setSelectedDayCheck({ date: businessDate, day: selectedResponse.data?.[0] ?? null });
+      })
+      .catch(() => { if (current) setOpenDayCheckFailed(true); })
+      .finally(() => { if (current) setCheckingOpenDay(false); });
+    return () => { current = false; };
+  }, [refreshKey, businessDate]);
+
   function submitOpen(event: FormEvent) {
     event.preventDefault();
+    if (!canOpenBusinessDay) return;
     setConfirm({
       title: t("Open business day"),
       message: `${t("Open business day for")} ${businessDate}?`,
@@ -143,7 +174,7 @@ export default function BusinessDayPage() {
           const response = isAxiosError<{ message?: string }>(requestError)
             ? requestError.response?.data
             : undefined;
-          setError(response?.message || t("Could not open business day."));
+          setError(t(response?.message || "Could not open business day."));
         } finally {
           setSubmitting(false);
         }
@@ -200,8 +231,10 @@ export default function BusinessDayPage() {
   }
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const selectedBusinessDay = items.find((item) => item.business_date === businessDate);
-  const canOpenBusinessDay = canCreateBusinessDay && Boolean(businessDate) && !selectedBusinessDay && !submitting;
+  const selectedDayChecked = selectedDayCheck?.date === businessDate;
+  const selectedBusinessDay = selectedDayChecked ? selectedDayCheck?.day : null;
+  const showOpenDayWarning = selectedDayChecked && !selectedBusinessDay && !checkingOpenDay && !openDayCheckFailed && Boolean(openDay);
+  const canOpenBusinessDay = canCreateBusinessDay && Boolean(businessDate) && selectedDayChecked && !selectedBusinessDay && !submitting && !checkingOpenDay && !openDayCheckFailed && !openDay;
 
   return (
     <div className="flex min-h-screen bg-[#f8f5f0]">
@@ -220,7 +253,7 @@ export default function BusinessDayPage() {
             {canCreateBusinessDay && (
               <form onSubmit={submitOpen} className="flex flex-col gap-2 sm:flex-row">
                 <input type="date" value={businessDate} onChange={(event) => setBusinessDate(event.target.value)} className="rounded-lg border border-stone-300 bg-white px-3.5 py-3 text-sm outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10 disabled:bg-stone-100" disabled={submitting || isTodayActionOnly} />
-                <button type="submit" disabled={!canOpenBusinessDay} title={selectedBusinessDay ? t("Business day already exists") : t("Open business day")} className="flex items-center justify-center gap-2 rounded-lg bg-[#362219] px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60">
+                <button type="submit" disabled={!canOpenBusinessDay} title={selectedBusinessDay ? t("Business day already exists") : showOpenDayWarning ? t("Close the currently open business day first.") : t("Open business day")} className="flex items-center justify-center gap-2 rounded-lg bg-[#362219] px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60">
                   <Plus size={17} />
                   {t("Open business day")}
                 </button>
@@ -228,20 +261,37 @@ export default function BusinessDayPage() {
             )}
           </header>
 
+          {showOpenDayWarning && openDay && <p role="status" className="mt-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">{t("Close the currently open business day first.")} ({new Date(`${openDay.business_date}T00:00:00`).toLocaleDateString(language === "id" ? "id-ID" : "en-GB", { day: "2-digit", month: "long", year: "numeric" })})</p>}
+          {openDayCheckFailed && <p role="alert" className="mt-4 text-sm text-red-700">{t("Could not verify the open business day. Refresh and try again.")}</p>}
           <section className="mt-7 overflow-hidden rounded-xl border border-stone-200 bg-white">
-            <div className="flex flex-col gap-4 border-b border-stone-200 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-4 border-b border-stone-200 p-4 xl:flex-row xl:items-center xl:justify-between">
               <div>
                 <h2 className="font-semibold">{t("Operational Days")}</h2>
                 <p className="text-xs text-stone-500">{total} {t("business days found")}</p>
               </div>
-              <label className="flex w-full max-w-xs items-center gap-2 rounded-lg border border-stone-200 px-3 py-2.5 focus-within:border-[#b86b42] focus-within:ring-4 focus-within:ring-[#b86b42]/10">
+              <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center xl:w-auto">
+              <label className="flex min-w-0 flex-col gap-2 text-sm text-stone-600 sm:flex-row sm:items-center">
+                <span className="shrink-0">{t("Business Date")}</span>
+                <input type="date" value={filterDate} onChange={(event) => {
+                  setPage(1);
+                  setSearchParams((current) => {
+                    const next = new URLSearchParams(current);
+                    next.delete("businessDayID");
+                    if (event.target.value) next.set("date", event.target.value);
+                    else next.delete("date");
+                    return next;
+                  });
+                }} className="h-11 w-full min-w-0 rounded-lg border border-stone-200 bg-white px-3 text-sm outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10 sm:w-44" />
+              </label>
+              <label className="flex h-11 w-full items-center gap-2 rounded-lg border border-stone-200 px-3 sm:w-52 focus-within:border-[#b86b42] focus-within:ring-4 focus-within:ring-[#b86b42]/10">
                 <Search size={17} className="text-stone-400" />
-                <select value={status} onChange={(event) => { setPage(1); setStatus(event.target.value); }} className="min-w-0 flex-1 bg-transparent text-sm outline-none">
+                <select aria-label={t("Status")} value={status} onChange={(event) => { setPage(1); setStatus(event.target.value); }} className="min-w-0 flex-1 bg-transparent text-sm outline-none">
                   <option value="">{t("All status")}</option>
                   <option value="OPEN">{t("Open")}</option>
                   <option value="CLOSED">{t("Closed")}</option>
                 </select>
               </label>
+              </div>
             </div>
             {error && <div className="m-4 rounded-lg bg-red-50 p-4 text-sm text-red-700">{error}</div>}
             <div className="overflow-x-auto">
@@ -293,7 +343,7 @@ export default function BusinessDayPage() {
                           <td className="px-5 py-4">
                             <div className="flex justify-end gap-2">
                               {canReadInventoryCounts && (
-                                <TableActionButton to={`/business-days/${item.business_day_id}/inventory-counts`} label={t("Stock Count")} variant="info">
+                                <TableActionButton to={`/business-days/${item.business_day_id}/inventory-counts?${new URLSearchParams({ date: item.business_date, businessDayID: item.business_day_id })}`} label={t("Stock Count")} variant="info">
                                   <ClipboardCheck size={16} />
                                 </TableActionButton>
                               )}

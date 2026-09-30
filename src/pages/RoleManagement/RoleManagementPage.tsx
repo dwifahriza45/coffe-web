@@ -91,13 +91,7 @@ const READ_DEPENDENCIES: Record<string, string[]> = {
     "stock_movements",
     "inventory_closing_counts",
   ],
-  inventory_opening_counts: [
-    "inventory_counts",
-    "stock_receipts",
-    "stock_adjustments",
-    "stock_movements",
-    "inventory_closing_counts",
-  ],
+  inventory_opening_counts: ["inventory_counts"],
   stock_receipts: [
     "inventory_counts",
     "inventory_opening_counts",
@@ -119,13 +113,7 @@ const READ_DEPENDENCIES: Record<string, string[]> = {
     "stock_adjustments",
     "inventory_closing_counts",
   ],
-  inventory_closing_counts: [
-    "inventory_counts",
-    "inventory_opening_counts",
-    "stock_receipts",
-    "stock_adjustments",
-    "stock_movements",
-  ],
+  inventory_closing_counts: ["inventory_counts"],
   ingredients: ["ingredient_units"],
   categories: ["products", "recipes", "recipe_items"],
   products: ["categories", "recipes", "recipe_items"],
@@ -133,14 +121,6 @@ const READ_DEPENDENCIES: Record<string, string[]> = {
   recipe_items: ["categories", "products", "recipes"],
 };
 const LINKED_READ_GROUPS: string[][] = [
-  [
-    "inventory_counts",
-    "inventory_opening_counts",
-    "stock_receipts",
-    "stock_adjustments",
-    "stock_movements",
-    "inventory_closing_counts",
-  ],
   ["categories", "products", "recipes", "recipe_items"],
   ["ingredients", "ingredient_units"],
 ];
@@ -336,6 +316,9 @@ export default function RoleManagementPage() {
   ): RolePermission[] {
     const requiredReadMenus = new Set<string>();
     permissions.forEach((permission) => {
+      if (permission.can_read && ["inventory_opening_counts", "inventory_closing_counts"].includes(permission.menu_key)) {
+        requiredReadMenus.add("inventory_counts");
+      }
       if (!hasWritePermission(permission)) return;
       (READ_DEPENDENCIES[permission.menu_key] ?? []).forEach((menuKey) =>
         requiredReadMenus.add(menuKey),
@@ -800,6 +783,7 @@ export default function RoleManagementPage() {
                     </p>
                   </div>
                 </div>
+                <p className="mb-3 text-xs text-stone-500">{t("Opening and Closing Stock: Create adds items, Update edits items and notes or submits the count, Delete removes draft items.")}</p>
                 <div className="overflow-x-auto rounded-xl border border-stone-200">
                   <table className="w-full min-w-[720px] text-left">
                     <thead className="bg-stone-50 text-xs uppercase tracking-wider text-stone-500">

@@ -14,6 +14,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { isAxiosError } from "axios";
 import {
   deleteUser,
+  checkUserDelete,
   getUsers,
   updateUser,
   updateUserActive,
@@ -23,7 +24,6 @@ import {
   createUserRole,
   deleteUserRole,
   getUserRoles,
-  getUserRoleUsage,
   type UserRole,
 } from "../../api/userRole.api";
 import { getRoles, type Role } from "../../api/role.api";
@@ -64,9 +64,6 @@ export default function UserManagementPage() {
   const showUserActions = canUpdateUsers || canDeleteUsers;
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
-  const [userRoleUsage, setUserRoleUsage] = useState<Record<string, boolean>>(
-    {},
-  );
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -79,6 +76,9 @@ export default function UserManagementPage() {
   const [actionUser, setActionUser] = useState<User | null>(null);
   const [actionMode, setActionMode] = useState<ActionMode | null>(null);
   const [actionError, setActionError] = useState("");
+  const [deleteReasons, setDeleteReasons] = useState<Record<string, string>>({});
+  const [checkingDelete, setCheckingDelete] = useState(false);
+  const [deleteBlockedReason, setDeleteBlockedReason] = useState("");
   const [actionFieldErrors, setActionFieldErrors] =
     useState<ActionFieldErrors>({});
   const [actionSubmitting, setActionSubmitting] = useState(false);
@@ -101,6 +101,7 @@ export default function UserManagementPage() {
     let current = true;
     async function loadUsers() {
       setLoading(true);
+      setDeleteReasons({});
       setError("");
       try {
         const response = await getUsers({
@@ -112,19 +113,24 @@ export default function UserManagementPage() {
         const nextUsers = response.data ?? [];
         setUsers(nextUsers);
         setTotal(response.total ?? 0);
-        if (nextUsers.length === 0) {
-          setUserRoleUsage({});
-          return;
+        if (canDeleteUsers) {
+          const checks = await Promise.all(nextUsers.map(async (user) => {
+            if (user.user_id === currentUser?.user_id) {
+              return [user.user_id, "Cannot delete your own account"] as const;
+            }
+            try {
+              await checkUserDelete(user.user_id);
+              return [user.user_id, ""] as const;
+            } catch (error) {
+              const message = isAxiosError<{ message?: string }>(error) ? error.response?.data?.message : undefined;
+              return [user.user_id, message || "Could not verify whether this user can be deleted. Please try again."] as const;
+            }
+          }));
+          if (current) setDeleteReasons(Object.fromEntries(checks));
         }
-        const usageResponse = await getUserRoleUsage(
-          nextUsers.map((user) => user.user_id),
-        );
-        if (!current) return;
-        setUserRoleUsage(usageResponse.data ?? {});
       } catch (requestError) {
         if (current) {
           setUsers([]);
-          setUserRoleUsage({});
           const message = isAxiosError<{ message?: string }>(requestError)
             ? requestError.response?.data?.message
             : undefined;
@@ -141,7 +147,7 @@ export default function UserManagementPage() {
     return () => {
       current = false;
     };
-  }, [page, pageSize, search, refreshKey]);
+  }, [page, pageSize, search, refreshKey, canDeleteUsers, currentUser?.user_id]);
 
   function handleSearch(event: FormEvent) {
     event.preventDefault();
@@ -151,6 +157,24 @@ export default function UserManagementPage() {
 
   function refreshUsers() {
     setRefreshKey((value) => value + 1);
+  }
+
+  async function requestDelete(user: User) {
+    if (checkingDelete) return;
+    if (user.user_id === currentUser?.user_id) {
+      setDeleteBlockedReason(t("Cannot delete your own account"));
+      return;
+    }
+    setCheckingDelete(true);
+    try {
+      await checkUserDelete(user.user_id);
+      openAction("delete", user);
+    } catch (error) {
+      const message = isAxiosError<{ message?: string }>(error) ? error.response?.data?.message : undefined;
+      setDeleteBlockedReason(t(message || "Could not verify whether this user can be deleted. Please try again."));
+    } finally {
+      setCheckingDelete(false);
+    }
   }
 
   function openAction(mode: ActionMode, user: User) {
@@ -379,6 +403,12 @@ export default function UserManagementPage() {
       }>(requestError)
         ? requestError.response?.data
         : undefined;
+      if (actionMode === "delete" && isAxiosError(requestError) && requestError.response?.status === 409) {
+        setActionUser(null);
+        setActionMode(null);
+        setDeleteBlockedReason(t(response?.message || "Action failed. Please try again."));
+        return;
+      }
       setActionFieldErrors(response?.valid ?? {});
       setActionError(
         response?.valid
@@ -487,7 +517,6 @@ export default function UserManagementPage() {
                     </tr>
                   ) : (
                     users.map((user) => {
-                      const hasUserRole = Boolean(userRoleUsage[user.user_id]);
                       const isCurrentUser = user.user_id === currentUser?.user_id;
                       return (
                         <tr key={user.user_id} className="hover:bg-stone-50/70">
@@ -571,21 +600,21 @@ export default function UserManagementPage() {
                                 </>
                               )}
                               {canDeleteUsers && (
+                                <span tabIndex={deleteReasons[user.user_id] ? 0 : undefined} title={t(deleteReasons[user.user_id] || "Delete user")}>
                                 <button
                                   type="button"
-                                  onClick={() => openAction("delete", user)}
-                                  disabled={hasUserRole || isCurrentUser}
+                                  onClick={() => void requestDelete(user)}
+                                  disabled={checkingDelete || isCurrentUser || deleteReasons[user.user_id] !== ""}
                                   className="grid size-8 place-items-center rounded-lg text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent"
                                   title={
                                     isCurrentUser
                                       ? t("Cannot delete your own account")
-                                      : hasUserRole
-                                        ? t("Have user role")
-                                        : t("Delete user")
+                                      : t(deleteReasons[user.user_id] || "Delete user")
                                   }
                                 >
                                   <Trash2 size={15} />
                                 </button>
+                                </span>
                               )}
                               </div>
                             </td>
@@ -832,6 +861,16 @@ export default function UserManagementPage() {
               </button>
             </footer>
           </form>
+        </div>
+      )}
+      {deleteBlockedReason && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm" role="alertdialog" aria-modal="true" aria-labelledby="delete-blocked-title" aria-describedby="delete-blocked-reason">
+          <section className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <h2 id="delete-blocked-title" className="text-lg font-bold">{t("Cannot delete user")}</h2>
+            <p id="delete-blocked-reason" className="mt-3 text-sm text-stone-600">{deleteBlockedReason}</p>
+            <button type="button" disabled className="mt-6 mr-3 cursor-not-allowed rounded-lg bg-stone-200 px-4 py-2.5 text-sm font-semibold text-stone-400">{t("Delete user")}</button>
+            <button autoFocus type="button" onClick={() => setDeleteBlockedReason("")} className="mt-6 rounded-lg bg-[#362219] px-4 py-2.5 text-sm font-semibold text-white">{t("Close")}</button>
+          </section>
         </div>
       )}
       {rolesUser && (

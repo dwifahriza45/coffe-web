@@ -1,3 +1,4 @@
+import { formatBusinessDate } from "../../utils/businessDate";
 import { getDraftStockReceiptCount } from "../../api/stockReceipt.api";
 import { ArrowLeft, Pencil, Plus, Trash2, X } from "lucide-react";
 import { isAxiosError } from "axios";
@@ -17,7 +18,7 @@ import ConfirmDialog from "../../components/common/ConfirmDialog";
 import Navbar from "../../components/layout/Navbar";
 import Sidebar from "../../components/layout/Sidebar";
 import { useAuth } from "../../app/AuthContext";
-import { getUserRoleNames } from "../../app/roleAccess";
+import { userCan } from "../../app/roleAccess";
 import { formatNumber, normalizeNumberInput } from "../../utils/numberFormat";
 
 const emptyItemForm: InventoryCountItemPayload = { inventory_count_id: "", ingredient_id: "", actual_quantity: "", notes: "" };
@@ -32,13 +33,18 @@ function formatDateTime(value?: string) {
 
 export default function InventoryCountDetailPage() {
   const { user } = useAuth();
-  const roles = getUserRoleNames(user);
-  const canEditDraft = roles.some((role) => ["admin", "leader", "inventory"].includes(role));
-  const canSubmit = roles.some((role) => ["admin", "leader"].includes(role));
   const { businessDayID = "", inventoryCountID = "" } = useParams();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [draftStockInCount, setDraftStockInCount] = useState<number | null>(null);
   const [count, setCount] = useState<InventoryCount | null>(null);
+  const permissionKey = count?.count_type === "OPENING" ? "inventory_opening_counts" : "inventory_closing_counts";
+  const editable = Boolean(count && count.status === "DRAFT");
+  const canCreateItem = editable && userCan(user, permissionKey, "create");
+  const canMutateDraft = editable && userCan(user, permissionKey, "update");
+  const canDeleteItem = editable && userCan(user, permissionKey, "delete");
+  const canSubmit = canMutateDraft;
+  const canLoadIngredients = ["inventory_opening_counts", "inventory_closing_counts"].some((key) => userCan(user, key, "create") || userCan(user, key, "update"));
+  const canReadReceipts = userCan(user, "stock_receipts");
   const [items, setItems] = useState<InventoryCountItem[]>([]);
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [notes, setNotes] = useState("");
@@ -69,11 +75,11 @@ export default function InventoryCountDetailPage() {
         const [countResponse, itemResponse, ingredientResponse] = await Promise.all([
           getInventoryCount(inventoryCountID),
           getInventoryCountItems({ start: 0, limit: 100, inventory_count_id: inventoryCountID, ingredient_id: "", name: "" }),
-          getIngredients({ start: 0, limit: 100, name: "" }),
+          canLoadIngredients ? getIngredients({ start: 0, limit: 100, name: "" }) : Promise.resolve({ data: [] as Ingredient[] }),
         ]);
         if (!current) return;
         const nextCount = countResponse.data ?? null;
-        const pending = nextCount?.count_type === "CLOSING" ? await getDraftStockReceiptCount(nextCount.business_day_id) : 0;
+        const pending = nextCount?.count_type === "CLOSING" && canReadReceipts ? await getDraftStockReceiptCount(nextCount.business_day_id) : 0;
         if (!current) return;
         setDraftStockInCount(pending);
         setCount(nextCount);
@@ -94,9 +100,10 @@ export default function InventoryCountDetailPage() {
     return () => {
       current = false;
     };
-  }, [inventoryCountID, refreshKey]);
+  }, [inventoryCountID, refreshKey, canLoadIngredients, canReadReceipts]);
 
   function openItemModal(item?: InventoryCountItem) {
+    if (loading || submitting || (item ? !canMutateDraft : !canCreateItem)) return;
     setEditingItem(item ?? null);
     setItemForm(item ? {
       inventory_count_id: item.inventory_count_id,
@@ -129,7 +136,7 @@ export default function InventoryCountDetailPage() {
   }
 
   function requestSubmit() {
-    if (loading || draftStockInCount === null || draftStockInCount > 0) return;
+    if (!canSubmit || submitting || loading || draftStockInCount === null || draftStockInCount > 0) return;
     setNotice("");
     setConfirm({
       title: `Submit ${countTitle(count?.count_type)}`,
@@ -156,6 +163,7 @@ export default function InventoryCountDetailPage() {
 
   function submitItem(event: FormEvent) {
     event.preventDefault();
+    if (loading || submitting || (editingItem ? !canMutateDraft : !canCreateItem)) return;
     setConfirm({
       title: editingItem ? "Update item" : "Add item",
       message: editingItem ? "Update this stock count item?" : "Add this stock count item?",
@@ -184,6 +192,7 @@ export default function InventoryCountDetailPage() {
   }
 
   function requestDelete(item: InventoryCountItem) {
+    if (!canDeleteItem || loading || submitting) return;
     setConfirm({
       title: "Delete item",
       message: "Delete this stock count item?",
@@ -208,8 +217,11 @@ export default function InventoryCountDetailPage() {
   }
 
   const locked = count?.status === "SUBMITTED";
-  const canMutateDraft = canEditDraft && !locked;
-  const backPath = businessDayID ? `/business-days/${businessDayID}/inventory-counts` : "/stock-count";
+  const backQuery = new URLSearchParams({
+    ...(count?.business_day_info?.business_date ? { date: count.business_day_info.business_date } : {}),
+    ...(count?.business_day_id ? { businessDayID: count.business_day_id } : {}),
+  });
+  const backPath = businessDayID ? `/business-days/${businessDayID}/inventory-counts?${backQuery}` : `/stock-count?${backQuery}`;
 
   return (
     <div className="flex min-h-screen bg-[#f8f5f0]">
@@ -226,7 +238,7 @@ export default function InventoryCountDetailPage() {
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div>
                 <h1 className="font-serif text-3xl font-bold">{countTitle(count?.count_type)}</h1>
-                <p className="mt-2 text-sm text-stone-500">{count?.business_day_info?.business_date ?? businessDayID}</p>
+                <p className="mt-2 text-sm text-stone-500">{formatBusinessDate(count?.business_day_info?.business_date)}</p>
                 <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold">
                   <span className={`rounded-full px-2.5 py-1 ${count?.status === "SUBMITTED" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>{count?.status ?? "DRAFT"}</span>
                   <span className="rounded-full bg-stone-100 px-2.5 py-1 text-stone-600">Submitted by {count?.counted_by_info?.fullname ?? count?.counted_by ?? "-"}</span>
@@ -262,7 +274,7 @@ export default function InventoryCountDetailPage() {
                 <h2 className="font-semibold">Stock Count Items</h2>
                 <p className="text-xs text-stone-500">{items.length} items</p>
               </div>
-              <button type="button" onClick={() => openItemModal()} disabled={!canMutateDraft} className="flex items-center gap-2 rounded-lg bg-[#362219] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+              <button type="button" onClick={() => openItemModal()} disabled={!canCreateItem || loading || submitting} className="flex items-center gap-2 rounded-lg bg-[#362219] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
                 <Plus size={16} />
                 Add item
               </button>
@@ -290,8 +302,8 @@ export default function InventoryCountDetailPage() {
                         <td className="px-5 py-4 text-sm text-stone-600">{item.notes || "-"}</td>
                         <td className="px-5 py-4">
                           <div className="flex justify-end gap-1.5">
-                            <button type="button" onClick={() => openItemModal(item)} disabled={!canMutateDraft} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent" title="Update item"><Pencil size={15} /></button>
-                            <button type="button" onClick={() => requestDelete(item)} disabled={!canMutateDraft} className="grid size-8 place-items-center rounded-lg text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent" title="Delete item"><Trash2 size={15} /></button>
+                            <button type="button" onClick={() => openItemModal(item)} disabled={!canMutateDraft || loading || submitting} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent" title="Update item"><Pencil size={15} /></button>
+                            <button type="button" onClick={() => requestDelete(item)} disabled={!canDeleteItem || loading || submitting} className="grid size-8 place-items-center rounded-lg text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent" title="Delete item"><Trash2 size={15} /></button>
                           </div>
                         </td>
                       </tr>
@@ -330,7 +342,7 @@ export default function InventoryCountDetailPage() {
             </div>
             <footer className="flex justify-end gap-3 border-t border-stone-200 p-5">
               <button type="button" onClick={() => setModalOpen(false)} className="rounded-lg border border-stone-300 px-4 py-2.5 text-sm font-semibold hover:bg-stone-50">Cancel</button>
-              <button type="submit" disabled={submitting} className="rounded-lg bg-[#362219] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">{submitting ? "Saving..." : "Save"}</button>
+              <button type="submit" disabled={submitting || (editingItem ? !canMutateDraft : !canCreateItem)} className="rounded-lg bg-[#362219] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">{submitting ? "Saving..." : "Save"}</button>
             </footer>
           </form>
         </div>

@@ -87,7 +87,10 @@ export function RequirePermission({
   action?: PermissionAction;
 }) {
   const { user } = useAuth();
-  return userCan(user, menuKey, action) ? (
+  const allowed = userCan(user, menuKey, action) ||
+    (menuKey === "inventory_counts" && action === "read" &&
+      ["inventory_opening_counts", "inventory_closing_counts"].some((key) => userCan(user, key)));
+  return allowed ? (
     children
   ) : (
     <Navigate to={getHomeRoute(user)} replace />

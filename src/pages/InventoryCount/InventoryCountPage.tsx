@@ -1,3 +1,5 @@
+import { useAuth } from "../../app/AuthContext";
+import { userCan } from "../../app/roleAccess";
 import { Activity, ArrowLeft, ArrowRight, ClipboardCheck, PackagePlus, SlidersHorizontal } from "lucide-react";
 import { isAxiosError } from "axios";
 import { useEffect, useState } from "react";
@@ -6,9 +8,7 @@ import { getBusinessDays, type BusinessDay } from "../../api/businessDay.api";
 import { getInventoryCounts, type InventoryCount } from "../../api/inventoryCount.api";
 import Navbar from "../../components/layout/Navbar";
 import Sidebar from "../../components/layout/Sidebar";
-import { useAuth } from "../../app/AuthContext";
 import { useLanguage, type Language } from "../../app/LanguageContext";
-import { getUserRoleNames } from "../../app/roleAccess";
 
 function formatBusinessDate(value: string | undefined, language: Language) {
   if (!value) return "";
@@ -28,12 +28,13 @@ function today() {
 }
 
 export default function InventoryCountPage() {
-  const { user } = useAuth();
   const { language, t } = useLanguage();
-  const roles = getUserRoleNames(user);
-  const inventoryOnly = roles.includes("inventory") && !roles.some((role) => ["admin", "leader"].includes(role));
-  const { businessDayID = "" } = useParams();
+  const { user } = useAuth();
+  const canReadOpening = userCan(user, "inventory_opening_counts");
+  const canReadClosing = userCan(user, "inventory_closing_counts");
+  const { businessDayID: routeBusinessDayID = "" } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
+  const businessDayID = routeBusinessDayID || searchParams.get("businessDayID") || "";
   const queryDate = searchParams.get("date") ?? "";
   const focusStep = searchParams.get("focus") ?? "";
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -45,7 +46,7 @@ export default function InventoryCountPage() {
 
   useEffect(() => {
     if (!businessDayID && !queryDate) {
-      setSearchParams({ date: selectedDate }, { replace: true });
+      setSearchParams((current) => { const next = new URLSearchParams(current); next.set("date", selectedDate); return next; }, { replace: true });
     }
     if (!businessDayID && queryDate && queryDate !== selectedDate) {
       setSelectedDate(queryDate);
@@ -58,19 +59,19 @@ export default function InventoryCountPage() {
       setLoading(true);
       setError("");
       try {
+        let dayID = businessDayID;
+        if (!dayID) {
+          const days = await getBusinessDays({ start: 0, limit: 1, status: "", business_date: selectedDate });
+          dayID = days.data?.[0]?.business_day_id || "";
+        }
+        if (!current) return;
+        if (!dayID) { setItems([]); return; }
         const response = await getInventoryCounts({
-          start: 0,
-          limit: businessDayID ? 10 : 100,
-          business_day_id: businessDayID,
-          count_type: "",
-          status: "",
-          name: "",
+          start: 0, limit: 10, business_day_id: dayID,
+          count_type: "", status: "", name: "",
         });
         if (!current) return;
-        const nextItems = businessDayID
-          ? response.data ?? []
-          : (response.data ?? []).filter((item) => item.business_day_info?.business_date === selectedDate);
-        setItems(nextItems);
+        setItems(response.data ?? []);
       } catch (requestError) {
         if (!current) return;
         const response = isAxiosError<{ message?: string }>(requestError)
@@ -140,17 +141,18 @@ export default function InventoryCountPage() {
     : `/stock-movements?date=${encodeURIComponent(scopedBusinessDate)}`;
 
   function countPath(item: InventoryCount) {
-    return businessDayID
-      ? `/business-days/${businessDayID}/inventory-counts/${item.inventory_count_id}`
-      : `/stock-count/${item.inventory_count_id}`;
+    const query = new URLSearchParams({ businessDayID: item.business_day_id, date: item.business_day_info?.business_date || scopedBusinessDate, focus: item.count_type.toLowerCase() });
+    return `/business-days/${item.business_day_id}/inventory-counts/${item.inventory_count_id}?${query}`;
   }
 
   function nextAction() {
-    if (!openingCount) return { label: t("Waiting for stock count"), path: "", disabled: true };
-    if (!openingSubmitted) return { label: t("Submit opening stock"), path: countPath(openingCount), disabled: false };
-    if (closingCount && !closingSubmitted) return { label: t("Submit closing stock"), path: countPath(closingCount), disabled: false };
-    if (closingSubmitted) return { label: t("View closing stock"), path: countPath(closingCount), disabled: false };
-    return { label: t("Review stock movement"), path: movementPath, disabled: false };
+    const target = !openingSubmitted && openingCount ? openingCount : closingCount ?? openingCount;
+    if (!target) return { label: t("Waiting for stock count"), path: "" };
+    const key = target.count_type === "OPENING" ? "inventory_opening_counts" : "inventory_closing_counts";
+    const label = target.status === "DRAFT" && userCan(user, key, "update")
+      ? t(target.count_type === "OPENING" ? "Submit opening stock" : "Submit closing stock")
+      : t("Open");
+    return { label, path: countPath(target) };
   }
 
   const action = nextAction();
@@ -183,7 +185,7 @@ export default function InventoryCountPage() {
                     onChange={(event) => {
                       const nextDate = event.target.value || today();
                       setSelectedDate(nextDate);
-                      setSearchParams({ date: nextDate });
+                      setSearchParams((current) => { const next = new URLSearchParams(current); next.set("date", nextDate); next.delete("businessDayID"); return next; });
                     }}
                     className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm font-normal text-stone-700 outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10"
                   />
@@ -204,12 +206,12 @@ export default function InventoryCountPage() {
               <>
               <div className="grid gap-4 p-5 lg:grid-cols-[1fr_auto] lg:items-center">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">{inventoryOnly ? t("Today") : t("Daily workflow")}</p>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">{t("Daily workflow")}</p>
                   <h2 className="mt-1 text-xl font-bold text-stone-950">
-                    {openingSubmitted ? closingSubmitted ? t("Stock count complete") : t("Continue daily inventory") : t("Start with Opening Stock")}
+                    {!canReadOpening ? t("Closing Stock") : !canReadClosing ? t("Opening Stock") : openingSubmitted ? closingSubmitted ? t("Stock count complete") : t("Continue daily inventory") : t("Start with Opening Stock")}
                   </h2>
                   <p className="mt-1 text-sm text-stone-500">
-                    {openingSubmitted
+                    {!canReadOpening ? t("Count ending stock.") : !canReadClosing ? t("Count beginning stock.") : openingSubmitted
                       ? closingSubmitted
                         ? t("Opening and Closing Stock have been submitted.")
                         : t("Record Stock In or Adjustment when needed. If there is none, continue to Closing Stock.")
@@ -226,7 +228,7 @@ export default function InventoryCountPage() {
                 )}
               </div>
               <div className="divide-y divide-stone-100 border-t border-stone-100 text-sm">
-                {openingCount ? (
+                {canReadOpening && (openingCount ? (
                 <Link to={countPath(openingCount)} className={`flex gap-4 px-5 py-4 transition hover:bg-stone-50 ${focusStep === "opening" ? "bg-amber-50/60 ring-1 ring-inset ring-amber-200" : ""}`}>
                   <span className={`grid size-8 shrink-0 place-items-center rounded-full text-xs font-bold ${openingSubmitted ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>1</span>
                   <div className="min-w-0 flex-1 sm:flex sm:items-center sm:justify-between sm:gap-5">
@@ -255,7 +257,8 @@ export default function InventoryCountPage() {
                     <p className="mt-1 text-stone-500">{t("Count beginning stock.")}</p>
                   </div>
                 </div>
-                )}
+                ))}
+                {userCan(user, "stock_receipts") && (
                 <Link to={stockInPath} className="flex gap-4 px-5 py-4 hover:bg-stone-50">
                   <span className="grid size-8 shrink-0 place-items-center rounded-full bg-stone-100 text-xs font-bold text-stone-600">2</span>
                   <div className="min-w-0 flex-1 sm:flex sm:items-center sm:justify-between sm:gap-5">
@@ -266,6 +269,8 @@ export default function InventoryCountPage() {
                     <p className="mt-2 shrink-0 font-semibold text-stone-700 sm:mt-0">{t("Optional")}</p>
                   </div>
                 </Link>
+                )}
+                {userCan(user, "stock_adjustments") && (
                 <Link to={adjustmentPath} className="flex gap-4 px-5 py-4 hover:bg-stone-50">
                   <span className="grid size-8 shrink-0 place-items-center rounded-full bg-stone-100 text-xs font-bold text-stone-600">3</span>
                   <div className="min-w-0 flex-1 sm:flex sm:items-center sm:justify-between sm:gap-5">
@@ -276,6 +281,8 @@ export default function InventoryCountPage() {
                     <p className="mt-2 shrink-0 font-semibold text-stone-700 sm:mt-0">{t("Optional")}</p>
                   </div>
                 </Link>
+                )}
+                {userCan(user, "stock_movements") && (
                 <Link to={movementPath} className="flex gap-4 px-5 py-4 hover:bg-stone-50">
                   <span className="grid size-8 shrink-0 place-items-center rounded-full bg-stone-100 text-xs font-bold text-stone-600">4</span>
                   <div className="min-w-0 flex-1 sm:flex sm:items-center sm:justify-between sm:gap-5">
@@ -286,7 +293,8 @@ export default function InventoryCountPage() {
                     <p className="mt-2 shrink-0 font-semibold text-stone-700 sm:mt-0">{t("Review")}</p>
                   </div>
                 </Link>
-                {closingCount ? (
+                )}
+                {canReadClosing && (closingCount ? (
                 <Link to={countPath(closingCount)} className={`flex gap-4 px-5 py-4 transition hover:bg-stone-50 ${focusStep === "closing" ? "bg-amber-50/60 ring-1 ring-inset ring-amber-200" : ""}`}>
                   <span className={`grid size-8 shrink-0 place-items-center rounded-full text-xs font-bold ${closingSubmitted ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>5</span>
                   <div className="min-w-0 flex-1 sm:flex sm:items-center sm:justify-between sm:gap-5">
@@ -315,7 +323,7 @@ export default function InventoryCountPage() {
                     <p className="mt-1 text-stone-500">{t("Count ending stock.")}</p>
                   </div>
                 </div>
-                )}
+                ))}
               </div>
               </>
             )}
