@@ -49,6 +49,8 @@ const PERMISSION_MENUS = [
   { key: "roles", label: "Roles" },
   { key: "business_days", label: "Business Days" },
   { key: "inventory_counts", label: "Stock Count" },
+  { key: "current_stock", label: "Current Stock" },
+  { key: "reconciliations", label: "Reconciliation" },
   { key: "inventory_opening_counts", label: "Opening Stock" },
   { key: "stock_receipts", label: "Stock In" },
   { key: "stock_adjustments", label: "Stock Adjustments" },
@@ -92,27 +94,9 @@ const READ_DEPENDENCIES: Record<string, string[]> = {
     "inventory_closing_counts",
   ],
   inventory_opening_counts: ["inventory_counts"],
-  stock_receipts: [
-    "inventory_counts",
-    "inventory_opening_counts",
-    "stock_adjustments",
-    "stock_movements",
-    "inventory_closing_counts",
-  ],
-  stock_adjustments: [
-    "inventory_counts",
-    "inventory_opening_counts",
-    "stock_receipts",
-    "stock_movements",
-    "inventory_closing_counts",
-  ],
-  stock_movements: [
-    "inventory_counts",
-    "inventory_opening_counts",
-    "stock_receipts",
-    "stock_adjustments",
-    "inventory_closing_counts",
-  ],
+  stock_receipts: ["inventory_counts", "inventory_opening_counts"],
+  stock_adjustments: ["inventory_counts", "inventory_opening_counts"],
+  stock_movements: [],
   inventory_closing_counts: ["inventory_counts"],
   ingredients: ["ingredient_units"],
   categories: ["products", "recipes", "recipe_items"],
@@ -121,6 +105,11 @@ const READ_DEPENDENCIES: Record<string, string[]> = {
   recipe_items: ["categories", "products", "recipes"],
 };
 const LINKED_READ_GROUPS: string[][] = [
+  [
+    "inventory_counts",
+    "inventory_opening_counts",
+    "inventory_closing_counts",
+  ],
   ["categories", "products", "recipes", "recipe_items"],
   ["ingredients", "ingredient_units"],
 ];

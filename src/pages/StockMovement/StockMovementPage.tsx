@@ -75,7 +75,7 @@ export default function StockMovementPage() {
               <div className="mb-3 grid size-11 place-items-center rounded-xl bg-[#efe9df] text-[#8a5a3f]"><ArrowRightLeft size={22} /></div>
               <h1 className="font-serif text-3xl font-bold">{t("Stock Movement")}</h1>
               <p className="mt-2 text-sm text-stone-500">{displayDate}</p>
-              <p className="mt-1 text-xs text-stone-500">{t("Submitted Stock In is recorded automatically in each ingredient’s base unit.")}</p>
+              <p className="mt-1 text-xs text-stone-500">{t("Stock movement history from submitted stock activity.")}</p>
             </div>
             <button type="button" onClick={() => setRefresh((value) => value + 1)} disabled={loading} className="rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-semibold disabled:opacity-40">{t("Refresh")}</button>
           </header>
@@ -93,7 +93,7 @@ export default function StockMovementPage() {
               <table className="w-full min-w-[1000px] text-left text-sm">
                 <thead className="bg-stone-50 text-xs uppercase text-stone-500"><tr>{["Date / Time", "Ingredient", "Movement", "Quantity", "Reference", "Submitted by", "Notes"].map((label) => <th key={label} className="px-5 py-3">{t(label)}</th>)}</tr></thead>
                 <tbody className="divide-y divide-stone-100">
-                  {loading ? <tr><td colSpan={7} className="p-12 text-center text-stone-500">{t("Loading movements...")}</td></tr> : items.length === 0 ? <tr><td colSpan={7} className="p-12 text-center text-stone-500">{t("No movements found. Submit Stock In with items to record incoming quantities.")}</td></tr> : items.map((item) => {
+                  {loading ? <tr><td colSpan={7} className="p-12 text-center text-stone-500">{t("Loading movements...")}</td></tr> : items.length === 0 ? <tr><td colSpan={7} className="p-12 text-center text-stone-500">{t("No stock movement history found.")}</td></tr> : items.map((item) => {
                     const outgoing = ["ORDER_USAGE", "WASTE", "ADJUSTMENT_OUT"].includes(item.movement_type);
                     return <tr key={item.stock_movement_id}>
                       <td className="px-5 py-4"><p>{item.business_date}</p><p className="mt-1 text-xs text-stone-500">{formatDateTime(item.created_at, language)}</p></td>

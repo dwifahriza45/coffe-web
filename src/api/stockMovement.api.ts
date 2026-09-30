@@ -21,5 +21,5 @@ export interface StockMovement {
 
 export const getStockMovements = async (payload: {
   start: number; limit: number; business_day_id: string; business_date: string;
-  movement_type: string; name: string;
+  movement_type: string; name: string; ingredient_id?: string;
 }) => (await api.post<ApiResponse<StockMovement[]>>("/stock-movements/list", payload)).data;

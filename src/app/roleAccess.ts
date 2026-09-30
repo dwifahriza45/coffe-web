@@ -18,6 +18,7 @@ export const userCan = (
   menuKey: string,
   action: PermissionAction = "read",
 ) => {
+  if (userHasRole(user, ["admin"])) return true;
   const permission = user?.permissions?.find(
     (item) => item.menu_key === menuKey,
   );

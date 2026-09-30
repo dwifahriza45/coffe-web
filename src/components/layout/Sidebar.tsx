@@ -2,6 +2,7 @@ import {
   LayoutDashboard,
   LockKeyhole,
   LogOut,
+  Boxes,
   CalendarDays,
   ClipboardCheck,
   CupSoda,
@@ -11,6 +12,7 @@ import {
   Truck,
   Shield,
   Search,
+  Scale,
   X,
   UserCog,
 } from "lucide-react";
@@ -53,6 +55,8 @@ export default function Sidebar({
   const canReadStockReceipts = userCan(user, "stock_receipts");
   const canReadStockAdjustments = userCan(user, "stock_adjustments");
   const canReadStockMovements = userCan(user, "stock_movements");
+  const canReadCurrentStock = userCan(user, "current_stock");
+  const canReadReconciliations = userCan(user, "reconciliations");
   const canReadClosingCounts =
     userCan(user, "inventory_closing_counts");
   const canReadUnits = userCan(user, "units");
@@ -119,6 +123,18 @@ export default function Sidebar({
       to: `/stock-count${stockOpnameContextQuery}`,
       icon: ClipboardCheck,
     });
+  if (canReadCurrentStock)
+    inventoryOperationLinks.push({
+      label: t("Current Stock"),
+      to: "/current-stock",
+      icon: Boxes,
+    });
+  if (canReadReconciliations)
+    inventoryOperationLinks.push({
+      label: t("Reconciliation"),
+      to: "/reconciliation",
+      icon: Scale,
+    });
   if (canReadOpeningCounts)
     stockOpnameChildLinks.push({
       label: t("Opening Stock"),
@@ -170,12 +186,18 @@ export default function Sidebar({
   const filteredHrisLinks = hrisLinks.filter((link) => matchesMenu(link.label, "HRIS"));
   const filteredInventoryMasterLinks = inventoryMasterLinks.filter((link) => matchesMenu(link.label, t("Master Data")));
   const filteredInventoryOperationLinks = inventoryOperationLinks.filter((link) => matchesMenu(link.label, t("Inventory")));
+  const filteredStandaloneInventoryOperationLinks =
+    filteredInventoryOperationLinks.filter(
+      (link) => link.to.split("?")[0] !== "/stock-count",
+    );
   const filteredStockOpnameChildLinks = stockOpnameChildLinks.filter((link) => matchesMenu(link.label, `${t("Inventory")} ${t("Stock Count")}`));
   const filteredInventoryMenuLinks = inventoryMenuLinks.filter((link) => matchesMenu(link.label, t("Menu")));
   const showStockOpnameGroup =
     filteredInventoryOperationLinks.length > 0 ||
     filteredStockOpnameChildLinks.length > 0;
-  const stockOpnameLink = inventoryOperationLinks[0];
+  const stockOpnameLink = filteredInventoryOperationLinks.find(
+    (link) => link.to.split("?")[0] === "/stock-count",
+  );
   const hasMenus = [links, hrisLinks, inventoryMasterLinks, inventoryOperationLinks, stockOpnameChildLinks, inventoryMenuLinks].some((group) => group.length > 0);
   const resultCount = [filteredLinks, filteredHrisLinks, filteredInventoryMasterLinks, filteredInventoryOperationLinks, filteredStockOpnameChildLinks, filteredInventoryMenuLinks].reduce((total, group) => total + group.length, 0);
   const StockOpnameIcon = stockOpnameLink?.icon;
@@ -288,6 +310,19 @@ export default function Sidebar({
                         ))}
                       </div>
                     )}
+                    {filteredStandaloneInventoryOperationLinks.map(({ label, to, icon: Icon }) => (
+                      <NavLink
+                        key={label}
+                        to={to}
+                        onClick={onClose}
+                        className={({ isActive }) =>
+                          `flex items-center gap-3 rounded-lg p-3 text-sm ${isActive ? "bg-[#4b3023] text-white" : "text-stone-300 hover:bg-white/5"}`
+                        }
+                      >
+                        <Icon size={18} />
+                        {label}
+                      </NavLink>
+                    ))}
                   </div>
                 </div>
               )}

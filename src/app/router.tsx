@@ -7,6 +7,8 @@ import BusinessDayPage from "../pages/BusinessDay/BusinessDayPage";
 import CategoryManagementPage from "../pages/CategoryManagement/CategoryManagementPage";
 import CategoryDetailPage from "../pages/CategoryDetail/CategoryDetailPage";
 import DashboardPage from "../pages/Dashboard/DashboardPage";
+import CurrentStockPage from "../pages/CurrentStock/CurrentStockPage";
+import CurrentStockDetailPage from "../pages/CurrentStock/CurrentStockDetailPage";
 import IngredientDetailPage from "../pages/IngredientDetail/IngredientDetailPage";
 import IngredientManagementPage from "../pages/IngredientManagement/IngredientManagementPage";
 import InventoryCountPage from "../pages/InventoryCount/InventoryCountPage";
@@ -15,6 +17,7 @@ import HomePage from "../pages/Home/HomePage";
 import MenuItemsPage from "../pages/MenuItems/MenuItemsPage";
 import NotFoundPage from "../pages/NotFound/NotFoundPage";
 import ProductDetailPage from "../pages/ProductDetail/ProductDetailPage";
+import ReconciliationPage from "../pages/Reconciliation/ReconciliationPage";
 import RoleManagementPage from "../pages/RoleManagement/RoleManagementPage";
 import StockAdjustmentPage from "../pages/StockAdjustment/StockAdjustmentPage";
 import StockAdjustmentDetailPage from "../pages/StockAdjustmentDetail/StockAdjustmentDetailPage";
@@ -172,6 +175,9 @@ export default function AppRouter() {
         <Route path="/stock-adjustments" element={<RequireAuth><RequirePermission menuKey="stock_adjustments"><StockAdjustmentPage /></RequirePermission></RequireAuth>} />
         <Route path="/stock-adjustments/:adjustmentID" element={<RequireAuth><RequirePermission menuKey="stock_adjustments"><StockAdjustmentDetailPage /></RequirePermission></RequireAuth>} />
         <Route path="/stock-movements" element={<RequireAuth><RequirePermission menuKey="stock_movements"><StockMovementPage /></RequirePermission></RequireAuth>} />
+        <Route path="/current-stock" element={<RequireAuth><RequirePermission menuKey="current_stock"><CurrentStockPage /></RequirePermission></RequireAuth>} />
+        <Route path="/current-stock/:ingredientID" element={<RequireAuth><RequirePermission menuKey="current_stock"><CurrentStockDetailPage /></RequirePermission></RequireAuth>} />
+        <Route path="/reconciliation" element={<RequireAuth><RequirePermission menuKey="reconciliations"><ReconciliationPage /></RequirePermission></RequireAuth>} />
         <Route
           path="/unit-management"
           element={
