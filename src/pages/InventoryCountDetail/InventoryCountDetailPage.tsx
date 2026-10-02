@@ -25,7 +25,7 @@ import { formatNumber, normalizeNumberInput } from "../../utils/numberFormat";
 const emptyItemForm: InventoryCountItemPayload = { inventory_count_id: "", ingredient_id: "", actual_quantity: "", notes: "" };
 
 function formatDateTime(value?: string) {
-  return value ? new Date(value).toLocaleString("en-GB") : "-";
+  return value ? new Date(value).toLocaleString("id-ID") : "-";
 }
 
 function numericValue(value?: string) {

@@ -8,6 +8,7 @@ import {
   CupSoda,
   FolderTree,
   PackageOpen,
+  Tags,
   Ruler,
   Truck,
   Shield,
@@ -17,7 +18,7 @@ import {
   UserCog,
 } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
-import { useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { logout as logoutRequest } from "../../api/auth.api";
 import { useAuth } from "../../app/AuthContext";
 import { invalidateSession } from "../../app/authSession";
@@ -31,6 +32,8 @@ type SidebarLink = {
   icon: typeof LayoutDashboard;
 };
 
+const SIDEBAR_SCROLL_KEY = "crema-sidebar-scroll";
+
 export default function Sidebar({
   isOpen,
   onClose,
@@ -43,6 +46,7 @@ export default function Sidebar({
   const location = useLocation();
   const [menuSearch, setMenuSearch] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const navRef = useRef<HTMLElement>(null);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const canReadDashboard = userCan(user, "dashboard");
@@ -61,6 +65,8 @@ export default function Sidebar({
     userCan(user, "inventory_closing_counts");
   const canReadUnits = userCan(user, "units");
   const canReadIngredients = userCan(user, "ingredients");
+  const canReadBrandTypes = userCan(user, "brand_types");
+  const canReadIngredientPrices = userCan(user, "ingredient_prices");
   const canReadSuppliers = userCan(user, "suppliers");
   const canReadCategories = userCan(user, "categories");
   const canReadProducts = userCan(user, "products");
@@ -105,18 +111,30 @@ export default function Sidebar({
     });
   if (canReadUnits)
     inventoryMasterLinks.push({
-      label: t("Unit Management"),
+      label: t("Content unit"),
       to: "/unit-management",
       icon: Ruler,
     });
-  if (canReadIngredients)
+  if (canReadBrandTypes)
     inventoryMasterLinks.push({
-      label: t("Ingredient Management"),
-      to: "/ingredient-management",
-      icon: PackageOpen,
+      label: t("Brand / Type"),
+      to: "/brand-type-management",
+      icon: Tags,
     });
   if (canReadSuppliers)
     inventoryMasterLinks.push({ label: t("Suppliers"), to: "/supplier-management", icon: Truck });
+  if (canReadIngredients)
+    inventoryMasterLinks.push({
+      label: t("Ingredients"),
+      to: "/ingredient-management",
+      icon: PackageOpen,
+    });
+  if (canReadIngredientPrices)
+    inventoryMasterLinks.push({
+      label: t("Master Price & PAR"),
+      to: "/ingredient-price-management",
+      icon: Scale,
+    });
   if (canReadInventoryCounts)
     inventoryOperationLinks.push({
       label: t("Stock Count"),
@@ -129,6 +147,12 @@ export default function Sidebar({
       to: "/current-stock",
       icon: Boxes,
     });
+  if (canReadStockReceipts)
+    inventoryOperationLinks.push({
+      label: t("Purchasing"),
+      to: "/stock-in",
+      icon: Truck,
+    });
   if (canReadReconciliations)
     inventoryOperationLinks.push({
       label: t("Reconciliation"),
@@ -140,12 +164,6 @@ export default function Sidebar({
       label: t("Opening Stock"),
       to: stockCountOpeningPath,
       icon: ClipboardCheck,
-    });
-  if (canReadStockReceipts)
-    stockOpnameChildLinks.push({
-      label: t("Stock In"),
-      to: `/stock-in${stockOpnameContextQuery}`,
-      icon: Truck,
     });
   if (canReadStockAdjustments)
     stockOpnameChildLinks.push({
@@ -201,6 +219,23 @@ export default function Sidebar({
   const hasMenus = [links, hrisLinks, inventoryMasterLinks, inventoryOperationLinks, stockOpnameChildLinks, inventoryMenuLinks].some((group) => group.length > 0);
   const resultCount = [filteredLinks, filteredHrisLinks, filteredInventoryMasterLinks, filteredInventoryOperationLinks, filteredStockOpnameChildLinks, filteredInventoryMenuLinks].reduce((total, group) => total + group.length, 0);
   const StockOpnameIcon = stockOpnameLink?.icon;
+
+  useLayoutEffect(() => {
+    if (menuSearch) return;
+    const savedScroll = Number(window.sessionStorage.getItem(SIDEBAR_SCROLL_KEY) ?? 0);
+    if (navRef.current) {
+      navRef.current.scrollTop = Number.isFinite(savedScroll) ? savedScroll : 0;
+    }
+  }, []);
+
+  function rememberScroll() {
+    if (!navRef.current) return;
+    window.sessionStorage.setItem(
+      SIDEBAR_SCROLL_KEY,
+      String(navRef.current.scrollTop),
+    );
+  }
+
   function isStockChildActive(to: string, pathActive: boolean) {
     const path = to.split("?")[0];
     const focus = path === "/stock-count/opening" ? "opening" : path === "/stock-count/closing" ? "closing" : null;
@@ -255,12 +290,20 @@ export default function Sidebar({
             )}
           </div>
         )}
-        <nav aria-label={t("Main navigation")} className="sidebar-scroll mt-4 -mr-2 min-h-0 flex-1 space-y-2 overflow-y-auto pb-5 pr-2">
+        <nav
+          ref={navRef}
+          aria-label={t("Main navigation")}
+          onScroll={rememberScroll}
+          className="sidebar-scroll mt-4 -mr-2 min-h-0 flex-1 space-y-2 overflow-y-auto pb-5 pr-2"
+        >
           {filteredLinks.map(({ label, to, icon: Icon }) => (
             <NavLink
               key={label}
               to={to}
-              onClick={onClose}
+              onClick={() => {
+                rememberScroll();
+                onClose();
+              }}
               className={({ isActive }) =>
                 `flex items-center gap-3 rounded-lg p-3 text-sm ${isActive ? "bg-[#4b3023] text-white" : "text-stone-300 hover:bg-white/5"}`
               }
@@ -284,7 +327,10 @@ export default function Sidebar({
                       <NavLink
                         key={stockOpnameLink.label}
                         to={stockOpnameLink.to}
-                        onClick={onClose}
+                        onClick={() => {
+                          rememberScroll();
+                          onClose();
+                        }}
                         className={({ isActive }) =>
                           `flex items-center gap-3 rounded-lg p-3 text-sm ${isActive ? "bg-[#4b3023] text-white" : "text-stone-300 hover:bg-white/5"}`
                         }
@@ -299,7 +345,10 @@ export default function Sidebar({
                           <NavLink
                             key={label}
                             to={to}
-                            onClick={onClose}
+                            onClick={() => {
+                              rememberScroll();
+                              onClose();
+                            }}
                             className={({ isActive }) =>
                               `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm ${isStockChildActive(to, isActive) ? "bg-[#4b3023] text-white" : "text-stone-300 hover:bg-white/5"}`
                             }
@@ -314,7 +363,10 @@ export default function Sidebar({
                       <NavLink
                         key={label}
                         to={to}
-                        onClick={onClose}
+                        onClick={() => {
+                          rememberScroll();
+                          onClose();
+                        }}
                         className={({ isActive }) =>
                           `flex items-center gap-3 rounded-lg p-3 text-sm ${isActive ? "bg-[#4b3023] text-white" : "text-stone-300 hover:bg-white/5"}`
                         }
@@ -339,7 +391,10 @@ export default function Sidebar({
                       <NavLink
                         key={label}
                         to={to}
-                        onClick={onClose}
+                        onClick={() => {
+                          rememberScroll();
+                          onClose();
+                        }}
                         className={({ isActive }) =>
                           `flex items-center gap-3 rounded-lg p-3 text-sm ${isActive ? "bg-[#4b3023] text-white" : "text-stone-300 hover:bg-white/5"}`
                         }
@@ -364,7 +419,10 @@ export default function Sidebar({
                       <NavLink
                         key={label}
                         to={to}
-                        onClick={onClose}
+                        onClick={() => {
+                          rememberScroll();
+                          onClose();
+                        }}
                         className={({ isActive }) =>
                           `flex items-center gap-3 rounded-lg p-3 text-sm ${isActive ? "bg-[#4b3023] text-white" : "text-stone-300 hover:bg-white/5"}`
                         }
@@ -391,7 +449,10 @@ export default function Sidebar({
                   <NavLink
                     key={label}
                     to={to}
-                    onClick={onClose}
+                    onClick={() => {
+                      rememberScroll();
+                      onClose();
+                    }}
                     className={({ isActive }) =>
                       `flex items-center gap-3 rounded-lg p-3 text-sm ${isActive ? "bg-[#4b3023] text-white" : "text-stone-300 hover:bg-white/5"}`
                     }

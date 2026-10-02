@@ -4,13 +4,14 @@ import SupplierManagementPage from "../pages/SupplierManagement/SupplierManageme
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import LoginPage from "../pages/auth/LoginPage";
 import BusinessDayPage from "../pages/BusinessDay/BusinessDayPage";
+import BrandTypeManagementPage from "../pages/BrandTypeManagement/BrandTypeManagementPage";
 import CategoryManagementPage from "../pages/CategoryManagement/CategoryManagementPage";
 import CategoryDetailPage from "../pages/CategoryDetail/CategoryDetailPage";
 import DashboardPage from "../pages/Dashboard/DashboardPage";
 import CurrentStockPage from "../pages/CurrentStock/CurrentStockPage";
 import CurrentStockDetailPage from "../pages/CurrentStock/CurrentStockDetailPage";
-import IngredientDetailPage from "../pages/IngredientDetail/IngredientDetailPage";
 import IngredientManagementPage from "../pages/IngredientManagement/IngredientManagementPage";
+import IngredientPriceManagementPage from "../pages/IngredientPriceManagement/IngredientPriceManagementPage";
 import InventoryCountPage from "../pages/InventoryCount/InventoryCountPage";
 import InventoryCountDetailPage from "../pages/InventoryCountDetail/InventoryCountDetailPage";
 import HomePage from "../pages/Home/HomePage";
@@ -199,11 +200,21 @@ export default function AppRouter() {
           }
         />
         <Route
-          path="/ingredient-management/:ingredientID"
+          path="/brand-type-management"
           element={
             <RequireAuth>
-              <RequirePermission menuKey="ingredients">
-                <IngredientDetailPage />
+              <RequirePermission menuKey="brand_types">
+                <BrandTypeManagementPage />
+              </RequirePermission>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/ingredient-price-management"
+          element={
+            <RequireAuth>
+              <RequirePermission menuKey="ingredient_prices">
+                <IngredientPriceManagementPage />
               </RequirePermission>
             </RequireAuth>
           }

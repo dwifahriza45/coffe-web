@@ -1,21 +1,16 @@
 import {
   createContext,
   useContext,
-  useEffect,
   useMemo,
-  useState,
   type ReactNode,
 } from "react";
 
-export type Language = "id" | "en";
+export type Language = "id";
 
 type LanguageContextValue = {
   language: Language;
-  setLanguage: (language: Language) => void;
   t: (text: string) => string;
 };
-
-const STORAGE_KEY = "crema-language";
 
 const translations: Record<string, string> = {
   "Open navigation": "Buka navigasi",
@@ -42,19 +37,43 @@ const translations: Record<string, string> = {
   "Business Days": "Bisnis Harian",
   "User Management": "Manajemen User",
   "Role Management": "Manajemen Role",
-  "Unit Management": "Manajemen Unit",
-  "Ingredient Management": "Manajemen Bahan",
+  "Unit Management": "Satuan isi",
+  "Ingredient Management": "Bahan",
   Suppliers: "Supplier",
+  Packaging: "Satuan kemasan",
+  "Brand / Type": "Brand / Type",
+  "Master Price & PAR": "Master Harga & PAR",
+  "Could not load ingredient prices.": "Gagal memuat Master Harga & PAR.",
+  "Add ingredient price": "Tambah harga bahan",
+  "Update ingredient price": "Update harga bahan",
+  "Create ingredient price": "Buat harga bahan",
+  "Delete ingredient price": "Hapus harga bahan",
+  "All ingredient prices": "Semua harga bahan",
+  "prices found": "harga ditemukan",
+  "Search price...": "Cari harga...",
+  "Loading prices...": "Memuat harga...",
+  "No prices found": "Harga tidak ditemukan",
+  "Create this ingredient price?": "Buat harga bahan ini?",
+  "Update this ingredient price?": "Update harga bahan ini?",
+  "Delete this ingredient price permanently?": "Hapus harga bahan ini permanen?",
+  "Could not delete ingredient price.": "Gagal menghapus harga bahan.",
+  "Unit Price": "Harga Satuan",
+  "Effective Date": "Tanggal Berlaku",
+  "Package Qty": "Qty Kemasan",
+  "Content Qty": "Isi",
+  Content: "Isi",
+  required: "wajib diisi",
   "Stock Count": "Stock Opname",
   "Current Stock": "Stock Saat Ini",
   "Stock In": "Stock Masuk",
+  Purchasing: "Purchasing",
   "Stock Adjustments": "Penyesuaian Stock",
   "Stock Movements": "Riwayat Mutasi",
   "Menu Items": "Menu Item",
   Dashboard: "Dashboard",
   Users: "User",
   Roles: "Role",
-  Units: "Unit",
+  Units: "Satuan isi",
   Ingredients: "Bahan",
   Categories: "Kategori",
   Products: "Produk",
@@ -85,6 +104,41 @@ const translations: Record<string, string> = {
   "Update role": "Update role",
   "Have assigned users": "Masih punya user",
   "Delete role": "Hapus role",
+  "Select all": "Pilih semua",
+  "Select unit": "Pilih satuan",
+  "Delete selected": "Hapus terpilih",
+  "Delete selected units": "Hapus satuan terpilih",
+  "Delete selected units permanently?": "Hapus satuan terpilih secara permanen?",
+  "Could not delete selected units.": "Gagal menghapus satuan terpilih.",
+  "Delete selected packaging": "Hapus kemasan terpilih",
+  "Delete selected packaging permanently?":
+    "Hapus kemasan terpilih secara permanen?",
+  "Could not delete selected packaging.":
+    "Gagal menghapus kemasan terpilih.",
+  Export: "Export",
+  Import: "Import",
+  "Importing...": "Import...",
+  "Import finished": "Import selesai",
+  Detail: "Detail",
+  "Import detail": "Detail import",
+  Success: "Berhasil",
+  Failed: "Gagal",
+  Row: "Baris",
+  "Code, name, and unit type are required":
+    "Kode, nama, dan type satuan isi wajib diisi",
+  "Code and name are required": "Kode dan nama wajib diisi",
+  "Duplicate code in import file": "Kode duplikat di file import",
+  "Duplicate name in import file": "Nama duplikat di file import",
+  "Imported successfully": "Berhasil diimport",
+  "Import failed": "Import gagal",
+  "Unit code already exists": "Kode satuan isi sudah ada",
+  "Unit name already exists": "Nama satuan isi sudah ada",
+  "Invalid unit input": "Data satuan isi tidak valid",
+  "Packaging code already exists": "Kode satuan kemasan sudah ada",
+  "Packaging name already exists": "Nama satuan kemasan sudah ada",
+  "Invalid packaging input": "Data satuan kemasan tidak valid",
+  "Internal server error": "Terjadi kesalahan server",
+  "Could not read import file.": "File import tidak bisa dibaca.",
   "Delete this role permanently?": "Hapus role ini permanen?",
   "Confirm": "Konfirmasi",
   Page: "Halaman",
@@ -137,7 +191,8 @@ const translations: Record<string, string> = {
   "Loading recipes...": "Memuat resep...",
   "Loading suppliers...": "Memuat supplier...",
   "Loading ingredients...": "Memuat bahan...",
-  "Loading units...": "Memuat unit...",
+  "Loading units...": "Memuat satuan...",
+  "Loading packaging...": "Memuat satuan kemasan...",
   "Loading stock counts...": "Memuat stock opname...",
   "Loading stock receipts...": "Memuat stock masuk...",
   "Loading stock adjustments...": "Memuat penyesuaian stock...",
@@ -149,12 +204,14 @@ const translations: Record<string, string> = {
   "No categories found": "Kategori tidak ditemukan",
   "No ingredients found": "Bahan tidak ditemukan",
   "No suppliers found": "Supplier tidak ditemukan",
-  "No units found": "Unit tidak ditemukan",
+  "No units found": "Satuan isi tidak ditemukan",
+  "No packaging found": "Satuan kemasan tidak ditemukan",
   "Search adjustment...": "Cari penyesuaian...",
   "Search receipt...": "Cari penerimaan...",
   "Search ingredient...": "Cari bahan...",
   "Search supplier...": "Cari supplier...",
-  "Search unit...": "Cari unit...",
+  "Search unit...": "Cari satuan isi...",
+  "Search packaging...": "Cari satuan kemasan...",
   "Search category...": "Cari kategori...",
   "Search product...": "Cari produk...",
   "Search menu item...": "Cari menu item...",
@@ -174,9 +231,12 @@ const translations: Record<string, string> = {
   "Add supplier": "Tambah supplier",
   "Update supplier": "Update supplier",
   "Delete supplier": "Hapus supplier",
-  "Add unit": "Tambah unit",
-  "Update unit": "Update unit",
-  "Delete unit": "Hapus unit",
+  "Add unit": "Tambah satuan isi",
+  "Update unit": "Update satuan isi",
+  "Delete unit": "Hapus satuan isi",
+  "Add packaging": "Tambah satuan kemasan",
+  "Update packaging": "Update satuan kemasan",
+  "Delete packaging": "Hapus satuan kemasan",
   Name: "Nama",
   Description: "Deskripsi",
   Status: "Status",
@@ -192,7 +252,7 @@ const translations: Record<string, string> = {
   Category: "Kategori",
   Ingredient: "Bahan",
   Supplier: "Supplier",
-  Unit: "Unit",
+  Unit: "Satuan isi",
   "Business day": "Bisnis harian",
   "Created by": "Dibuat oleh",
   "Submitted by": "Disubmit oleh",
@@ -382,6 +442,17 @@ const translations: Record<string, string> = {
   "Delete stock in": "Hapus Stock Masuk",
   "Delete this empty stock in record?": "Hapus data Stock Masuk kosong ini?",
   "Could not delete stock receipt.": "Gagal menghapus Stock Masuk.",
+  "Trace supplier purchases, receipts, and received items.":
+    "Lacak pembelian supplier, penerimaan, dan item yang diterima.",
+  "You do not have permission to create purchasing records":
+    "Kamu tidak punya akses untuk membuat data purchasing",
+  "You do not have permission to update purchasing records.":
+    "Kamu tidak punya akses untuk mengubah data purchasing.",
+  "You do not have permission to delete purchasing records":
+    "Kamu tidak punya akses untuk menghapus data purchasing",
+  "Add purchase": "Tambah Purchasing",
+  "Purchase Receipts": "Data Purchasing",
+  "Purchase Items": "Item Purchasing",
   "Track incoming inventory receipts and received items.":
     "Catat barang masuk dan item yang diterima.",
   "Open a business day first": "Buka operasional harian dulu",
@@ -401,6 +472,8 @@ const translations: Record<string, string> = {
   "Remove all items before deleting this stock in":
     "Hapus semua item sebelum menghapus Stock Masuk ini",
   "Business Date": "Tanggal Bisnis",
+  "Purchase Date": "Tanggal Purchasing",
+  "Used for daily purchasing tracking": "Dipakai untuk tracking purchasing harian",
   "Auto from current open business day":
     "Otomatis dari operasional harian yang sedang buka",
   "Supplier *": "Supplier *",
@@ -528,24 +601,69 @@ const translations: Record<string, string> = {
   "ingredient is required": "bahan wajib dipilih",
   "quantity is required": "qty wajib diisi",
   "Could not update recipe status.": "Gagal mengubah status resep.",
-  "Could not load units.": "Gagal memuat unit.",
-  "Manage inventory measurement units.": "Kelola satuan ukur inventori.",
-  "All units": "Semua unit",
-  "units found": "unit ditemukan",
+  "Could not load units.": "Gagal memuat satuan isi.",
+  "Could not load packaging.": "Gagal memuat satuan kemasan.",
+  "Packaging is used by ingredients or prices":
+    "Satuan kemasan masih dipakai di Bahan atau Master Harga",
+  "Manage inventory measurement units.": "Kelola satuan isi stok.",
+  "Manage purchase packaging conversions.":
+    "Kelola kemasan pembelian dan konversinya ke satuan stok.",
+  "Manage purchase packaging units.": "Kelola master satuan kemasan pembelian.",
+  "Manage ingredient brand and type variants.":
+    "Kelola brand dan varian/type bahan.",
+  "Could not load brand types.": "Gagal memuat Brand / Type.",
+  "Add brand type": "Tambah Brand / Type",
+  "Update brand type": "Update Brand / Type",
+  "Create brand type": "Buat Brand / Type",
+  "Delete brand type": "Hapus Brand / Type",
+  "All brand types": "Semua Brand / Type",
+  "brand types found": "Brand / Type ditemukan",
+  "Search brand type...": "Cari Brand / Type...",
+  "Loading brand types...": "Memuat Brand / Type...",
+  "No brand types found": "Brand / Type tidak ditemukan",
+  "Create this brand type?": "Buat Brand / Type ini?",
+  "Update this brand type?": "Update Brand / Type ini?",
+  "Delete this brand type permanently?": "Hapus Brand / Type ini permanen?",
+  "Deactivate brand type": "Nonaktifkan Brand / Type",
+  "Deactivate this brand type?": "Nonaktifkan Brand / Type ini?",
+  "Activate brand type": "Aktifkan Brand / Type",
+  "Activate this brand type?": "Aktifkan Brand / Type ini?",
+  "Could not update brand type status.": "Gagal mengubah status Brand / Type.",
+  "Could not delete brand type.": "Gagal menghapus Brand / Type.",
+  "Brand / Type data is ready in the database. CRUD screen is next.":
+    "Data Brand / Type sudah siap di database. Layar CRUD menyusul.",
+  "Manage supplier prices, packaging content, and effective dates.":
+    "Kelola harga supplier, isi kemasan, dan tanggal berlaku.",
+  "Master Price & PAR data is ready in the database. CRUD screen is next.":
+    "Data Master Harga & PAR sudah siap di database. Layar CRUD menyusul.",
+  "All units": "Semua satuan isi",
+  "All packaging": "Semua satuan kemasan",
+  "units found": "satuan isi ditemukan",
+  "packaging found": "satuan kemasan ditemukan",
   Code: "Kode",
-  "Unit type": "Tipe unit",
+  "Unit type": "Tipe satuan isi",
   "all fields are required": "semua field wajib diisi",
-  "Create unit": "Buat unit",
-  "Create this unit?": "Buat unit ini?",
-  "Update this unit?": "Update unit ini?",
-  "Delete this unit permanently?": "Hapus unit ini permanen?",
-  "Could not delete unit.": "Gagal menghapus unit.",
-  "Deactivate unit": "Nonaktifkan unit",
-  "Deactivate this unit?": "Nonaktifkan unit ini?",
-  "Activate unit": "Aktifkan unit",
-  "Activate this unit?": "Aktifkan unit ini?",
-  "Could not update unit status.": "Gagal mengubah status unit.",
-  "Unit is used by ingredients, unit conversions, or stock movements": "Unit dipakai oleh bahan, konversi unit, atau mutasi stok",
+  "Create unit": "Buat satuan isi",
+  "Create this unit?": "Buat satuan isi ini?",
+  "Update this unit?": "Update satuan isi ini?",
+  "Delete this unit permanently?": "Hapus satuan isi ini permanen?",
+  "Create packaging": "Buat satuan kemasan",
+  "Create this packaging?": "Buat satuan kemasan ini?",
+  "Update this packaging?": "Update satuan kemasan ini?",
+  "Delete this packaging permanently?": "Hapus satuan kemasan ini permanen?",
+  "Could not delete unit.": "Gagal menghapus satuan isi.",
+  "Could not delete packaging.": "Gagal menghapus satuan kemasan.",
+  "Deactivate unit": "Nonaktifkan satuan isi",
+  "Deactivate this unit?": "Nonaktifkan satuan isi ini?",
+  "Deactivate packaging": "Nonaktifkan satuan kemasan",
+  "Deactivate this packaging?": "Nonaktifkan satuan kemasan ini?",
+  "Activate unit": "Aktifkan satuan isi",
+  "Activate this unit?": "Aktifkan satuan isi ini?",
+  "Activate packaging": "Aktifkan satuan kemasan",
+  "Activate this packaging?": "Aktifkan satuan kemasan ini?",
+  "Could not update unit status.": "Gagal mengubah status satuan isi.",
+  "Could not update packaging status.": "Gagal mengubah status satuan kemasan.",
+  "Unit is used by ingredients, unit conversions, or stock movements": "Satuan isi dipakai oleh bahan, satuan kemasan, atau mutasi stok",
   "Could not verify whether this user can be deleted. Please try again.": "Belum bisa memeriksa apakah akun dapat dihapus. Silakan coba lagi.",
   "Close the currently open business day first.": "Tutup operasional harian yang masih OPEN sebelum membuka yang baru.",
   "close the currently open business day before opening another": "Tutup operasional harian yang masih OPEN sebelum membuka yang baru.",
@@ -554,14 +672,16 @@ const translations: Record<string, string> = {
   "Cannot delete user": "Pengguna tidak bisa dihapus",
   "user cannot be deleted because it still has assigned roles": "Akun masih memiliki assignment role. Penghapusan diblokir; akun dan assignment role tetap utuh.",
   "user cannot be deleted because operational records reference this account; deactivate the account instead": "Akun masih terhubung dengan data operasional. Penghapusan diblokir. Nonaktifkan akun jika sudah tidak digunakan.",
-  "Unit is used by ingredients": "Unit sedang dipakai bahan",
+  "Unit is used by ingredients": "Satuan isi sedang dipakai bahan",
   "Could not load ingredients.": "Gagal memuat bahan.",
-  "Manage stock ingredients and base units.": "Kelola bahan stock dan unit dasar.",
+  "Manage stock ingredients and base units.": "Kelola bahan stok dan satuan dasar.",
   "All ingredients": "Semua bahan",
   "ingredients found": "bahan ditemukan",
-  "Base unit": "Unit dasar",
+  "Base unit": "Satuan dasar",
+  "Content unit": "Satuan isi",
+  "Packaging unit": "Satuan kemasan",
   "Min stock": "Stock minimum",
-  "base unit is required": "unit dasar wajib dipilih",
+  "base unit is required": "satuan dasar wajib dipilih",
   "minimum stock is required": "stock minimum wajib diisi",
   "Create ingredient": "Buat bahan",
   "Create this ingredient?": "Buat bahan ini?",
@@ -573,35 +693,35 @@ const translations: Record<string, string> = {
   "Activate ingredient": "Aktifkan bahan",
   "Activate this ingredient?": "Aktifkan bahan ini?",
   "Could not update ingredient status.": "Gagal mengubah status bahan.",
-  "Ingredient is used by ingredient units": "Bahan sedang dipakai konversi unit",
+  "Ingredient is used by ingredient units": "Bahan sedang dipakai satuan kemasan",
   "Ingredient Detail": "Detail Bahan",
   "Could not load ingredient detail.": "Gagal memuat detail bahan.",
   "Add unit conversion": "Tambah konversi unit",
-  "Unit Conversions": "Konversi Unit",
+  "Unit Conversions": "Satuan kemasan",
   conversions: "konversi",
   Conversion: "Konversi",
-  "Loading unit conversions...": "Memuat konversi unit...",
-  "No unit conversions found": "Konversi unit tidak ditemukan",
-  "unit is required": "unit wajib dipilih",
+  "Loading unit conversions...": "Memuat satuan kemasan...",
+  "No unit conversions found": "Satuan kemasan tidak ditemukan",
+  "unit is required": "satuan kemasan wajib dipilih",
   "conversion factor is required": "faktor konversi wajib diisi",
-  "Update ingredient unit": "Update konversi unit",
-  "Create ingredient unit": "Buat konversi unit",
-  "Update this ingredient unit?": "Update konversi unit ini?",
-  "Create this ingredient unit?": "Buat konversi unit ini?",
-  "Deactivate ingredient unit": "Nonaktifkan konversi unit",
-  "Deactivate this ingredient unit?": "Nonaktifkan konversi unit ini?",
-  "Activate ingredient unit": "Aktifkan konversi unit",
-  "Activate this ingredient unit?": "Aktifkan konversi unit ini?",
+  "Update ingredient unit": "Update satuan kemasan",
+  "Create ingredient unit": "Buat satuan kemasan",
+  "Update this ingredient unit?": "Update satuan kemasan ini?",
+  "Create this ingredient unit?": "Buat satuan kemasan ini?",
+  "Deactivate ingredient unit": "Nonaktifkan satuan kemasan",
+  "Deactivate this ingredient unit?": "Nonaktifkan satuan kemasan ini?",
+  "Activate ingredient unit": "Aktifkan satuan kemasan",
+  "Activate this ingredient unit?": "Aktifkan satuan kemasan ini?",
   "Could not update ingredient unit status.":
-    "Gagal mengubah status konversi unit.",
-  "Delete ingredient unit": "Hapus konversi unit",
+    "Gagal mengubah status satuan kemasan.",
+  "Delete ingredient unit": "Hapus satuan kemasan",
   "Delete this ingredient unit permanently?":
-    "Hapus konversi unit ini permanen?",
-  "Could not delete ingredient unit.": "Gagal menghapus konversi unit.",
-  "Update unit conversion": "Update konversi unit",
+    "Hapus satuan kemasan ini permanen?",
+  "Could not delete ingredient unit.": "Gagal menghapus satuan kemasan.",
+  "Update unit conversion": "Update satuan kemasan",
   "Conversion factor": "Faktor konversi",
   "Minimum stock": "Stock minimum",
-  "Select unit": "Pilih unit",
+  "Select packaging": "Pilih satuan kemasan",
   "Manage supplier contacts and availability.":
     "Kelola kontak dan ketersediaan supplier.",
   "All suppliers": "Semua supplier",
@@ -620,7 +740,7 @@ const translations: Record<string, string> = {
   "Supplier status updated successfully.":
     "Status supplier berhasil diubah.",
   "Could not update supplier status.": "Gagal mengubah status supplier.",
-  "Ingredient Units": "Konversi Unit Bahan",
+  "Ingredient Units": "Satuan kemasan",
   "Could not connect to the user service. Please try again.":
     "Gagal terhubung ke layanan user. Coba lagi.",
   "Could not load user roles.": "Gagal memuat role user.",
@@ -697,25 +817,13 @@ const translations: Record<string, string> = {
 
 const LanguageContext = createContext<LanguageContextValue | null>(null);
 
-function getInitialLanguage(): Language {
-  if (typeof window === "undefined") return "id";
-  return window.localStorage.getItem(STORAGE_KEY) === "en" ? "en" : "id";
-}
-
 export function LanguageProvider({ children }: { children: ReactNode }) {
-  const [language, setLanguageState] = useState<Language>(getInitialLanguage);
-
-  useEffect(() => {
-    window.localStorage.setItem(STORAGE_KEY, language);
-  }, [language]);
-
   const value = useMemo<LanguageContextValue>(
     () => ({
-      language,
-      setLanguage: setLanguageState,
-      t: (text) => (language === "id" ? translations[text] ?? text : text),
+      language: "id",
+      t: (text) => translations[text] ?? text,
     }),
-    [language],
+    [],
   );
 
   return (
@@ -731,9 +839,4 @@ export function useLanguage() {
     throw new Error("useLanguage must be used within LanguageProvider");
   }
   return context;
-}
-
-export function translateStaticText(language: Language, text: string) {
-  if (language === "en") return text;
-  return translations[text] ?? text;
 }

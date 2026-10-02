@@ -27,7 +27,7 @@ export const getIngredients = async (payload: {
 export const getIngredient = async (ingredientID: string) =>
   (await api.get<ApiResponse<Ingredient>>(`/ingredients/${ingredientID}`)).data;
 
-export const getIngredientUnitUsage = async (unitIDs: string[]) =>
+export const getUnitUsage = async (unitIDs: string[]) =>
   (
     await api.post<ApiResponse<Record<string, boolean>>>(
       "/ingredients/unit-usage",
@@ -36,7 +36,7 @@ export const getIngredientUnitUsage = async (unitIDs: string[]) =>
   ).data;
 
 export const createIngredient = async (payload: IngredientPayload) =>
-  (await api.post<ApiResponse<null>>("/ingredients/", payload)).data;
+  (await api.post<ApiResponse<Ingredient>>("/ingredients/", payload)).data;
 
 export const updateIngredient = async (
   ingredientID: string,

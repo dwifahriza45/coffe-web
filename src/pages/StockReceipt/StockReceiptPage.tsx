@@ -1,9 +1,8 @@
 import SupplierSelect from "../../components/suppliers/SupplierSelect";
-import { isOpeningStockSubmitted } from "../../api/inventoryCount.api";
 import { isAxiosError } from "axios";
-import { ArrowLeft, ArrowRight, PackagePlus, Plus, Search, Trash2, X } from "lucide-react";
+import { ArrowRight, PackagePlus, Plus, Search, Trash2, X } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link } from "react-router-dom";
 import {
   createStockReceipt,
   deleteStockReceipt,
@@ -11,45 +10,34 @@ import {
   type StockReceipt,
   type StockReceiptPayload,
 } from "../../api/stockReceipt.api";
-import { getBusinessDays, type BusinessDay } from "../../api/businessDay.api";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import Navbar from "../../components/layout/Navbar";
 import Sidebar from "../../components/layout/Sidebar";
 
 import { useAuth } from "../../app/AuthContext";
-import { useLanguage, type Language } from "../../app/LanguageContext";
-import { getUserRoleNames } from "../../app/roleAccess";
+import { useLanguage } from "../../app/LanguageContext";
+import { userCan } from "../../app/roleAccess";
 import { currentBusinessDate } from "../../utils/businessDate";
 
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50];
 const emptyForm: StockReceiptPayload = { supplier_name: "", notes: "" };
 
-function formatDate(value: string | undefined, language: Language) {
-  return value ? new Date(`${value}T00:00:00`).toLocaleDateString(language === "id" ? "id-ID" : "en-GB", { day: "2-digit", month: "long", year: "numeric" }) : "-";
+function formatDate(value: string | undefined) {
+  return value ? new Date(`${value}T00:00:00`).toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" }) : "-";
 }
 
-function formatDateTime(value: string | undefined, language: Language) {
-  return value ? new Date(value).toLocaleString(language === "id" ? "id-ID" : "en-GB") : "-";
+function formatDateTime(value: string | undefined) {
+  return value ? new Date(value).toLocaleString("id-ID") : "-";
 }
 
 export default function StockReceiptPage() {
   const { user } = useAuth();
-  const { language, t } = useLanguage();
-  const roles = getUserRoleNames(user);
-  const requiresOpening = roles.some((role) => ["admin", "leader"].includes(role));
-  const [openingSubmitted, setOpeningSubmitted] = useState(false);
-  const todayOnly = roles.includes("inventory") && !roles.some((role) => ["admin", "leader"].includes(role));
-  const [searchParams] = useSearchParams();
-  const businessDayID = todayOnly ? "" : searchParams.get("businessDayID") ?? "";
-  const queryDate = searchParams.get("date") ?? "";
-  const scopedDate = todayOnly ? currentBusinessDate() : businessDayID ? queryDate || currentBusinessDate() : queryDate;
-  const contextQuery = businessDayID || scopedDate ? `?${new URLSearchParams({ ...(businessDayID ? { businessDayID } : {}), ...(scopedDate ? { date: scopedDate } : {}) })}` : "";
+  const { t } = useLanguage();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [items, setItems] = useState<StockReceipt[]>([]);
-  const [activeBusinessDay, setActiveBusinessDay] = useState<BusinessDay | null>(null);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
-  const [receiptDate, setReceiptDate] = useState("");
+  const [receiptDate, setReceiptDate] = useState(currentBusinessDate());
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [total, setTotal] = useState(0);
@@ -68,6 +56,8 @@ export default function StockReceiptPage() {
     tone?: "default" | "danger";
     onConfirm: () => void | Promise<void>;
   } | null>(null);
+  const canCreatePurchasing = userCan(user, "stock_receipts", "create");
+  const canDeletePurchasing = userCan(user, "stock_receipts", "delete");
 
   useEffect(() => {
     let current = true;
@@ -75,7 +65,7 @@ export default function StockReceiptPage() {
       setLoading(true);
       setError("");
       try {
-        const response = await getStockReceipts({ start: (page - 1) * pageSize, limit: pageSize, name: search, receipt_date: scopedDate || receiptDate });
+        const response = await getStockReceipts({ start: (page - 1) * pageSize, limit: pageSize, name: search, receipt_date: receiptDate });
         if (!current) return;
         setItems(response.data ?? []);
         setTotal(response.total ?? 0);
@@ -93,33 +83,9 @@ export default function StockReceiptPage() {
     return () => {
       current = false;
     };
-  }, [page, pageSize, search, receiptDate, scopedDate, refreshKey]);
+  }, [page, pageSize, search, receiptDate, refreshKey]);
 
-  useEffect(() => {
-    let current = true;
-    async function loadActiveBusinessDay() {
-      setActiveBusinessDay(null);
-      setOpeningSubmitted(false);
-      try {
-        const response = await getBusinessDays({ start: 0, limit: 1, status: "OPEN", business_date: scopedDate });
-        if (!current) return;
-        const day = response.data?.[0] ?? null;
-        const submitted = day && requiresOpening ? await isOpeningStockSubmitted(day.business_day_id) : false;
-        if (!current) return;
-        setOpeningSubmitted(Boolean(submitted));
-        setActiveBusinessDay(day && (!businessDayID || day.business_day_id === businessDayID) ? day : null);
-      } catch {
-        if (current) setActiveBusinessDay(null);
-      }
-    }
-    void loadActiveBusinessDay();
-    return () => {
-      current = false;
-    };
-  }, [refreshKey, scopedDate, businessDayID, requiresOpening]);
-
-  const canWrite = !requiresOpening || openingSubmitted;
-  const canCreate = Boolean(activeBusinessDay) && canWrite;
+  const canCreate = canCreatePurchasing;
 
   function openModal() {
     if (!canCreate) return;
@@ -133,7 +99,7 @@ export default function StockReceiptPage() {
     event.preventDefault();
     if (!form.supplier_name.trim()) { setSupplierError(t("Please select a supplier.")); return; }
     if (!canCreate) {
-      setError(t("Open a business day and submit Opening Stock before creating stock in."));
+      setError(t("You do not have permission to create purchasing records"));
       return;
     }
     setConfirm({
@@ -163,7 +129,7 @@ export default function StockReceiptPage() {
   }
 
   function requestDelete(item: StockReceipt) {
-    if (!canWrite || item.status === "SUBMITTED" || item.has_items) return;
+    if (!canDeletePurchasing || item.status === "SUBMITTED" || item.has_items) return;
     setConfirm({
       title: t("Delete stock in"),
       message: t("Delete this empty stock in record?"),
@@ -193,22 +159,17 @@ export default function StockReceiptPage() {
       <section className="min-w-0 flex-1">
         <Navbar onMenuClick={() => setSidebarOpen(true)} />
         <main className="p-5 sm:p-8">
-          {businessDayID && (
-            <Link to={`/business-days/${businessDayID}/inventory-counts`} className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-stone-600 hover:text-stone-900">
-              <ArrowLeft size={17} /> {t("Stock Count")}
-            </Link>
-          )}
           <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
             <div>
               <div className="mb-3 flex size-11 items-center justify-center rounded-xl bg-[#efe9df] text-[#8a5a3f]">
                 <PackagePlus size={22} />
               </div>
-              <h1 className="font-serif text-3xl font-bold">{t("Stock In")}</h1>
-              <p className="mt-2 text-sm text-stone-500">{scopedDate ? formatDate(scopedDate, language) : t("Track incoming inventory receipts and received items.")}</p>
+              <h1 className="font-serif text-3xl font-bold">{t("Purchasing")}</h1>
+              <p className="mt-2 text-sm text-stone-500">{formatDate(receiptDate)}</p>
             </div>
-            <button type="button" onClick={() => openModal()} disabled={!canCreate} title={!activeBusinessDay ? t("Open a business day first") : !canWrite ? t("Submit Opening Stock first") : t("Add stock in")} className="flex items-center gap-2 rounded-lg bg-[#362219] px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60">
+            <button type="button" onClick={() => openModal()} disabled={!canCreate} title={!canCreatePurchasing ? t("You do not have permission to create purchasing records") : t("Add purchase")} className="flex items-center gap-2 rounded-lg bg-[#362219] px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60">
               <Plus size={17} />
-              {t("Add stock in")}
+              {t("Add purchase")}
             </button>
           </header>
 
@@ -217,11 +178,11 @@ export default function StockReceiptPage() {
           <section className="mt-7 overflow-hidden rounded-xl border border-stone-200 bg-white">
             <div className="flex flex-col gap-3 border-b border-stone-200 p-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <h2 className="font-semibold">{t("Stock Receipts")}</h2>
+                <h2 className="font-semibold">{t("Purchase Receipts")}</h2>
                 <p className="text-xs text-stone-500">{total} {t("records found")}</p>
               </div>
               <div className="flex flex-col gap-2 sm:flex-row">
-                {!scopedDate && <input type="date" value={receiptDate} onChange={(event) => { setPage(1); setReceiptDate(event.target.value); }} className="rounded-lg border border-stone-200 px-3 py-2.5 text-sm outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10" />}
+                <input type="date" value={receiptDate} onChange={(event) => { setPage(1); setReceiptDate(event.target.value); }} className="rounded-lg border border-stone-200 px-3 py-2.5 text-sm outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10" />
                 <form onSubmit={(event) => { event.preventDefault(); setPage(1); setSearch(searchInput); }} className="flex w-full max-w-xs items-center gap-2 rounded-lg border border-stone-200 px-3 py-2.5 focus-within:border-[#b86b42] focus-within:ring-4 focus-within:ring-[#b86b42]/10">
                   <Search size={17} className="text-stone-400" />
                   <input value={searchInput} onChange={(event) => setSearchInput(event.target.value)} placeholder={t("Search receipt...")} className="min-w-0 flex-1 bg-transparent text-sm outline-none" />
@@ -229,8 +190,6 @@ export default function StockReceiptPage() {
               </div>
             </div>
             {error && <div className="m-4 rounded-lg bg-red-50 p-4 text-sm text-red-700">{error}</div>}
-            {!activeBusinessDay && <div className="m-4 rounded-lg bg-amber-50 p-4 text-sm text-amber-800">{scopedDate ? t("Stock in can only be added when this business day is open.") : t("Open a business day before adding stock in.")}</div>}
-            {activeBusinessDay && !canWrite && <div className="m-4 rounded-lg bg-amber-50 p-4 text-sm text-amber-800">{t("Submit Opening Stock before adding or changing stock in.")}</div>}
             <div className="overflow-x-auto">
               <table className="w-full min-w-220 text-left">
                 <thead className="bg-stone-50 text-xs uppercase tracking-wider text-stone-500">
@@ -251,16 +210,16 @@ export default function StockReceiptPage() {
                     <tr><td colSpan={7} className="px-5 py-14 text-center text-sm text-stone-500">{t("No stock receipts yet")}</td></tr>
                   ) : items.map((item) => (
                     <tr key={item.stock_receipt_id}>
-                      <td className="px-5 py-4 text-sm">{formatDate(item.receipt_date, language)}</td>
+                      <td className="px-5 py-4 text-sm">{formatDate(item.receipt_date)}</td>
                       <td className="px-5 py-4 text-sm font-semibold">{item.stock_receipt_id}</td>
                       <td className="px-5 py-4"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${item.status === "SUBMITTED" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>{item.status === "SUBMITTED" ? t("Submitted") : t("Draft")}</span></td>
                       <td className="px-5 py-4 text-sm">{item.supplier_name || "-"}</td>
                       <td className="px-5 py-4 text-sm">{item.created_by_info?.fullname ?? item.created_by}</td>
-                      <td className="px-5 py-4 text-sm text-stone-600">{formatDateTime(item.created_at, language)}</td>
+                      <td className="px-5 py-4 text-sm text-stone-600">{formatDateTime(item.created_at)}</td>
                       <td className="px-5 py-4">
                         <div className="flex justify-end gap-1.5">
-                          <Link to={`/stock-in/${item.stock_receipt_id}${contextQuery}`} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-900" title={t("Open")}><ArrowRight size={15} /></Link>
-                          <button type="button" onClick={() => requestDelete(item)} disabled={!canWrite || item.status === "SUBMITTED" || item.has_items} className="disabled:cursor-not-allowed disabled:opacity-40 grid size-8 place-items-center rounded-lg text-red-600 hover:bg-red-50" title={item.has_items ? t("Remove all items before deleting this stock in") : t("Delete")}><Trash2 size={15} /></button>
+                          <Link to={`/stock-in/${item.stock_receipt_id}`} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-900" title={t("Open")}><ArrowRight size={15} /></Link>
+                          <button type="button" onClick={() => requestDelete(item)} disabled={!canDeletePurchasing || item.status === "SUBMITTED" || item.has_items} className="disabled:cursor-not-allowed disabled:opacity-40 grid size-8 place-items-center rounded-lg text-red-600 hover:bg-red-50" title={!canDeletePurchasing ? t("You do not have permission to delete purchasing records") : item.has_items ? t("Remove all items before deleting this stock in") : t("Delete")}><Trash2 size={15} /></button>
                         </div>
                       </td>
                     </tr>
@@ -291,15 +250,15 @@ export default function StockReceiptPage() {
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
           <form onSubmit={submitForm} className="w-full max-w-lg rounded-2xl bg-white shadow-2xl">
             <header className="flex items-start justify-between border-b border-stone-200 p-5">
-              <h2 className="text-lg font-bold">{t("Add stock in")}</h2>
+              <h2 className="text-lg font-bold">{t("Add purchase")}</h2>
               <button type="button" onClick={() => setModalOpen(false)} className="grid size-9 place-items-center rounded-lg hover:bg-stone-100"><X size={18} /></button>
             </header>
             <div className="space-y-4 p-5">
               <label className="block text-sm font-semibold text-stone-700">
-                {t("Business Date")}
+                {t("Purchase Date")}
                 <div className="mt-2 rounded-lg border border-stone-200 bg-stone-50 px-3.5 py-3">
-                  <p className="text-sm font-semibold text-stone-900">{formatDate(activeBusinessDay?.business_date, language)}</p>
-                  <p className="mt-1 text-xs font-medium text-stone-500">{t("Auto from current open business day")}</p>
+                  <p className="text-sm font-semibold text-stone-900">{formatDate(receiptDate)}</p>
+                  <p className="mt-1 text-xs font-medium text-stone-500">{t("Used for daily purchasing tracking")}</p>
                 </div>
               </label>
               <label className="block text-sm font-semibold text-stone-700">
@@ -314,7 +273,7 @@ export default function StockReceiptPage() {
             </div>
             <footer className="flex flex-wrap justify-start gap-3 border-t border-stone-200 p-5">
               <button type="button" onClick={() => setModalOpen(false)} className="rounded-lg border border-stone-300 px-4 py-2.5 text-sm font-semibold hover:bg-stone-50">{t("Cancel")}</button>
-              <button type="submit" disabled={submitting || !canWrite} className="rounded-lg bg-[#362219] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">{submitting ? t("Saving...") : t("Save Draft")}</button>
+              <button type="submit" disabled={submitting || !canCreate} className="rounded-lg bg-[#362219] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">{submitting ? t("Saving...") : t("Save Draft")}</button>
             </footer>
           </form>
         </div>

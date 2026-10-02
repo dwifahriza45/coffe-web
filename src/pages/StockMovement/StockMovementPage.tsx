@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { getStockMovements, type StockMovement } from "../../api/stockMovement.api";
 import { useAuth } from "../../app/AuthContext";
-import { useLanguage, type Language } from "../../app/LanguageContext";
+import { useLanguage } from "../../app/LanguageContext";
 import { getUserRoleNames } from "../../app/roleAccess";
 import Navbar from "../../components/layout/Navbar";
 import Sidebar from "../../components/layout/Sidebar";
@@ -19,13 +19,13 @@ const movementLabels: Record<string, string> = {
   ADJUSTMENT_OUT: "Koreksi Stok (-)",
 };
 
-function formatDateTime(value: string, language: Language) {
-  return new Date(value).toLocaleString(language === "id" ? "id-ID" : "en-GB");
+function formatDateTime(value: string) {
+  return new Date(value).toLocaleString("id-ID");
 }
 
 export default function StockMovementPage() {
   const { user } = useAuth();
-  const { language, t } = useLanguage();
+  const { t } = useLanguage();
   const roles = getUserRoleNames(user);
   const todayOnly = roles.includes("inventory") && !roles.some((role) => ["admin", "leader"].includes(role));
   const [params] = useSearchParams();
@@ -96,7 +96,7 @@ export default function StockMovementPage() {
                   {loading ? <tr><td colSpan={7} className="p-12 text-center text-stone-500">{t("Loading movements...")}</td></tr> : items.length === 0 ? <tr><td colSpan={7} className="p-12 text-center text-stone-500">{t("No stock movement history found.")}</td></tr> : items.map((item) => {
                     const outgoing = ["ORDER_USAGE", "WASTE", "ADJUSTMENT_OUT"].includes(item.movement_type);
                     return <tr key={item.stock_movement_id}>
-                      <td className="px-5 py-4"><p>{item.business_date}</p><p className="mt-1 text-xs text-stone-500">{formatDateTime(item.created_at, language)}</p></td>
+                      <td className="px-5 py-4"><p>{item.business_date}</p><p className="mt-1 text-xs text-stone-500">{formatDateTime(item.created_at)}</p></td>
                       <td className="px-5 py-4 font-semibold">{item.ingredient_name}</td>
                       <td className="px-5 py-4"><span className="rounded-full bg-stone-100 px-2.5 py-1 text-xs font-semibold">{t(movementLabels[item.movement_type] ?? item.movement_type)}</span></td>
                       <td className={`whitespace-nowrap px-5 py-4 font-semibold ${outgoing ? "text-red-600" : "text-emerald-700"}`}>{outgoing ? "−" : "+"}{formatNumber(item.quantity, 3)} <span className="font-normal text-stone-500">{item.unit_code}</span></td>

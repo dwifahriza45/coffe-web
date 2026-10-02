@@ -5,7 +5,7 @@ export function currentBusinessDate() {
 
 export function formatBusinessDate(value?: string) {
   return value
-    ? new Date(`${value}T00:00:00`).toLocaleDateString("en-GB", {
+    ? new Date(`${value}T00:00:00`).toLocaleDateString("id-ID", {
         day: "2-digit",
         month: "long",
         year: "numeric",

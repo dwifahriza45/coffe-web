@@ -20,11 +20,14 @@ import Sidebar from "../../components/layout/Sidebar";
 import { formatNumber, normalizeNumberInput } from "../../utils/numberFormat";
 
 import { useAuth } from "../../app/AuthContext";
-import { getUserRoleNames } from "../../app/roleAccess";
+import { getUserRoleNames, userCan } from "../../app/roleAccess";
 import { currentBusinessDate, formatBusinessDate as formatDate } from "../../utils/businessDate";
 
 const emptyForm: StockReceiptItemPayload = { stock_receipt_id: "", ingredient_id: "", quantity: "", notes: "" };
 
+function formatDateTime(value: string | undefined) {
+  return value ? new Date(value).toLocaleString("id-ID") : "-";
+}
 
 export default function StockReceiptDetailPage() {
   const { user } = useAuth();
@@ -51,7 +54,8 @@ export default function StockReceiptDetailPage() {
   const [submitting, setSubmitting] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const locked = receipt?.status === "SUBMITTED";
-  const canWrite = !loading && !submitting && receipt?.status === "DRAFT" && (!requiresOpening || openingSubmitted);
+  const canUpdatePurchasing = userCan(user, "stock_receipts", "update");
+  const canWrite = !loading && !submitting && canUpdatePurchasing && receipt?.status === "DRAFT" && (!requiresOpening || openingSubmitted);
   const [confirm, setConfirm] = useState<{
     title: string;
     message: string;
@@ -197,9 +201,9 @@ export default function StockReceiptDetailPage() {
       <section className="min-w-0 flex-1">
         <Navbar onMenuClick={() => setSidebarOpen(true)} />
         <main className="p-5 sm:p-8">
-          <Link to={`/stock-in${contextQuery}`} className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-stone-600 hover:text-stone-900">
+            <Link to={`/stock-in${contextQuery}`} className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-stone-600 hover:text-stone-900">
             <ArrowLeft size={17} />
-            Stock In
+            Purchasing
           </Link>
 
           <section className="rounded-xl border border-stone-200 bg-white p-5">
@@ -208,7 +212,7 @@ export default function StockReceiptDetailPage() {
                 <div className="mb-3 flex size-11 items-center justify-center rounded-xl bg-[#efe9df] text-[#8a5a3f]">
                   <PackagePlus size={22} />
                 </div>
-                <h1 className="font-serif text-3xl font-bold">Stock In</h1>
+                <h1 className="font-serif text-3xl font-bold">Purchasing</h1>
                 <p className="mt-2 text-sm text-stone-500">{receipt?.stock_receipt_id ?? stockReceiptID}</p>
                 <div className="mt-4 grid gap-2 text-sm sm:grid-cols-[100px_minmax(0,1fr)]">
                   <span className="text-stone-500">Date</span>
@@ -218,8 +222,23 @@ export default function StockReceiptDetailPage() {
             </div>
             <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold">
               <span className={`rounded-full px-2.5 py-1 ${locked ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>{receipt?.status ?? "DRAFT"}</span>
-              <span className="rounded-full bg-stone-100 px-2.5 py-1 text-stone-600">Submitted by {receipt?.submitted_by_info?.fullname || receipt?.submitted_by || "-"}</span>
-              <span className="rounded-full bg-stone-100 px-2.5 py-1 text-stone-600">Submitted at {receipt?.submitted_at ? new Date(receipt.submitted_at).toLocaleString("en-GB") : "-"}</span>
+            </div>
+            <div className="mt-5 grid gap-3 rounded-lg border border-stone-200 bg-stone-50 p-4 text-sm md:grid-cols-3">
+              <div>
+                <p className="text-xs font-semibold uppercase text-stone-500">Created</p>
+                <p className="mt-1 font-semibold text-stone-900">{receipt?.created_by_info?.fullname || receipt?.created_by || "-"}</p>
+                <p className="text-xs text-stone-500">{formatDateTime(receipt?.created_at)}</p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase text-stone-500">Last updated</p>
+                <p className="mt-1 font-semibold text-stone-900">{formatDateTime(receipt?.updated_at)}</p>
+                <p className="text-xs text-stone-500">Draft changes and submission status</p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase text-stone-500">Submitted</p>
+                <p className="mt-1 font-semibold text-stone-900">{receipt?.submitted_by_info?.fullname || receipt?.submitted_by || "-"}</p>
+                <p className="text-xs text-stone-500">{formatDateTime(receipt?.submitted_at)}</p>
+              </div>
             </div>
             <label className="mt-5 block text-sm font-semibold text-stone-700">
               Supplier *
@@ -239,14 +258,16 @@ export default function StockReceiptDetailPage() {
 
           {!loading && !locked && requiresOpening && !openingSubmitted && <div className="mt-5 rounded-lg bg-amber-50 p-4 text-sm text-amber-800">Submit Opening Stock before adding or changing stock in.</div>}
 
-          {locked && <p className="mt-5 rounded-lg bg-stone-100 p-4 text-sm text-stone-600">This stock in has been submitted and can no longer be changed.</p>}
+          {!loading && !locked && !canUpdatePurchasing && <p className="mt-5 rounded-lg bg-amber-50 p-4 text-sm text-amber-800">You do not have permission to update purchasing records.</p>}
+
+          {locked && <p className="mt-5 rounded-lg bg-stone-100 p-4 text-sm text-stone-600">This purchase has been submitted and can no longer be changed.</p>}
 
           {error && <div className="mt-5 rounded-lg bg-red-50 p-4 text-sm text-red-700">{error}</div>}
 
           <section className="mt-5 overflow-hidden rounded-xl border border-stone-200 bg-white">
             <div className="flex items-center justify-between border-b border-stone-200 p-4">
               <div>
-                <h2 className="font-semibold">Stock Receipt Items</h2>
+                <h2 className="font-semibold">Purchase Items</h2>
                 <p className="text-xs text-stone-500">{items.length} items</p>
               </div>
               <button type="button" onClick={() => openItemModal()} disabled={!canWrite} className="disabled:cursor-not-allowed disabled:opacity-40 flex items-center gap-2 rounded-lg bg-[#362219] px-4 py-2 text-sm font-semibold text-white">

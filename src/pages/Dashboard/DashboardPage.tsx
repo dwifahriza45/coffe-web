@@ -3,7 +3,7 @@ import { useState } from "react";
 import Sidebar from "../../components/layout/Sidebar";
 import Navbar from "../../components/layout/Navbar";
 import { useAuth } from "../../app/AuthContext";
-import { useLanguage, type Language } from "../../app/LanguageContext";
+import { useLanguage } from "../../app/LanguageContext";
 
 function getGreeting(date: Date) {
   const hour = date.getHours();
@@ -13,8 +13,8 @@ function getGreeting(date: Date) {
   return "Good night";
 }
 
-function formatCurrentDate(date: Date, language: Language) {
-  return new Intl.DateTimeFormat(language === "id" ? "id-ID" : "en-US", {
+function formatCurrentDate(date: Date) {
+  return new Intl.DateTimeFormat("id-ID", {
     weekday: "long",
     day: "numeric",
     month: "long",
@@ -32,7 +32,7 @@ const orders = [
 
 export default function DashboardPage() {
   const { user } = useAuth();
-  const { language, t } = useLanguage();
+  const { t } = useLanguage();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const currentDate = new Date();
   const stats = [
@@ -60,7 +60,7 @@ export default function DashboardPage() {
           <header className="flex justify-between">
             <div>
               <p className="text-xs font-bold tracking-[.2em] text-[#a25e39]">
-                {formatCurrentDate(currentDate, language)}
+                {formatCurrentDate(currentDate)}
               </p>
               <h1 className="mt-2 font-serif text-3xl font-bold">
                 {t(getGreeting(currentDate))}, {user?.fullname || t("User")}.

@@ -15,7 +15,7 @@ import TableActionButton from "../../components/common/TableActionButton";
 import Navbar from "../../components/layout/Navbar";
 import Sidebar from "../../components/layout/Sidebar";
 import { useAuth } from "../../app/AuthContext";
-import { useLanguage, type Language } from "../../app/LanguageContext";
+import { useLanguage } from "../../app/LanguageContext";
 import { getUserRoleNames, userCan } from "../../app/roleAccess";
 import { getInventoryCounts } from "../../api/inventoryCount.api";
 import { getDraftStockAdjustmentCount } from "../../api/stockAdjustment.api";
@@ -30,15 +30,15 @@ function today() {
   return `${year}-${month}-${day}`;
 }
 
-function formatDateTime(value: string | undefined, language: Language) {
-  return value ? new Date(value).toLocaleString(language === "id" ? "id-ID" : "en-GB") : "-";
+function formatDateTime(value: string | undefined) {
+  return value ? new Date(value).toLocaleString("id-ID") : "-";
 }
 
 export default function BusinessDayPage() {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const filterDate = searchParams.get("date") || "";
-  const { language, t } = useLanguage();
+  const { t } = useLanguage();
   const roles = getUserRoleNames(user);
   const isTodayActionOnly = !roles.includes("admin") && roles.includes("leader");
   const canCreateBusinessDay = userCan(user, "business_days", "create");
@@ -261,7 +261,7 @@ export default function BusinessDayPage() {
             )}
           </header>
 
-          {showOpenDayWarning && openDay && <p role="status" className="mt-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">{t("Close the currently open business day first.")} ({new Date(`${openDay.business_date}T00:00:00`).toLocaleDateString(language === "id" ? "id-ID" : "en-GB", { day: "2-digit", month: "long", year: "numeric" })})</p>}
+          {showOpenDayWarning && openDay && <p role="status" className="mt-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">{t("Close the currently open business day first.")} ({new Date(`${openDay.business_date}T00:00:00`).toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" })})</p>}
           {openDayCheckFailed && <p role="alert" className="mt-4 text-sm text-red-700">{t("Could not verify the open business day. Refresh and try again.")}</p>}
           <section className="mt-7 overflow-hidden rounded-xl border border-stone-200 bg-white">
             <div className="flex flex-col gap-4 border-b border-stone-200 p-4 xl:flex-row xl:items-center xl:justify-between">
@@ -330,9 +330,9 @@ export default function BusinessDayPage() {
                       <tr key={item.business_day_id}>
                         <td className="px-5 py-4 text-sm">{item.business_date}</td>
                         <td className="px-5 py-4 text-sm font-semibold">{item.opened_by_info?.fullname ?? item.opened_by}</td>
-                        <td className="px-5 py-4 text-sm text-stone-600">{formatDateTime(item.opened_at, language)}</td>
+                        <td className="px-5 py-4 text-sm text-stone-600">{formatDateTime(item.opened_at)}</td>
                         <td className="px-5 py-4 text-sm">{item.closed_by_info?.fullname ?? (item.closed_by ? item.closed_by : "-")}</td>
-                        <td className="px-5 py-4 text-sm text-stone-600">{formatDateTime(item.closed_at, language)}</td>
+                        <td className="px-5 py-4 text-sm text-stone-600">{formatDateTime(item.closed_at)}</td>
                         <td className="px-5 py-4">
                           <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${item.status === "OPEN" ? "bg-green-50 text-green-700" : "bg-stone-100 text-stone-500"}`}>
                             {item.status === "OPEN" ? <CheckCircle2 size={13} /> : <Lock size={13} />}

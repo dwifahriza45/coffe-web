@@ -24,6 +24,13 @@ export const getSuppliers = async (payload: {
   name: string;
 }) => (await api.post<ApiResponse<Supplier[]>>("/suppliers/list", payload)).data;
 
+export const getSupplierUsage = async (supplierIDs: string[]) =>
+  (
+    await api.post<ApiResponse<Record<string, boolean>>>("/suppliers/usage", {
+      supplier_ids: supplierIDs,
+    })
+  ).data;
+
 export const createSupplier = async (payload: SupplierPayload) =>
   (await api.post<ApiResponse<null>>("/suppliers/", payload)).data;
 

@@ -1,9 +1,11 @@
-import { Pencil, Plus, Power, Truck, Search, Trash2, X } from "lucide-react";
-import { useEffect, useState, type FormEvent } from "react";
+import { Download, Pencil, Plus, Power, Truck, Search, Trash2, Upload, X } from "lucide-react";
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { isAxiosError } from "axios";
+import * as XLSX from "xlsx-js-style";
 import {
   createSupplier,
   deleteSupplier,
+  getSupplierUsage,
   getSuppliers,
   updateSupplier,
   type Supplier,
@@ -25,6 +27,24 @@ const emptyForm: SupplierPayload = {
   active: true,
 };
 
+type ImportStatus = "success" | "failed";
+
+interface ImportDetail {
+  row: number;
+  name: string;
+  phone: string;
+  email: string;
+  address: string;
+  status: ImportStatus;
+  reason: string;
+}
+
+interface ImportSummary {
+  success: number;
+  failed: number;
+  details: ImportDetail[];
+}
+
 export default function SupplierManagementPage() {
   const { user } = useAuth();
   const { t } = useLanguage();
@@ -33,7 +53,10 @@ export default function SupplierManagementPage() {
   const canDeleteSuppliers = userCan(user, "suppliers", "delete");
   const showActions = canUpdateSuppliers || canDeleteSuppliers;
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const importInputRef = useRef<HTMLInputElement | null>(null);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [supplierUsage, setSupplierUsage] = useState<Record<string, boolean>>({});
+  const [selectedSupplierIDs, setSelectedSupplierIDs] = useState<string[]>([]);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -48,6 +71,10 @@ export default function SupplierManagementPage() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [actionError, setActionError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [importSummary, setImportSummary] = useState<ImportSummary | null>(null);
+  const [importDetailOpen, setImportDetailOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [confirm, setConfirm] = useState<{
     title: string;
@@ -72,13 +99,31 @@ export default function SupplierManagementPage() {
         const nextSuppliers = response.data ?? [];
         setSuppliers(nextSuppliers);
         setTotal(response.total ?? 0);
-
+        if (nextSuppliers.length > 0) {
+          const usage = await getSupplierUsage(
+            nextSuppliers.map((supplier) => supplier.supplier_id),
+          );
+          if (!current) return;
+          const nextUsage = usage.data ?? {};
+          setSupplierUsage(nextUsage);
+          setSelectedSupplierIDs((currentIDs) =>
+            currentIDs.filter((supplierID) =>
+              nextSuppliers.some((supplier) => supplier.supplier_id === supplierID) &&
+              !nextUsage[supplierID],
+            ),
+          );
+        } else {
+          setSupplierUsage({});
+          setSelectedSupplierIDs([]);
+        }
       } catch (requestError) {
         if (!current) return;
         const response = isAxiosError<{ message?: string }>(requestError)
           ? requestError.response?.data
           : undefined;
         setSuppliers([]);
+        setSupplierUsage({});
+        setSelectedSupplierIDs([]);
         setError(response?.message || t("Could not load suppliers."));
       } finally {
         if (current) setLoading(false);
@@ -157,6 +202,7 @@ export default function SupplierManagementPage() {
 
   function requestDelete(supplier: Supplier) {
     if (!canDeleteSuppliers || submitting) return;
+    if (supplierUsage[supplier.supplier_id]) return;
     setConfirm({
       title: t("Delete supplier"),
       message: t("Delete this supplier permanently?"),
@@ -174,6 +220,9 @@ export default function SupplierManagementPage() {
     setSubmitting(true);
     try {
       await deleteSupplier(supplierID);
+      setSelectedSupplierIDs((currentIDs) =>
+        currentIDs.filter((selectedID) => selectedID !== supplierID),
+      );
       setNotice(t("Supplier deleted successfully."));
       if (suppliers.length === 1 && page > 1) setPage((value) => value - 1);
       setRefreshKey((value) => value + 1);
@@ -189,6 +238,7 @@ export default function SupplierManagementPage() {
 
   function requestToggleActive(supplier: Supplier) {
     if (!canUpdateSuppliers || submitting) return;
+    if (supplier.active && supplierUsage[supplier.supplier_id]) return;
     setConfirm({
       title: supplier.active ? t("Deactivate supplier") : t("Activate supplier"),
       message: supplier.active
@@ -225,8 +275,219 @@ export default function SupplierManagementPage() {
     }
   }
 
+  function toggleSelectSupplier(supplier: Supplier) {
+    if (supplierUsage[supplier.supplier_id]) return;
+    setSelectedSupplierIDs((currentIDs) =>
+      currentIDs.includes(supplier.supplier_id)
+        ? currentIDs.filter((supplierID) => supplierID !== supplier.supplier_id)
+        : [...currentIDs, supplier.supplier_id],
+    );
+  }
+
+  function toggleSelectAllAvailable() {
+    if (selectableSuppliers.length === 0) return;
+    if (allSelectableChecked) {
+      setSelectedSupplierIDs((currentIDs) =>
+        currentIDs.filter(
+          (supplierID) =>
+            !selectableSuppliers.some((supplier) => supplier.supplier_id === supplierID),
+        ),
+      );
+      return;
+    }
+    setSelectedSupplierIDs((currentIDs) => {
+      const nextIDs = new Set(currentIDs);
+      selectableSuppliers.forEach((supplier) => nextIDs.add(supplier.supplier_id));
+      return Array.from(nextIDs);
+    });
+  }
+
+  function requestBatchDelete() {
+    if (selectedSupplierIDs.length === 0) return;
+    setConfirm({
+      title: t("Delete selected suppliers"),
+      message: t("Delete selected suppliers permanently?"),
+      confirmText: t("Delete selected suppliers"),
+      tone: "danger",
+      onConfirm: batchDeleteConfirmed,
+    });
+  }
+
+  async function batchDeleteConfirmed() {
+    if (!canDeleteSuppliers || submitting) return;
+    setNotice("");
+    setError("");
+    setConfirm(null);
+    setSubmitting(true);
+    try {
+      await Promise.all(selectedSupplierIDs.map((supplierID) => deleteSupplier(supplierID)));
+      setSelectedSupplierIDs([]);
+      setNotice(t("Supplier deleted successfully."));
+      setRefreshKey((value) => value + 1);
+    } catch (requestError) {
+      const response = isAxiosError<{ message?: string }>(requestError)
+        ? requestError.response?.data
+        : undefined;
+      setError(response?.message || t("Could not delete selected suppliers."));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function writeSuppliersWorkbook(exportItems: Supplier[]) {
+    const header = ["NAMA", "PHONE", "EMAIL", "ADDRESS", "STATUS"];
+    const rows = exportItems.map((supplier) => [
+      supplier.name,
+      supplier.phone,
+      supplier.email,
+      supplier.address,
+      supplier.active ? "Active" : "Inactive",
+    ]);
+    const worksheet = XLSX.utils.aoa_to_sheet([header, ...rows]);
+    worksheet["!cols"] = [{ wch: 30 }, { wch: 18 }, { wch: 32 }, { wch: 42 }, { wch: 14 }];
+    const range = XLSX.utils.decode_range(worksheet["!ref"] ?? "A1:E1");
+    const border = {
+      top: { style: "thin", color: { rgb: "B8A99F" } },
+      right: { style: "thin", color: { rgb: "B8A99F" } },
+      bottom: { style: "thin", color: { rgb: "B8A99F" } },
+      left: { style: "thin", color: { rgb: "B8A99F" } },
+    };
+    for (let row = range.s.r; row <= range.e.r; row += 1) {
+      for (let column = range.s.c; column <= range.e.c; column += 1) {
+        const address = XLSX.utils.encode_cell({ r: row, c: column });
+        if (!worksheet[address]) continue;
+        worksheet[address].s = {
+          border,
+          alignment: { horizontal: "center", vertical: "center" },
+          ...(row === 0
+            ? {
+                font: { bold: true, color: { rgb: "FFFFFF" } },
+                fill: { fgColor: { rgb: "362219" }, patternType: "solid" },
+              }
+            : {}),
+        };
+      }
+    }
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Suppliers");
+    XLSX.writeFile(workbook, "suppliers.xlsx");
+  }
+
+  async function exportSuppliers() {
+    setExporting(true);
+    setError("");
+    try {
+      const exportItems: Supplier[] = [];
+      const exportLimit = 100;
+      let exportStart = 0;
+      let exportTotal = total;
+      do {
+        const response = await getSuppliers({
+          start: exportStart,
+          limit: exportLimit,
+          name: search,
+        });
+        const nextItems = response.data ?? [];
+        if (nextItems.length === 0) break;
+        exportItems.push(...nextItems);
+        exportTotal = response.total ?? exportItems.length;
+        exportStart += nextItems.length;
+      } while (exportStart < exportTotal);
+      writeSuppliersWorkbook(exportItems);
+    } catch (requestError) {
+      const response = isAxiosError<{ message?: string }>(requestError)
+        ? requestError.response?.data
+        : undefined;
+      setError(response?.message || t("Could not export suppliers."));
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  function getImportReason(message?: string) {
+    const normalized = (message ?? "").toLowerCase().trim();
+    if (normalized === "supplier name already exists") return t("Supplier name already exists");
+    if (normalized === "invalid input") return t("Invalid supplier input");
+    if (normalized === "internal server error") return t("Internal server error");
+    return t("Import failed");
+  }
+
+  async function importSuppliers(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    setImporting(true);
+    setError("");
+    setImportSummary(null);
+    try {
+      const workbook = XLSX.read(await file.arrayBuffer(), { type: "array" });
+      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json<(string | number | null)[]>(firstSheet, {
+        header: 1,
+        defval: "",
+      });
+      const details: ImportDetail[] = [];
+      const seenNames = new Set<string>();
+
+      for (const [index, row] of rows.slice(1).entries()) {
+        const rowNumber = index + 2;
+        const name = String(row[0] ?? "").trim();
+        const phone = String(row[1] ?? "").trim();
+        const email = String(row[2] ?? "").trim();
+        const address = String(row[3] ?? "").trim();
+        const normalizedName = name.toLowerCase();
+
+        if (!name && !phone && !email && !address) continue;
+        if (!name) {
+          details.push({ row: rowNumber, name, phone, email, address, status: "failed", reason: t("Name is required") });
+          continue;
+        }
+        if (seenNames.has(normalizedName)) {
+          details.push({ row: rowNumber, name, phone, email, address, status: "failed", reason: t("Duplicate name in import file") });
+          continue;
+        }
+
+        seenNames.add(normalizedName);
+        try {
+          await createSupplier({ name, phone, email, address, active: true });
+          details.push({ row: rowNumber, name, phone, email, address, status: "success", reason: t("Imported successfully") });
+        } catch (requestError) {
+          const response = isAxiosError<{ message?: string }>(requestError)
+            ? requestError.response?.data
+            : undefined;
+          details.push({ row: rowNumber, name, phone, email, address, status: "failed", reason: getImportReason(response?.message) });
+        }
+      }
+
+      const summary = details.reduce<ImportSummary>(
+        (current, detail) => ({
+          success: current.success + (detail.status === "success" ? 1 : 0),
+          failed: current.failed + (detail.status === "failed" ? 1 : 0),
+          details: [...current.details, detail],
+        }),
+        { success: 0, failed: 0, details: [] },
+      );
+      setImportSummary(summary);
+      setRefreshKey((value) => value + 1);
+    } catch {
+      setImportSummary({
+        success: 0,
+        failed: 1,
+        details: [{ row: 0, name: "", phone: "", email: "", address: "", status: "failed", reason: t("Could not read import file.") }],
+      });
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  const selectableSuppliers = suppliers.filter((supplier) => !supplierUsage[supplier.supplier_id]);
+  const allSelectableChecked =
+    selectableSuppliers.length > 0 &&
+    selectableSuppliers.every((supplier) => selectedSupplierIDs.includes(supplier.supplier_id));
+  const partiallyChecked = selectedSupplierIDs.length > 0 && !allSelectableChecked;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const columnCount = showActions ? 6 : 5;
+  const columnCount = 6 + (canDeleteSuppliers ? 1 : 0) + (showActions ? 1 : 0);
   return (
     <div className="flex min-h-screen bg-[#f8f5f0]">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
@@ -256,41 +517,89 @@ export default function SupplierManagementPage() {
           {notice && <p role="status" className="mt-4 text-sm text-emerald-700">{notice}</p>}
 
           <section className="mt-7 overflow-hidden rounded-xl border border-stone-200 bg-white">
-            <div className="flex flex-col gap-4 border-b border-stone-200 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-4 border-b border-stone-200 p-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <h2 className="font-semibold">{t("All suppliers")}</h2>
                 <p className="text-xs text-stone-500">{total} {t("suppliers found")}</p>
               </div>
-              <form
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  setPage(1);
-                  setSearch(searchInput.trim());
-                }}
-                className="flex w-full max-w-sm items-center gap-2 rounded-lg border border-stone-200 px-3 py-2.5 focus-within:border-[#b86b42] focus-within:ring-4 focus-within:ring-[#b86b42]/10"
-              >
-                <Search size={17} className="text-stone-400" />
-                <input
-                  value={searchInput}
-                  onChange={(event) => setSearchInput(event.target.value)}
-                  className="min-w-0 flex-1 bg-transparent text-sm outline-none"
-                  placeholder={t("Search supplier...")}
-                />
-              </form>
+              <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center lg:w-auto">
+                <form
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    setPage(1);
+                    setSearch(searchInput.trim());
+                  }}
+                  className="flex h-11 w-full max-w-sm items-center gap-2 rounded-lg border border-stone-200 px-3 focus-within:border-[#b86b42] focus-within:ring-4 focus-within:ring-[#b86b42]/10 sm:w-80"
+                >
+                  <Search size={17} className="text-stone-400" />
+                  <input
+                    value={searchInput}
+                    onChange={(event) => setSearchInput(event.target.value)}
+                    className="min-w-0 flex-1 bg-transparent text-sm outline-none"
+                    placeholder={t("Search supplier...")}
+                  />
+                </form>
+                {canCreateSuppliers && (
+                  <>
+                    <input ref={importInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={(event) => void importSuppliers(event)} />
+                    <button type="button" onClick={() => importInputRef.current?.click()} disabled={importing} className="flex h-11 items-center justify-center gap-2 rounded-lg border border-stone-200 px-4 text-sm font-semibold text-stone-700 hover:bg-stone-50 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent">
+                      <Upload size={16} />
+                      {importing ? t("Importing...") : t("Import")}
+                    </button>
+                  </>
+                )}
+                <button type="button" onClick={() => void exportSuppliers()} disabled={loading || exporting || total === 0} className="flex h-11 items-center justify-center gap-2 rounded-lg border border-stone-200 px-4 text-sm font-semibold text-stone-700 hover:bg-stone-50 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent">
+                  <Download size={16} />
+                  {exporting ? t("Exporting...") : t("Export")}
+                </button>
+                {canDeleteSuppliers && (
+                  <>
+                    <label className="flex h-11 items-center gap-2 rounded-lg border border-stone-200 px-3 text-xs font-semibold text-stone-600">
+                      <input
+                        type="checkbox"
+                        checked={allSelectableChecked}
+                        ref={(input) => {
+                          if (input) input.indeterminate = partiallyChecked;
+                        }}
+                        onChange={toggleSelectAllAvailable}
+                        disabled={loading || selectableSuppliers.length === 0}
+                        className="size-4 accent-[#362219] disabled:cursor-not-allowed"
+                      />
+                      {t("Select all")}
+                    </label>
+                    <button type="button" onClick={requestBatchDelete} disabled={selectedSupplierIDs.length === 0 || submitting} className="flex h-11 items-center justify-center gap-2 rounded-lg border border-red-200 px-4 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:border-stone-200 disabled:text-stone-300 disabled:hover:bg-transparent">
+                      <Trash2 size={16} />
+                      {t("Delete selected")} ({selectedSupplierIDs.length})
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
             {error && (
               <div className="m-4 rounded-lg bg-red-50 p-4 text-sm text-red-700">
                 {error}
               </div>
             )}
+            {importSummary && (
+              <div className="m-4 flex flex-col gap-3 rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-800 sm:flex-row sm:items-center sm:justify-between">
+                <p className="font-semibold">
+                  {t("Import finished")}: {t("Success")} {importSummary.success}, {t("Failed")} {importSummary.failed}
+                </p>
+                <button type="button" onClick={() => setImportDetailOpen(true)} className="self-start rounded-lg border border-green-300 px-3 py-2 text-xs font-bold text-green-800 hover:bg-green-100 sm:self-auto">
+                  {t("Detail")}
+                </button>
+              </div>
+            )}
             <div className="overflow-x-auto">
               <table className="w-full min-w-170 text-left">
                 <thead className="bg-stone-50 text-xs uppercase tracking-wider text-stone-500">
                   <tr>
+                    {canDeleteSuppliers && <th className="w-12 px-5 py-3"></th>}
                     <th className="px-5 py-3">{t("Supplier")}</th>
                     <th className="px-5 py-3">{t("Phone")}</th>
                     <th className="px-5 py-3">{t("Email")}</th>
                     <th className="px-5 py-3">{t("Address")}</th>
+                    <th className="px-5 py-3">{t("Usage")}</th>
                     <th className="px-5 py-3">{t("Status")}</th>
                     {showActions && <th className="px-5 py-3 text-right">{t("Action")}</th>}
                   </tr>
@@ -310,8 +619,21 @@ export default function SupplierManagementPage() {
                     </tr>
                   ) : (
                     suppliers.map((supplier) => {
+                      const inUse = Boolean(supplierUsage[supplier.supplier_id]);
                       return (
                       <tr key={supplier.supplier_id} className="hover:bg-stone-50/70">
+                        {canDeleteSuppliers && (
+                          <td className="px-5 py-4">
+                            <input
+                              type="checkbox"
+                              checked={selectedSupplierIDs.includes(supplier.supplier_id)}
+                              onChange={() => toggleSelectSupplier(supplier)}
+                              disabled={inUse}
+                              className="size-4 accent-[#362219] disabled:cursor-not-allowed"
+                              title={inUse ? t("Supplier is used by purchases or prices") : t("Select supplier")}
+                            />
+                          </td>
+                        )}
                         <td className="px-5 py-4">
                           <p className="text-sm font-semibold">{supplier.name}</p>
                           <p className="mt-1 text-xs text-stone-500">{supplier.supplier_id}</p>
@@ -319,7 +641,12 @@ export default function SupplierManagementPage() {
                         <td className="px-5 py-4 text-sm">{supplier.phone || "-"}</td>
                         <td className="px-5 py-4 text-sm">{supplier.email || "-"}</td>
                         <td className="max-w-xs whitespace-pre-wrap break-words px-5 py-4 text-sm">{supplier.address || "-"}</td>
-
+                        <td className="px-5 py-4">
+                          <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${inUse ? "bg-amber-50 text-amber-700" : "bg-stone-100 text-stone-500"}`}>
+                            <span className={`size-1.5 rounded-full ${inUse ? "bg-amber-500" : "bg-stone-400"}`} />
+                            {inUse ? t("Used") : t("Unused")}
+                          </span>
+                        </td>
                         <td className="px-5 py-4">
                           <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${supplier.active ? "bg-green-50 text-green-700" : "bg-stone-100 text-stone-500"}`}>
                             {supplier.active ? t("Active") : t("Inactive")}
@@ -338,16 +665,18 @@ export default function SupplierManagementPage() {
                             {canUpdateSuppliers && <button
                               type="button"
                               onClick={() => requestToggleActive(supplier)}
+                              disabled={supplier.active && inUse}
                               className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent"
-                              title={supplier.active ? t("Deactivate supplier") : t("Activate supplier")}
+                              title={supplier.active && inUse ? t("Supplier is used by purchases or prices") : supplier.active ? t("Deactivate supplier") : t("Activate supplier")}
                             >
                               <Power size={15} />
                             </button>}
                             {canDeleteSuppliers && <button
                               type="button"
                               onClick={() => requestDelete(supplier)}
+                              disabled={inUse}
                               className="grid size-8 place-items-center rounded-lg text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent"
-                              title={t("Delete supplier")}
+                              title={inUse ? t("Supplier is used by purchases or prices") : t("Delete supplier")}
                             >
                               <Trash2 size={15} />
                             </button>}
@@ -446,6 +775,61 @@ export default function SupplierManagementPage() {
               </button>
             </footer>
           </form>
+        </div>
+      )}
+
+      {importDetailOpen && importSummary && (
+        <div className="fixed inset-0 z-[85] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+          <section className="flex max-h-[85vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <header className="flex items-start justify-between border-b border-stone-200 p-5">
+              <div>
+                <h2 className="text-lg font-bold">{t("Import detail")}</h2>
+                <p className="mt-1 text-sm text-stone-500">
+                  {t("Success")} {importSummary.success}, {t("Failed")} {importSummary.failed}
+                </p>
+              </div>
+              <button type="button" onClick={() => setImportDetailOpen(false)} className="grid size-9 place-items-center rounded-lg hover:bg-stone-100">
+                <X size={18} />
+              </button>
+            </header>
+            <div className="overflow-auto p-5">
+              <table className="w-full min-w-220 text-left">
+                <thead className="bg-stone-50 text-xs uppercase tracking-wider text-stone-500">
+                  <tr>
+                    <th className="px-4 py-3">{t("Row")}</th>
+                    <th className="px-4 py-3">{t("Name")}</th>
+                    <th className="px-4 py-3">{t("Phone")}</th>
+                    <th className="px-4 py-3">{t("Email")}</th>
+                    <th className="px-4 py-3">{t("Address")}</th>
+                    <th className="px-4 py-3">{t("Status")}</th>
+                    <th className="px-4 py-3">{t("Reason")}</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-stone-100">
+                  {importSummary.details.map((detail, index) => (
+                    <tr key={`${detail.row}-${index}`}>
+                      <td className="px-4 py-3 text-sm font-semibold">{detail.row || "-"}</td>
+                      <td className="px-4 py-3 text-sm">{detail.name || "-"}</td>
+                      <td className="px-4 py-3 text-sm">{detail.phone || "-"}</td>
+                      <td className="px-4 py-3 text-sm">{detail.email || "-"}</td>
+                      <td className="px-4 py-3 text-sm">{detail.address || "-"}</td>
+                      <td className="px-4 py-3">
+                        <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${detail.status === "success" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
+                          {detail.status === "success" ? t("Success") : t("Failed")}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-stone-600">{detail.reason}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <footer className="flex justify-end border-t border-stone-200 p-5">
+              <button type="button" onClick={() => setImportDetailOpen(false)} className="rounded-lg bg-[#362219] px-4 py-2.5 text-sm font-semibold text-white">
+                {t("Close")}
+              </button>
+            </footer>
+          </section>
         </div>
       )}
 

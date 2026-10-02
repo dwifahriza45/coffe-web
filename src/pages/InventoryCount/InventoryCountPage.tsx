@@ -8,11 +8,11 @@ import { getBusinessDays, type BusinessDay } from "../../api/businessDay.api";
 import { getInventoryCounts, type InventoryCount } from "../../api/inventoryCount.api";
 import Navbar from "../../components/layout/Navbar";
 import Sidebar from "../../components/layout/Sidebar";
-import { useLanguage, type Language } from "../../app/LanguageContext";
+import { useLanguage } from "../../app/LanguageContext";
 
-function formatBusinessDate(value: string | undefined, language: Language) {
+function formatBusinessDate(value: string | undefined) {
   if (!value) return "";
-  return new Date(`${value}T00:00:00`).toLocaleDateString(language === "id" ? "id-ID" : "en-GB", {
+  return new Date(`${value}T00:00:00`).toLocaleDateString("id-ID", {
     day: "2-digit",
     month: "long",
     year: "numeric",
@@ -28,7 +28,7 @@ function today() {
 }
 
 export default function InventoryCountPage() {
-  const { language, t } = useLanguage();
+  const { t } = useLanguage();
   const { user } = useAuth();
   const canReadOpening = userCan(user, "inventory_opening_counts");
   const canReadClosing = userCan(user, "inventory_closing_counts");
@@ -175,7 +175,7 @@ export default function InventoryCountPage() {
             </div>
             <h1 className="font-serif text-3xl font-bold">{t("Stock Count")}</h1>
             <div className="mt-2 flex flex-wrap items-center gap-3">
-              <p className="text-sm text-stone-500">{formatBusinessDate(businessDay?.business_date, language) || (businessDayID ? businessDayID : formatBusinessDate(selectedDate, language))}</p>
+              <p className="text-sm text-stone-500">{formatBusinessDate(businessDay?.business_date) || (businessDayID ? businessDayID : formatBusinessDate(selectedDate))}</p>
               {!businessDayID && (
                 <label className="inline-flex items-center gap-2 text-xs font-semibold text-stone-500">
                   {t("Business Date")}

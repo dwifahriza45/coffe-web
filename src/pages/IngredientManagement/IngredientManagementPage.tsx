@@ -1,7 +1,6 @@
 import { Boxes, Pencil, Plus, Power, Search, Trash2, X } from "lucide-react";
 import { isAxiosError } from "axios";
 import { useEffect, useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
 import {
   createIngredient,
   deleteIngredient,
@@ -10,7 +9,6 @@ import {
   type Ingredient,
   type IngredientPayload,
 } from "../../api/ingredient.api";
-import { getIngredientUsage } from "../../api/ingredientUnit.api";
 import { getUnits, type Unit } from "../../api/unit.api";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import Navbar from "../../components/layout/Navbar";
@@ -35,10 +33,8 @@ export default function IngredientManagementPage() {
   const canUpdateIngredients = userCan(user, "ingredients", "update");
   const canDeleteIngredients = userCan(user, "ingredients", "delete");
   const showActions = canUpdateIngredients || canDeleteIngredients;
-  const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
-  const [ingredientUsage, setIngredientUsage] = useState<Record<string, boolean>>({});
   const [unitOptions, setUnitOptions] = useState<Unit[]>([]);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
@@ -49,7 +45,7 @@ export default function IngredientManagementPage() {
   const [error, setError] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [editingIngredient, setEditingIngredient] = useState<Ingredient | null>(null);
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState<IngredientPayload>(emptyForm);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [actionError, setActionError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -77,22 +73,12 @@ export default function IngredientManagementPage() {
         const nextIngredients = response.data ?? [];
         setIngredients(nextIngredients);
         setTotal(response.total ?? 0);
-        if (nextIngredients.length > 0) {
-          const usage = await getIngredientUsage(
-            nextIngredients.map((ingredient) => ingredient.ingredient_id),
-          );
-          if (!current) return;
-          setIngredientUsage(usage.data ?? {});
-        } else {
-          setIngredientUsage({});
-        }
       } catch (requestError) {
         if (!current) return;
         const response = isAxiosError<{ message?: string }>(requestError)
           ? requestError.response?.data
           : undefined;
         setIngredients([]);
-        setIngredientUsage({});
         setError(response?.message || t("Could not load ingredients."));
       } finally {
         if (current) setLoading(false);
@@ -106,16 +92,18 @@ export default function IngredientManagementPage() {
 
   useEffect(() => {
     let current = true;
-    async function loadUnits() {
+    async function loadOptions() {
       try {
-        const response = await getUnits({ start: 0, limit: 100, name: "" });
+        const unitResponse = await getUnits({ start: 0, limit: 100, name: "" });
         if (!current) return;
-        setUnitOptions(response.data ?? []);
+        setUnitOptions(unitResponse.data ?? []);
       } catch {
-        if (current) setUnitOptions([]);
+        if (current) {
+          setUnitOptions([]);
+        }
       }
     }
-    void loadUnits();
+    void loadOptions();
     return () => {
       current = false;
     };
@@ -142,7 +130,11 @@ export default function IngredientManagementPage() {
     event.preventDefault();
     setFieldErrors({});
     setActionError("");
-    if (!form.name.trim() || !form.base_unit.trim() || !form.minimum_stock) {
+    if (
+      !form.name.trim() ||
+      !form.base_unit.trim() ||
+      !form.minimum_stock
+    ) {
       setFieldErrors({
         name: !form.name.trim() ? t("name is required") : "",
         base_unit: !form.base_unit.trim() ? t("base unit is required") : "",
@@ -162,10 +154,16 @@ export default function IngredientManagementPage() {
     setConfirm(null);
     setSubmitting(true);
     try {
+      const ingredientPayload: IngredientPayload = {
+        name: form.name,
+        base_unit: form.base_unit,
+        minimum_stock: form.minimum_stock,
+        active: form.active,
+      };
       if (editingIngredient) {
-        await updateIngredient(editingIngredient.ingredient_id, form);
+        await updateIngredient(editingIngredient.ingredient_id, ingredientPayload);
       } else {
-        await createIngredient(form);
+        await createIngredient(ingredientPayload);
       }
       setModalOpen(false);
       setRefreshKey((value) => value + 1);
@@ -181,7 +179,6 @@ export default function IngredientManagementPage() {
   }
 
   function requestDelete(ingredient: Ingredient) {
-    if (ingredientUsage[ingredient.ingredient_id]) return;
     setConfirm({
       title: t("Delete ingredient"),
       message: t("Delete this ingredient permanently?"),
@@ -208,7 +205,6 @@ export default function IngredientManagementPage() {
   }
 
   function requestToggleActive(ingredient: Ingredient) {
-    if (ingredient.active && ingredientUsage[ingredient.ingredient_id]) return;
     setConfirm({
       title: ingredient.active ? t("Deactivate ingredient") : t("Activate ingredient"),
       message: ingredient.active ? t("Deactivate this ingredient?") : t("Activate this ingredient?"),
@@ -239,7 +235,7 @@ export default function IngredientManagementPage() {
   }
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const columnCount = showActions ? 6 : 5;
+  const columnCount = showActions ? 5 : 4;
 
   return (
     <div className="flex min-h-screen bg-[#f8f5f0]">
@@ -281,13 +277,12 @@ export default function IngredientManagementPage() {
             </div>
             {error && <div className="m-4 rounded-lg bg-red-50 p-4 text-sm text-red-700">{error}</div>}
             <div className="overflow-x-auto">
-              <table className="w-full min-w-190 text-left">
+              <table className="w-full min-w-220 text-left">
                 <thead className="bg-stone-50 text-xs uppercase tracking-wider text-stone-500">
                   <tr>
                     <th className="px-5 py-3">{t("Ingredient")}</th>
-                    <th className="px-5 py-3">{t("Base unit")}</th>
+                    <th className="px-5 py-3">{t("Content unit")}</th>
                     <th className="px-5 py-3">{t("Min stock")}</th>
-                    <th className="px-5 py-3">{t("Usage")}</th>
                     <th className="px-5 py-3">{t("Status")}</th>
                     {showActions && <th className="px-5 py-3 text-right">{t("Action")}</th>}
                   </tr>
@@ -299,20 +294,13 @@ export default function IngredientManagementPage() {
                     <tr><td colSpan={columnCount} className="px-5 py-14 text-center text-sm text-stone-500">{t("No ingredients found")}</td></tr>
                   ) : (
                     ingredients.map((ingredient) => {
-                      const inUse = Boolean(ingredientUsage[ingredient.ingredient_id]);
                       return (
-                      <tr key={ingredient.ingredient_id} onClick={() => navigate(`/ingredient-management/${ingredient.ingredient_id}`)} className="group cursor-pointer hover:bg-stone-50/70">
+                      <tr key={ingredient.ingredient_id} className="hover:bg-stone-50/70">
                         <td className="px-5 py-4">
-                          <p className="inline-flex text-sm font-semibold transition-colors group-hover:text-[#92502f] group-hover:underline group-hover:underline-offset-4">{ingredient.name}</p>
+                          <p className="text-sm font-semibold">{ingredient.name}</p>
                         </td>
                         <td className="px-5 py-4 text-sm">{ingredient.base_unit_info?.name ?? ingredient.base_unit}</td>
                         <td className="px-5 py-4 text-sm">{formatNumber(ingredient.minimum_stock, 3)}</td>
-                        <td className="px-5 py-4">
-                          <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${inUse ? "bg-amber-50 text-amber-700" : "bg-stone-100 text-stone-500"}`}>
-                            <span className={`size-1.5 rounded-full ${inUse ? "bg-amber-500" : "bg-stone-400"}`} />
-                            {inUse ? t("Used") : t("Unused")}
-                          </span>
-                        </td>
                         <td className="px-5 py-4">
                           <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${ingredient.active ? "bg-green-50 text-green-700" : "bg-stone-100 text-stone-500"}`}>
                             {ingredient.active ? t("Active") : t("Inactive")}
@@ -321,8 +309,8 @@ export default function IngredientManagementPage() {
                         {showActions && <td className="px-5 py-4">
                           <div className="flex justify-end gap-1.5">
                             {canUpdateIngredients && <button type="button" onClick={(event) => { event.stopPropagation(); openModal(ingredient); }} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800" title={t("Update ingredient")}><Pencil size={15} /></button>}
-                            {canUpdateIngredients && <button type="button" onClick={(event) => { event.stopPropagation(); requestToggleActive(ingredient); }} disabled={ingredient.active && inUse} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent" title={ingredient.active && inUse ? t("Ingredient is used by ingredient units") : ingredient.active ? t("Deactivate ingredient") : t("Activate ingredient")}><Power size={15} /></button>}
-                            {canDeleteIngredients && <button type="button" onClick={(event) => { event.stopPropagation(); requestDelete(ingredient); }} disabled={inUse} className="grid size-8 place-items-center rounded-lg text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent" title={inUse ? t("Ingredient is used by ingredient units") : t("Delete ingredient")}><Trash2 size={15} /></button>}
+                            {canUpdateIngredients && <button type="button" onClick={(event) => { event.stopPropagation(); requestToggleActive(ingredient); }} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent" title={ingredient.active ? t("Deactivate ingredient") : t("Activate ingredient")}><Power size={15} /></button>}
+                            {canDeleteIngredients && <button type="button" onClick={(event) => { event.stopPropagation(); requestDelete(ingredient); }} className="grid size-8 place-items-center rounded-lg text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent" title={t("Delete ingredient")}><Trash2 size={15} /></button>}
                           </div>
                         </td>}
                       </tr>
@@ -374,7 +362,7 @@ export default function IngredientManagementPage() {
                 {fieldErrors.name && <p className="mt-1.5 text-xs font-medium text-red-600">{fieldErrors.name}</p>}
               </label>
               <label className="block text-sm font-semibold text-stone-700">
-                {t("Base unit")}
+                {t("Content unit")}
                 <select value={form.base_unit} onChange={(event) => setForm((current) => ({ ...current, base_unit: event.target.value }))} className="mt-2 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10" disabled={submitting}>
                   <option value="">{t("Select unit")}</option>
                   {unitOptions.map((unit) => (

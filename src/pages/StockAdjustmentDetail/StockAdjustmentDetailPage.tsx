@@ -30,7 +30,7 @@ const adjustmentTypeLabels: Record<AdjustmentType, string> = {
 };
 
 function formatDate(value?: string) {
-  return value ? new Date(`${value}T00:00:00`).toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" }) : "-";
+  return value ? new Date(`${value}T00:00:00`).toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" }) : "-";
 }
 
 export default function StockAdjustmentDetailPage() {
@@ -213,7 +213,7 @@ export default function StockAdjustmentDetailPage() {
             <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold">
               <span className={`rounded-full px-2.5 py-1 ${locked ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>{adjustment?.status ?? "DRAFT"}</span>
               <span className="rounded-full bg-stone-100 px-2.5 py-1 text-stone-600">Submitted by {adjustment?.submitted_by_info?.fullname || adjustment?.submitted_by || "-"}</span>
-              <span className="rounded-full bg-stone-100 px-2.5 py-1 text-stone-600">Submitted at {adjustment?.submitted_at ? new Date(adjustment.submitted_at).toLocaleString("en-GB") : "-"}</span>
+              <span className="rounded-full bg-stone-100 px-2.5 py-1 text-stone-600">Submitted at {adjustment?.submitted_at ? new Date(adjustment.submitted_at).toLocaleString("id-ID") : "-"}</span>
             </div>
             <label className="mt-5 block text-sm font-semibold text-stone-700">Reason *<textarea value={draft.reason} onChange={(event) => { setDraft((current) => ({ ...current, reason: event.target.value })); setReasonError(""); }} disabled={!canWrite} className="mt-2 min-h-20 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm font-normal outline-none focus:border-[#b86b42] disabled:bg-stone-100" />{reasonError && <span role="alert" className="mt-2 block text-xs text-red-600">{reasonError}</span>}</label>
             <label className="mt-5 block text-sm font-semibold text-stone-700">Notes<textarea value={draft.notes} onChange={(event) => setDraft((current) => ({ ...current, notes: event.target.value }))} disabled={!canWrite} className="mt-2 min-h-20 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm font-normal outline-none focus:border-[#b86b42] disabled:bg-stone-100" /></label>

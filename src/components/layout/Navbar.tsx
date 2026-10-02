@@ -3,11 +3,11 @@ import { useEffect, useRef, useState } from "react";
 import { logout as logoutRequest } from "../../api/auth.api";
 import { useAuth } from "../../app/AuthContext";
 import { invalidateSession } from "../../app/authSession";
-import { useLanguage, type Language } from "../../app/LanguageContext";
+import { useLanguage } from "../../app/LanguageContext";
 
 export default function Navbar({ onMenuClick }: { onMenuClick: () => void }) {
   const { user, setUser } = useAuth();
-  const { language, setLanguage, t } = useLanguage();
+  const { t } = useLanguage();
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [logoutOpen, setLogoutOpen] = useState(false);
@@ -62,26 +62,6 @@ export default function Navbar({ onMenuClick }: { onMenuClick: () => void }) {
           </button>
           <div className="hidden lg:block" />
           <div className="flex shrink-0 items-center gap-3">
-            <div
-              className="flex h-10 shrink-0 items-center rounded-xl border border-stone-200 bg-white p-1"
-              aria-label="Language"
-            >
-              {(["id", "en"] as Language[]).map((item) => (
-                <button
-                  key={item}
-                  type="button"
-                  onClick={() => setLanguage(item)}
-                  aria-pressed={language === item}
-                  className={`h-8 min-w-9 rounded-lg px-2 text-xs font-bold uppercase transition ${
-                    language === item
-                      ? "bg-[#b86b42] text-white shadow-sm"
-                      : "text-stone-500 hover:bg-stone-100 hover:text-stone-800"
-                  }`}
-                >
-                  {item}
-                </button>
-              ))}
-            </div>
             <button
               type="button"
               aria-label={t("Notifications")}
