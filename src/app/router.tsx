@@ -1,3 +1,5 @@
+import CategoryIngredientManagementPage from "../pages/CategoryIngredientManagement/CategoryIngredientManagementPage";
+import PackagingManagementPage from "../pages/PackagingManagement/PackagingManagementPage";
 import InventoryCountEntryPage from "../pages/InventoryCount/InventoryCountEntryPage";
 import StockMovementPage from "../pages/StockMovement/StockMovementPage";
 import SupplierManagementPage from "../pages/SupplierManagement/SupplierManagementPage";
@@ -38,6 +40,8 @@ export default function AppRouter() {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="/category-ingredient-management" element={<RequireAuth><RequirePermission menuKey="category_ingredient"><CategoryIngredientManagementPage /></RequirePermission></RequireAuth>} />
+        <Route path="/packaging-management" element={<RequireAuth><RequirePermission menuKey="ingredient_prices"><PackagingManagementPage /></RequirePermission></RequireAuth>} />
         <Route
           path="/"
           element={

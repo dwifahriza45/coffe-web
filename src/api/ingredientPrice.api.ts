@@ -28,12 +28,6 @@ export interface IngredientPrice {
 
 export interface IngredientPricePayload {
   ingredient_id: string;
-  brand_type_id: string;
-  supplier_id: string;
-  packaging_id: string;
-  package_qty: string;
-  content_qty: string;
-  content_unit_id: string;
   price: string;
   effective_date: string;
   active: boolean;
@@ -56,3 +50,6 @@ export const updateIngredientPrice = async (
 
 export const deleteIngredientPrice = async (priceID: string) =>
   (await api.delete<ApiResponse<null>>(`/ingredient-prices/${priceID}`)).data;
+
+export const getIngredientPrice = async (priceID: string) =>
+  (await api.get<ApiResponse<IngredientPrice>>(`/ingredient-prices/${priceID}`)).data;

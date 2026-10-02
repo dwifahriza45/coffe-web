@@ -3,17 +3,32 @@ import type { ApiResponse } from "../types/auth";
 import type { Unit } from "./unit.api";
 
 export interface Ingredient {
+  in_use: boolean;
+  category_ingredient_name: string;
   ingredient_id: string;
+  category_ingredient_id: string;
   name: string;
   base_unit: string;
   base_unit_info?: Unit;
+  brand_type_id: string;
+  supplier_id: string;
+  packaging_id: string;
+  package_qty: string;
+  content_qty: string;
+  content_unit_id: string;
   minimum_stock: string;
   active: boolean;
 }
 
 export interface IngredientPayload {
+  category_ingredient_id: string;
   name: string;
-  base_unit: string;
+  brand_type_id: string;
+  supplier_id: string;
+  packaging_id: string;
+  package_qty: string;
+  content_qty: string;
+  content_unit_id: string;
   minimum_stock: string;
   active: boolean;
 }

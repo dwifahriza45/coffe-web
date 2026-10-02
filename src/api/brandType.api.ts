@@ -3,11 +3,13 @@ import type { ApiResponse } from "../types/auth";
 
 export interface BrandType {
   brand_type_id: string;
+  category_ingredient_id: string;
   name: string;
   active: boolean;
 }
 
 export interface BrandTypePayload {
+  category_ingredient_id: string;
   name: string;
   active: boolean;
 }
@@ -16,7 +18,9 @@ export const getBrandTypes = async (payload: {
   start: number;
   limit: number;
   name: string;
-}) => (await api.post<ApiResponse<BrandType[]>>("/brand-types/list", payload)).data;
+  category_ingredient_id?: string;
+}) =>
+  (await api.post<ApiResponse<BrandType[]>>("/brand-types/list", payload)).data;
 
 export const getBrandTypeUsage = async (brandTypeIDs: string[]) =>
   (
@@ -31,7 +35,25 @@ export const createBrandType = async (payload: BrandTypePayload) =>
 export const updateBrandType = async (
   brandTypeID: string,
   payload: BrandTypePayload,
-) => (await api.put<ApiResponse<null>>(`/brand-types/${brandTypeID}`, payload)).data;
+) =>
+  (await api.put<ApiResponse<null>>(`/brand-types/${brandTypeID}`, payload))
+    .data;
 
 export const deleteBrandType = async (brandTypeID: string) =>
   (await api.delete<ApiResponse<null>>(`/brand-types/${brandTypeID}`)).data;
+
+export const getAllBrandTypes = async (categoryIngredientID = "") => {
+  const items: BrandType[] = [];
+  for (let start = 0; ;) {
+    const response = await getBrandTypes({
+      start,
+      limit: 100,
+      name: "",
+      category_ingredient_id: categoryIngredientID,
+    });
+    const page = response.data ?? [];
+    items.push(...page);
+    start += page.length;
+    if (!page.length || start >= (response.total ?? start)) return items;
+  }
+};

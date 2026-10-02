@@ -796,7 +796,7 @@ export default function UnitManagementPage() {
       </section>
 
       {modalOpen && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-80 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
           <form onSubmit={submitForm} className="w-full max-w-md rounded-2xl bg-white shadow-2xl">
             <header className="flex items-start justify-between border-b border-stone-200 p-5">
               <h2 className="text-lg font-bold">{editingUnit ? t("Update unit") : t("Add unit")}</h2>
@@ -837,7 +837,7 @@ export default function UnitManagementPage() {
       )}
 
       {importDetailOpen && importSummary && (
-        <div className="fixed inset-0 z-[85] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-85 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
           <section className="flex max-h-[85vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
             <header className="flex items-start justify-between border-b border-stone-200 p-5">
               <div>

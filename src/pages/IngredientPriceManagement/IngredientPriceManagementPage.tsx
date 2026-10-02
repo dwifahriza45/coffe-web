@@ -1,7 +1,6 @@
 import { isAxiosError } from "axios";
 import { Pencil, Plus, Scale, Search, Trash2, X } from "lucide-react";
 import { useEffect, useState, type FormEvent } from "react";
-import { getBrandTypes, type BrandType } from "../../api/brandType.api";
 import { getIngredients, type Ingredient } from "../../api/ingredient.api";
 import {
   createIngredientPrice,
@@ -11,12 +10,10 @@ import {
   type IngredientPrice,
   type IngredientPricePayload,
 } from "../../api/ingredientPrice.api";
-import { getPackagings, type Packaging } from "../../api/packaging.api";
-import { getSuppliers, type Supplier } from "../../api/supplier.api";
-import { getUnits, type Unit } from "../../api/unit.api";
 import { useAuth } from "../../app/AuthContext";
 import { useLanguage } from "../../app/LanguageContext";
 import { userCan } from "../../app/roleAccess";
+import IngredientDetailDialog from "../../components/common/IngredientDetailDialog";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import Navbar from "../../components/layout/Navbar";
 import Sidebar from "../../components/layout/Sidebar";
@@ -26,12 +23,6 @@ const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50];
 const today = new Date().toISOString().slice(0, 10);
 const emptyForm: IngredientPricePayload = {
   ingredient_id: "",
-  brand_type_id: "",
-  supplier_id: "",
-  packaging_id: "",
-  package_qty: "1",
-  content_qty: "",
-  content_unit_id: "",
   price: "",
   effective_date: today,
   active: true,
@@ -44,13 +35,10 @@ export default function IngredientPriceManagementPage() {
   const canUpdate = userCan(user, "ingredient_prices", "update");
   const canDelete = userCan(user, "ingredient_prices", "delete");
   const showActions = canUpdate || canDelete;
+  const [detailPriceID, setDetailPriceID] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [items, setItems] = useState<IngredientPrice[]>([]);
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
-  const [brandTypes, setBrandTypes] = useState<BrandType[]>([]);
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [packagings, setPackagings] = useState<Packaging[]>([]);
-  const [units, setUnits] = useState<Unit[]>([]);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -79,23 +67,15 @@ export default function IngredientPriceManagementPage() {
       setLoading(true);
       setError("");
       try {
-        const [priceRes, ingredientRes, brandRes, supplierRes, packagingRes, unitRes] =
+        const [priceRes, ingredientRes] =
           await Promise.all([
             getIngredientPrices({ start: (page - 1) * pageSize, limit: pageSize, name: search }),
             getIngredients({ start: 0, limit: 100, name: "" }),
-            getBrandTypes({ start: 0, limit: 100, name: "" }),
-            getSuppliers({ start: 0, limit: 100, name: "" }),
-            getPackagings({ start: 0, limit: 100, name: "" }),
-            getUnits({ start: 0, limit: 100, name: "" }),
           ]);
         if (!current) return;
         setItems(priceRes.data ?? []);
         setTotal(priceRes.total ?? 0);
         setIngredients(ingredientRes.data ?? []);
-        setBrandTypes(brandRes.data ?? []);
-        setSuppliers(supplierRes.data ?? []);
-        setPackagings(packagingRes.data ?? []);
-        setUnits(unitRes.data ?? []);
       } catch (requestError) {
         if (!current) return;
         const response = isAxiosError<{ message?: string }>(requestError)
@@ -119,12 +99,6 @@ export default function IngredientPriceManagementPage() {
       item
         ? {
             ingredient_id: item.ingredient_id,
-            brand_type_id: item.brand_type_id,
-            supplier_id: item.supplier_id,
-            packaging_id: item.packaging_id,
-            package_qty: item.package_qty,
-            content_qty: item.content_qty,
-            content_unit_id: item.content_unit_id,
             price: item.price,
             effective_date: item.effective_date.slice(0, 10),
             active: item.active,
@@ -140,11 +114,6 @@ export default function IngredientPriceManagementPage() {
     event.preventDefault();
     const required: (keyof IngredientPricePayload)[] = [
       "ingredient_id",
-      "supplier_id",
-      "packaging_id",
-      "package_qty",
-      "content_qty",
-      "content_unit_id",
       "price",
       "effective_date",
     ];
@@ -210,7 +179,7 @@ export default function IngredientPriceManagementPage() {
   }
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const columnCount = showActions ? 10 : 9;
+  const columnCount = showActions ? 6 : 5;
 
   return (
     <div className="flex min-h-screen bg-[#f8f5f0]">
@@ -239,22 +208,18 @@ export default function IngredientPriceManagementPage() {
             </div>
             {error && <div className="m-4 rounded-lg bg-red-50 p-4 text-sm text-red-700">{error}</div>}
             <div className="overflow-x-auto">
-              <table className="w-full min-w-300 text-left">
+              <table className="w-full min-w-220 text-left">
                 <thead className="bg-stone-50 text-xs uppercase tracking-wider text-stone-500">
                   <tr>
-                    <th className="px-5 py-3">{t("Ingredient")}</th><th className="px-5 py-3">{t("Brand / Type")}</th><th className="px-5 py-3">{t("Packaging unit")}</th><th className="px-5 py-3">{t("Content")}</th><th className="px-5 py-3">{t("Price")}</th><th className="px-5 py-3">{t("Unit Price")}</th><th className="px-5 py-3">{t("Supplier")}</th><th className="px-5 py-3">{t("Effective Date")}</th><th className="px-5 py-3">{t("Status")}</th>{showActions && <th className="px-5 py-3 text-right">{t("Action")}</th>}
+                    <th className="px-5 py-3">{t("Ingredient")}</th><th className="px-5 py-3">{t("Price")}</th><th className="px-5 py-3">{t("Unit Price")}</th><th className="px-5 py-3">{t("Effective Date")}</th><th className="px-5 py-3">{t("Status")}</th>{showActions && <th className="px-5 py-3 text-right">{t("Action")}</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-100">
                   {loading ? <tr><td colSpan={columnCount} className="px-5 py-14 text-center text-sm text-stone-500">{t("Loading prices...")}</td></tr> : items.length === 0 ? <tr><td colSpan={columnCount} className="px-5 py-14 text-center text-sm text-stone-500">{t("No prices found")}</td></tr> : items.map((item) => (
                     <tr key={item.price_id}>
-                      <td className="px-5 py-4 text-sm font-semibold">{item.ingredient_info?.name ?? item.ingredient_id}</td>
-                      <td className="px-5 py-4 text-sm">{item.brand_type_info?.name ?? "-"}</td>
-                      <td className="px-5 py-4 text-sm">{formatNumber(item.package_qty, 3)} {item.packaging_info?.name ?? item.packaging_id}</td>
-                      <td className="px-5 py-4 text-sm">{formatNumber(item.content_qty, 3)} {item.content_unit_info?.code ?? ""}</td>
+                      <td className="px-5 py-4 text-sm font-semibold"><button type="button" onClick={() => setDetailPriceID(item.price_id)} className="text-left text-[#9a5735] underline decoration-[#9a5735]/30 underline-offset-4 hover:text-[#362219] hover:decoration-current focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#b86b42]" aria-haspopup="dialog">{item.ingredient_info?.name ?? item.ingredient_id}</button></td>
                       <td className="px-5 py-4 text-sm font-semibold">Rp {formatNumber(item.price, 2)}</td>
                       <td className="px-5 py-4 text-sm">Rp {formatNumber(item.unit_price, 2)}</td>
-                      <td className="px-5 py-4 text-sm">{item.supplier_info?.name ?? item.supplier_id}</td>
                       <td className="px-5 py-4 text-sm">{item.effective_date}</td>
                       <td className="px-5 py-4"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${item.active ? "bg-green-50 text-green-700" : "bg-stone-100 text-stone-500"}`}>{item.active ? t("Active") : t("Inactive")}</span></td>
                       {showActions && <td className="px-5 py-4"><div className="flex justify-end gap-1.5">{canUpdate && <button type="button" onClick={() => openModal(item)} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800"><Pencil size={15} /></button>}{canDelete && <button type="button" onClick={() => requestDelete(item)} className="grid size-8 place-items-center rounded-lg text-red-600 hover:bg-red-50"><Trash2 size={15} /></button>}</div></td>}
@@ -271,18 +236,14 @@ export default function IngredientPriceManagementPage() {
         </main>
       </section>
 
+      {detailPriceID && <IngredientDetailDialog priceID={detailPriceID} onClose={() => setDetailPriceID(null)} />}
+
       {modalOpen && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
           <form onSubmit={submitForm} className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
             <header className="flex items-start justify-between border-b border-stone-200 p-5"><h2 className="text-lg font-bold">{editingItem ? t("Update ingredient price") : t("Add ingredient price")}</h2><button type="button" onClick={() => setModalOpen(false)} className="grid size-9 place-items-center rounded-lg hover:bg-stone-100"><X size={18} /></button></header>
             <div className="grid gap-4 p-5 sm:grid-cols-2">
               <SelectField label={t("Ingredient")} value={form.ingredient_id} error={fieldErrors.ingredient_id} onChange={(value) => setForm((current) => ({ ...current, ingredient_id: value }))} options={ingredients.map((item) => ({ value: item.ingredient_id, label: item.name, disabled: !item.active }))} />
-              <SelectField label={t("Brand / Type")} value={form.brand_type_id} onChange={(value) => setForm((current) => ({ ...current, brand_type_id: value }))} options={brandTypes.map((item) => ({ value: item.brand_type_id, label: item.name, disabled: !item.active }))} optional />
-              <SelectField label={t("Supplier")} value={form.supplier_id} error={fieldErrors.supplier_id} onChange={(value) => setForm((current) => ({ ...current, supplier_id: value }))} options={suppliers.map((item) => ({ value: item.supplier_id, label: item.name, disabled: !item.active }))} />
-              <SelectField label={t("Packaging unit")} value={form.packaging_id} error={fieldErrors.packaging_id} onChange={(value) => setForm((current) => ({ ...current, packaging_id: value }))} options={packagings.map((item) => ({ value: item.packaging_id, label: `${item.name} (${item.code})`, disabled: !item.active }))} />
-              <InputField label={t("Package Qty")} value={form.package_qty} error={fieldErrors.package_qty} onChange={(value) => setForm((current) => ({ ...current, package_qty: normalizeNumberInput(value) }))} />
-              <InputField label={t("Content Qty")} value={form.content_qty} error={fieldErrors.content_qty} onChange={(value) => setForm((current) => ({ ...current, content_qty: normalizeNumberInput(value) }))} />
-              <SelectField label={t("Content unit")} value={form.content_unit_id} error={fieldErrors.content_unit_id} onChange={(value) => setForm((current) => ({ ...current, content_unit_id: value }))} options={units.map((item) => ({ value: item.unit_id, label: `${item.name} (${item.code})`, disabled: !item.active }))} />
               <InputField label={t("Price")} value={form.price} error={fieldErrors.price} onChange={(value) => setForm((current) => ({ ...current, price: normalizeNumberInput(value) }))} />
               <label className="block text-sm font-semibold text-stone-700">{t("Effective Date")}<input type="date" value={form.effective_date} onChange={(event) => setForm((current) => ({ ...current, effective_date: event.target.value }))} className="mt-2 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10" />{fieldErrors.effective_date && <p className="mt-1.5 text-xs font-medium text-red-600">{fieldErrors.effective_date}</p>}</label>
               {actionError && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700 sm:col-span-2">{actionError}</p>}

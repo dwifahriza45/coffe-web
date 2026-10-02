@@ -1,3 +1,7 @@
+import { getAllCategoryIngredients, type CategoryIngredient } from "../../api/categoryIngredient.api";
+import { getPackagings, type Packaging } from "../../api/packaging.api";
+import { getSuppliers, type Supplier } from "../../api/supplier.api";
+import { getAllBrandTypes, type BrandType } from "../../api/brandType.api";
 import { Boxes, Pencil, Plus, Power, Search, Trash2, X } from "lucide-react";
 import { isAxiosError } from "axios";
 import { useEffect, useState, type FormEvent } from "react";
@@ -20,8 +24,14 @@ import { formatNumber, normalizeNumberInput } from "../../utils/numberFormat";
 
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50];
 const emptyForm: IngredientPayload = {
+  category_ingredient_id: "",
   name: "",
-  base_unit: "",
+  brand_type_id: "",
+  supplier_id: "",
+  packaging_id: "",
+  package_qty: "1",
+  content_qty: "",
+  content_unit_id: "",
   minimum_stock: "",
   active: true,
 };
@@ -35,6 +45,10 @@ export default function IngredientManagementPage() {
   const showActions = canUpdateIngredients || canDeleteIngredients;
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
+  const [categoryIngredients, setCategoryIngredients] = useState<CategoryIngredient[]>([]);
+  const [brandTypes, setBrandTypes] = useState<BrandType[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [packagings, setPackagings] = useState<Packaging[]>([]);
   const [unitOptions, setUnitOptions] = useState<Unit[]>([]);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
@@ -94,12 +108,27 @@ export default function IngredientManagementPage() {
     let current = true;
     async function loadOptions() {
       try {
-        const unitResponse = await getUnits({ start: 0, limit: 100, name: "" });
+        const [unitResponse, brandResponse, supplierResponse, packagingResponse, categoryResponse] = await Promise.all([
+          getUnits({ start: 0, limit: 100, name: "" }),
+          getAllBrandTypes(),
+          getSuppliers({ start: 0, limit: 100, name: "" }),
+          getPackagings({ start: 0, limit: 100, name: "" }),
+          getAllCategoryIngredients(),
+        ]);
         if (!current) return;
         setUnitOptions(unitResponse.data ?? []);
+        setBrandTypes(brandResponse);
+        setSuppliers(supplierResponse.data ?? []);
+        setPackagings(packagingResponse.data ?? []);
+        setCategoryIngredients(categoryResponse);
       } catch {
         if (current) {
           setUnitOptions([]);
+          setBrandTypes([]);
+          setSuppliers([]);
+          setPackagings([]);
+          setCategoryIngredients([]);
+          setActionError(t("Action failed."));
         }
       }
     }
@@ -114,8 +143,14 @@ export default function IngredientManagementPage() {
     setForm(
       ingredient
         ? {
+            category_ingredient_id: ingredient.category_ingredient_id,
             name: ingredient.name,
-            base_unit: ingredient.base_unit,
+            brand_type_id: ingredient.brand_type_id,
+            supplier_id: ingredient.supplier_id,
+            packaging_id: ingredient.packaging_id,
+            package_qty: ingredient.package_qty,
+            content_qty: ingredient.content_qty,
+            content_unit_id: ingredient.content_unit_id,
             minimum_stock: ingredient.minimum_stock,
             active: ingredient.active,
           }
@@ -132,16 +167,31 @@ export default function IngredientManagementPage() {
     setActionError("");
     if (
       !form.name.trim() ||
-      !form.base_unit.trim() ||
       !form.minimum_stock
     ) {
       setFieldErrors({
         name: !form.name.trim() ? t("name is required") : "",
-        base_unit: !form.base_unit.trim() ? t("base unit is required") : "",
         minimum_stock: !form.minimum_stock ? t("minimum stock is required") : "",
       });
       return;
     }
+    const combinationErrors: Record<string, string> = {};
+    for (const key of ["brand_type_id", "supplier_id", "packaging_id", "content_unit_id", "package_qty", "content_qty"] as const) {
+      if (!form[key]?.trim()) combinationErrors[key] = t("required");
+    }
+    const validSelections = {
+      brand_type_id: brandTypes.some((item) => item.brand_type_id === form.brand_type_id && item.active && categoryIngredients.some((category) => category.category_ingredient_id === item.category_ingredient_id && category.active)),
+      supplier_id: suppliers.some((item) => item.supplier_id === form.supplier_id && item.active),
+      packaging_id: packagings.some((item) => item.packaging_id === form.packaging_id && item.active),
+      content_unit_id: unitOptions.some((item) => item.unit_id === form.content_unit_id && item.active),
+    };
+    for (const key of Object.keys(validSelections) as (keyof typeof validSelections)[]) {
+      if (!validSelections[key]) combinationErrors[key] = t("required");
+    }
+    for (const key of ["package_qty", "content_qty"] as const) {
+      if (!Number.isFinite(Number(form[key])) || Number(form[key]) <= 0) combinationErrors[key] = t("invalid input");
+    }
+    if (Object.keys(combinationErrors).length) { setFieldErrors(combinationErrors); return; }
     setConfirm({
       title: editingIngredient ? t("Update ingredient") : t("Create ingredient"),
       message: editingIngredient ? t("Update this ingredient?") : t("Create this ingredient?"),
@@ -155,8 +205,15 @@ export default function IngredientManagementPage() {
     setSubmitting(true);
     try {
       const ingredientPayload: IngredientPayload = {
+        category_ingredient_id: "",
         name: form.name,
-        base_unit: form.base_unit,
+        brand_type_id: form.brand_type_id,
+        supplier_id: form.supplier_id,
+        packaging_id: form.packaging_id,
+        package_qty: form.package_qty,
+        content_qty: form.content_qty,
+        content_unit_id: form.content_unit_id,
+
         minimum_stock: form.minimum_stock,
         active: form.active,
       };
@@ -218,8 +275,15 @@ export default function IngredientManagementPage() {
     setSubmitting(true);
     try {
       await updateIngredient(ingredient.ingredient_id, {
-        name: ingredient.name,
-        base_unit: ingredient.base_unit,
+        category_ingredient_id: ingredient.category_ingredient_id,
+            name: ingredient.name,
+        brand_type_id: ingredient.brand_type_id,
+        supplier_id: ingredient.supplier_id,
+        packaging_id: ingredient.packaging_id,
+        package_qty: ingredient.package_qty,
+        content_qty: ingredient.content_qty,
+        content_unit_id: ingredient.content_unit_id,
+
         minimum_stock: ingredient.minimum_stock,
         active: !ingredient.active,
       });
@@ -235,7 +299,7 @@ export default function IngredientManagementPage() {
   }
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const columnCount = showActions ? 5 : 4;
+  const columnCount = showActions ? 10 : 9;
 
   return (
     <div className="flex min-h-screen bg-[#f8f5f0]">
@@ -249,7 +313,7 @@ export default function IngredientManagementPage() {
                 <Boxes size={22} />
               </div>
               <h1 className="font-serif text-3xl font-bold">{t("Ingredient Management")}</h1>
-              <p className="mt-2 text-sm text-stone-500">{t("Manage stock ingredients and base units.")}</p>
+              <p className="mt-2 text-sm text-stone-500">{t("Manage stock ingredients and packaging.")}</p>
             </div>
             {canCreateIngredients && <button type="button" onClick={() => openModal()} className="flex items-center gap-2 rounded-lg bg-[#362219] px-5 py-3 text-sm font-semibold text-white">
               <Plus size={17} />
@@ -281,8 +345,13 @@ export default function IngredientManagementPage() {
                 <thead className="bg-stone-50 text-xs uppercase tracking-wider text-stone-500">
                   <tr>
                     <th className="px-5 py-3">{t("Ingredient")}</th>
-                    <th className="px-5 py-3">{t("Content unit")}</th>
+                    <th className="px-5 py-3">{t("Ingredient Category")}</th>
+                    <th className="px-5 py-3">{t("Brand / Type")}</th>
+                    <th className="px-5 py-3">{t("Supplier")}</th>
+                    <th className="px-5 py-3">{t("Packaging unit")}</th>
+                    <th className="px-5 py-3">{t("Content")}</th>
                     <th className="px-5 py-3">{t("Min stock")}</th>
+                    <th className="px-5 py-3">{t("Usage")}</th>
                     <th className="px-5 py-3">{t("Status")}</th>
                     {showActions && <th className="px-5 py-3 text-right">{t("Action")}</th>}
                   </tr>
@@ -299,8 +368,17 @@ export default function IngredientManagementPage() {
                         <td className="px-5 py-4">
                           <p className="text-sm font-semibold">{ingredient.name}</p>
                         </td>
-                        <td className="px-5 py-4 text-sm">{ingredient.base_unit_info?.name ?? ingredient.base_unit}</td>
+                        <td className="px-5 py-4 text-sm">{categoryIngredients.find((item) => item.category_ingredient_id === ingredient.category_ingredient_id)?.name ?? "-"}</td>
+                        <td className="px-5 py-4 text-sm">{brandTypes.find((item) => item.brand_type_id === ingredient.brand_type_id)?.name ?? "-"}</td>
+                        <td className="px-5 py-4 text-sm">{suppliers.find((item) => item.supplier_id === ingredient.supplier_id)?.name ?? "-"}</td>
+                        <td className="px-5 py-4 text-sm">{formatNumber(ingredient.package_qty, 3)} {packagings.find((item) => item.packaging_id === ingredient.packaging_id)?.name ?? "-"}</td>
+                        <td className="px-5 py-4 text-sm">{formatNumber(ingredient.content_qty, 3)} {unitOptions.find((item) => item.unit_id === ingredient.content_unit_id)?.code ?? "-"}</td>
                         <td className="px-5 py-4 text-sm">{formatNumber(ingredient.minimum_stock, 3)}</td>
+                        <td className="px-5 py-4">
+                          <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${ingredient.in_use ? "bg-amber-50 text-amber-700" : "bg-stone-100 text-stone-500"}`}>
+                            {ingredient.in_use ? t("Used") : t("Unused")}
+                          </span>
+                        </td>
                         <td className="px-5 py-4">
                           <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${ingredient.active ? "bg-green-50 text-green-700" : "bg-stone-100 text-stone-500"}`}>
                             {ingredient.active ? t("Active") : t("Inactive")}
@@ -350,7 +428,7 @@ export default function IngredientManagementPage() {
 
       {modalOpen && (
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-          <form onSubmit={submitForm} className="w-full max-w-md rounded-2xl bg-white shadow-2xl">
+          <form onSubmit={submitForm} className="max-h-[90vh] overflow-y-auto w-full max-w-2xl rounded-2xl bg-white shadow-2xl">
             <header className="flex items-start justify-between border-b border-stone-200 p-5">
               <h2 className="text-lg font-bold">{editingIngredient ? t("Update ingredient") : t("Add ingredient")}</h2>
               <button type="button" onClick={() => setModalOpen(false)} className="grid size-9 place-items-center rounded-lg hover:bg-stone-100"><X size={18} /></button>
@@ -362,20 +440,16 @@ export default function IngredientManagementPage() {
                 {fieldErrors.name && <p className="mt-1.5 text-xs font-medium text-red-600">{fieldErrors.name}</p>}
               </label>
               <label className="block text-sm font-semibold text-stone-700">
-                {t("Content unit")}
-                <select value={form.base_unit} onChange={(event) => setForm((current) => ({ ...current, base_unit: event.target.value }))} className="mt-2 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10" disabled={submitting}>
-                  <option value="">{t("Select unit")}</option>
-                  {unitOptions.map((unit) => (
-                    <option key={unit.unit_id} value={unit.unit_id} disabled={!unit.active}>{unit.name} ({unit.code}){unit.active ? "" : ` - ${t("Inactive")}`}</option>
-                  ))}
-                </select>
-                {fieldErrors.base_unit && <p className="mt-1.5 text-xs font-medium text-red-600">{fieldErrors.base_unit}</p>}
-              </label>
-              <label className="block text-sm font-semibold text-stone-700">
                 {t("Minimum stock")}
                 <input inputMode="decimal" placeholder="0" value={formatNumber(form.minimum_stock, 3)} onChange={(event) => setForm((current) => ({ ...current, minimum_stock: normalizeNumberInput(event.target.value) }))} className="mt-2 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10" disabled={submitting} />
                 {fieldErrors.minimum_stock && <p className="mt-1.5 text-xs font-medium text-red-600">{fieldErrors.minimum_stock}</p>}
               </label>
+              <SelectField label={t("Brand / Type")} value={form.brand_type_id} error={fieldErrors.brand_type_id} onChange={(value) => setForm((current) => ({ ...current, brand_type_id: value }))} options={brandTypes.filter((item) => item.active && categoryIngredients.some((category) => category.category_ingredient_id === item.category_ingredient_id && category.active)).map((item) => ({ value: item.brand_type_id, label: item.name }))} />
+              <SelectField label={t("Supplier")} value={form.supplier_id} error={fieldErrors.supplier_id} onChange={(value) => setForm((current) => ({ ...current, supplier_id: value }))} options={suppliers.filter((item) => item.active).map((item) => ({ value: item.supplier_id, label: item.name }))} />
+              <SelectField label={t("Packaging unit")} value={form.packaging_id} error={fieldErrors.packaging_id} onChange={(value) => setForm((current) => ({ ...current, packaging_id: value }))} options={packagings.filter((item) => item.active).map((item) => ({ value: item.packaging_id, label: `${item.name} (${item.code})` }))} />
+              <InputField label={t("Package Qty")} value={form.package_qty} error={fieldErrors.package_qty} onChange={(value) => setForm((current) => ({ ...current, package_qty: normalizeNumberInput(value) }))} />
+              <InputField label={t("Content Qty")} value={form.content_qty} error={fieldErrors.content_qty} onChange={(value) => setForm((current) => ({ ...current, content_qty: normalizeNumberInput(value) }))} />
+              <SelectField label={t("Content unit")} value={form.content_unit_id} error={fieldErrors.content_unit_id} onChange={(value) => setForm((current) => ({ ...current, content_unit_id: value }))} options={unitOptions.filter((item) => item.active).map((item) => ({ value: item.unit_id, label: `${item.name} (${item.code})` }))} />
               {actionError && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{actionError}</p>}
             </div>
             <footer className="flex justify-end gap-3 border-t border-stone-200 p-5">
@@ -389,4 +463,12 @@ export default function IngredientManagementPage() {
       <ConfirmDialog open={Boolean(confirm)} title={confirm?.title ?? ""} message={confirm?.message ?? ""} confirmText={confirm?.confirmText ?? t("Confirm")} tone={confirm?.tone} submitting={submitting} onCancel={() => setConfirm(null)} onConfirm={() => void confirm?.onConfirm()} />
     </div>
   );
+}
+
+function InputField({ label, value, error, onChange }: { label: string; value: string; error?: string; onChange: (value: string) => void }) {
+  return <label className="block text-sm font-semibold text-stone-700">{label}<input inputMode="decimal" value={formatNumber(value, 3)} onChange={(event) => onChange(event.target.value)} className="mt-2 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10" />{error && <p className="mt-1.5 text-xs font-medium text-red-600">{error}</p>}</label>;
+}
+
+function SelectField({ label, value, error, options, optional, disabled, onChange }: { label: string; value: string; error?: string; optional?: boolean; disabled?: boolean; options: { value: string; label: string }[]; onChange: (value: string) => void }) {
+  return <label className="block text-sm font-semibold text-stone-700">{label}<select value={options.some((option) => option.value === value) ? value : ""} disabled={disabled} onChange={(event) => onChange(event.target.value)} className="mt-2 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10"><option value="">{optional ? "-" : "Select"}</option>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>{error && <p className="mt-1.5 text-xs font-medium text-red-600">{error}</p>}</label>;
 }
