@@ -1,0 +1,21 @@
+services:
+  coffe-web:
+    container_name: coffe-web
+
+    image: "${DOCKER_IMAGE:?Set DOCKER_IMAGE in .env, e.g. username/coffe-web}:${IMAGE_TAG:?Set IMAGE_TAG in .env, e.g. sha-a1b2c3d}"
+
+    environment:
+      API_UPSTREAM: "${API_UPSTREAM:-http://coffee-api:8081}"
+
+    ports:
+      - "127.0.0.1:${WEB_PORT:-8085}:80"
+    
+    
+    networks:
+      - appnet
+
+    restart: always
+
+networks:
+  appnet:
+    driver: bridge
