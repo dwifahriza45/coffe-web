@@ -115,7 +115,7 @@ export default function Sidebar({
       to: "/unit-management",
       icon: Ruler,
     });
-  if (canReadIngredientPrices)
+  if (userCan(user, "packagings"))
     inventoryMasterLinks.push({ label: t("Packaging unit"), to: "/packaging-management", icon: PackageOpen });
   if (userCan(user, "category_ingredient"))
     inventoryMasterLinks.push({ label: t("Ingredient Categories"), to: "/category-ingredient-management", icon: FolderTree });

@@ -61,9 +61,9 @@ interface ImportSummary {
 export default function PackagingManagementPage() {
   const { user } = useAuth();
   const { t } = useLanguage();
-  const canCreatePackagings = userCan(user, "ingredient_prices", "create");
-  const canUpdatePackagings = userCan(user, "ingredient_prices", "update");
-  const canDeletePackagings = userCan(user, "ingredient_prices", "delete");
+  const canCreatePackagings = userCan(user, "packagings", "create");
+  const canUpdatePackagings = userCan(user, "packagings", "update");
+  const canDeletePackagings = userCan(user, "packagings", "delete");
   const showActions = canUpdatePackagings || canDeletePackagings;
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const importInputRef = useRef<HTMLInputElement | null>(null);

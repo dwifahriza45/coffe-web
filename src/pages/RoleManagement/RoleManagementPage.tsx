@@ -58,6 +58,7 @@ const PERMISSION_MENUS = [
   { key: "inventory_closing_counts", label: "Closing Stock" },
   { key: "ingredients", label: "Ingredients" },
   { key: "units", label: "Content unit" },
+  { key: "packagings", label: "Packaging unit" },
   { key: "category_ingredient", label: "Ingredient Categories" },
   { key: "brand_types", label: "Brand / Type" },
   { key: "ingredient_prices", label: "Master Price & PAR" },

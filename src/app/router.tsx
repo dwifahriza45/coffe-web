@@ -41,7 +41,7 @@ export default function AppRouter() {
     <BrowserRouter>
       <Routes>
         <Route path="/category-ingredient-management" element={<RequireAuth><RequirePermission menuKey="category_ingredient"><CategoryIngredientManagementPage /></RequirePermission></RequireAuth>} />
-        <Route path="/packaging-management" element={<RequireAuth><RequirePermission menuKey="ingredient_prices"><PackagingManagementPage /></RequirePermission></RequireAuth>} />
+        <Route path="/packaging-management" element={<RequireAuth><RequirePermission menuKey="packagings"><PackagingManagementPage /></RequirePermission></RequireAuth>} />
         <Route
           path="/"
           element={
