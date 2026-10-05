@@ -1,9 +1,4 @@
-import {
-  createContext,
-  useContext,
-  useMemo,
-  type ReactNode,
-} from "react";
+import { createContext, useContext, useMemo, type ReactNode } from "react";
 
 export type Language = "id";
 
@@ -27,6 +22,10 @@ const translations: Record<string, string> = {
   "Team Member": "Anggota Tim",
   Email: "Email",
   Phone: "Telepon",
+  Link: "Link",
+  "Open link": "Buka link",
+  "Link must be a valid http:// or https:// URL":
+    "Link harus berupa URL http:// atau https:// yang valid",
   "Confirm logout?": "Konfirmasi keluar?",
   "You’ll need to sign in again to access the C.R.E.M.A dashboard.":
     "Kamu perlu masuk lagi untuk mengakses dashboard C.R.E.M.A.",
@@ -47,6 +46,24 @@ const translations: Record<string, string> = {
   Suppliers: "Supplier",
   Packaging: "Satuan kemasan",
   "Brand / Type": "Brand / Type",
+  "Back to ingredients": "Kembali ke bahan",
+  "Choose the active price for this ingredient": "Kelola pilihan harga aktif dan nonaktif untuk bahan ini.",
+  "Active price": "Harga aktif",
+  "Ingredient price history": "Riwayat harga bahan",
+  "No ingredient prices yet": "Belum ada harga bahan",
+  "Ingredient has no active price. Select an active price in ingredient details first.": "Bahan belum punya harga aktif. Pilih harga aktif di detail bahan terlebih dahulu.",
+  "Price follows the active ingredient price": "Harga mengikuti harga aktif bahan; transaksi lama memakai harga tersimpan",
+  "Ingredient price saved": "Harga bahan berhasil disimpan",
+  "Use as active price": "Gunakan sebagai harga aktif",
+  "Enter a valid price and date": "Isi harga valid (maksimal 2 desimal) dan tanggal",
+  "Price per packaging unit. Used as the default for new supplier shopping records.": "Harga per satuan kemasan. Dipakai sebagai harga awal saat mencatat belanja supplier baru.",
+  "Activating a price automatically deactivates the previous price. Saved shopping records keep their prices.": "Mengaktifkan harga akan menonaktifkan harga sebelumnya. Harga pada belanja yang sudah disimpan tetap.",
+  "Save this price as active? The previous active price will become inactive.": "Simpan sebagai harga aktif? Harga aktif sebelumnya akan dinonaktifkan.",
+  "Save this inactive price?": "Simpan harga ini sebagai nonaktif?",
+  "Deactivate ingredient price": "Nonaktifkan harga bahan",
+  "Activate ingredient price": "Aktifkan harga bahan",
+  "Deactivate this price? No price will be selected.": "Nonaktifkan harga ini? Bahan tidak akan memiliki harga aktif.",
+  "Use this price? The previous active price will become inactive.": "Gunakan harga ini? Harga aktif sebelumnya akan dinonaktifkan.",
   "Master Price & PAR": "Master Harga & PAR",
   "Could not load ingredient prices.": "Gagal memuat Master Harga & PAR.",
   "Add ingredient price": "Tambah harga bahan",
@@ -60,7 +77,8 @@ const translations: Record<string, string> = {
   "No prices found": "Harga tidak ditemukan",
   "Create this ingredient price?": "Buat harga bahan ini?",
   "Update this ingredient price?": "Update harga bahan ini?",
-  "Delete this ingredient price permanently?": "Hapus harga bahan ini permanen?",
+  "Delete this ingredient price permanently?":
+    "Hapus harga bahan ini permanen?",
   "Could not delete ingredient price.": "Gagal menghapus harga bahan.",
   "Unit Price": "Harga Satuan",
   "Effective Date": "Tanggal Berlaku",
@@ -113,13 +131,13 @@ const translations: Record<string, string> = {
   "Select unit": "Pilih satuan",
   "Delete selected": "Hapus terpilih",
   "Delete selected units": "Hapus satuan terpilih",
-  "Delete selected units permanently?": "Hapus satuan terpilih secara permanen?",
+  "Delete selected units permanently?":
+    "Hapus satuan terpilih secara permanen?",
   "Could not delete selected units.": "Gagal menghapus satuan terpilih.",
   "Delete selected packaging": "Hapus kemasan terpilih",
   "Delete selected packaging permanently?":
     "Hapus kemasan terpilih secara permanen?",
-  "Could not delete selected packaging.":
-    "Gagal menghapus kemasan terpilih.",
+  "Could not delete selected packaging.": "Gagal menghapus kemasan terpilih.",
   Export: "Export",
   Import: "Import",
   "Importing...": "Import...",
@@ -134,6 +152,23 @@ const translations: Record<string, string> = {
   "Code and name are required": "Kode dan nama wajib diisi",
   "Duplicate code in import file": "Kode duplikat di file import",
   "Duplicate name in import file": "Nama duplikat di file import",
+  "Invalid supplier status": "Status supplier tidak valid",
+  "Supplier updated successfully": "Supplier berhasil diperbarui",
+  "You do not have permission to update suppliers":
+    "Anda tidak memiliki izin memperbarui supplier",
+  "You do not have permission to create suppliers":
+    "Anda tidak memiliki izin membuat supplier",
+  "Could not prepare supplier import":
+    "Tidak dapat membaca file atau memuat data supplier untuk impor",
+  "Brand type is used by ingredients": "Brand/type sedang digunakan oleh bahan",
+  "Invalid brand type status": "Status brand/type tidak valid",
+  "Brand type updated successfully": "Brand/type berhasil diperbarui",
+  "You do not have permission to update brand types":
+    "Anda tidak memiliki izin memperbarui brand/type",
+  "You do not have permission to create brand types":
+    "Anda tidak memiliki izin membuat brand/type",
+  "Could not prepare brand type import":
+    "Tidak dapat membaca file atau memuat data brand/type untuk impor",
   "Imported successfully": "Berhasil diimport",
   "Import failed": "Import gagal",
   "Unit code already exists": "Kode satuan isi sudah ada",
@@ -145,7 +180,7 @@ const translations: Record<string, string> = {
   "Internal server error": "Terjadi kesalahan server",
   "Could not read import file.": "File import tidak bisa dibaca.",
   "Delete this role permanently?": "Hapus role ini permanen?",
-  "Confirm": "Konfirmasi",
+  Confirm: "Konfirmasi",
   Page: "Halaman",
   of: "dari",
   Limit: "Limit",
@@ -265,6 +300,94 @@ const translations: Record<string, string> = {
   "Select supplier": "Pilih supplier",
   "Could not load suppliers": "Gagal memuat supplier",
   "Could not load suppliers.": "Gagal memuat supplier.",
+  "Phone must start with 08 and contain 10–13 digits only":
+    "Nomor telepon harus diawali 08 dan hanya berisi 10–13 digit angka",
+  "Select ingredient category first": "Pilih kategori bahan terlebih dahulu",
+  "Back to suppliers": "Kembali ke supplier",
+  "Supplier details": "Detail supplier",
+  "Supplier ingredients": "Bahan dari supplier",
+  "Latest effective prices": "Harga aktif yang dipilih di detail bahan",
+  "No supplier ingredients found": "Belum ada bahan dari supplier ini",
+  "Supplier transaction history": "Riwayat transaksi supplier",
+  "transactions found": "transaksi ditemukan",
+  "Loading transaction history...": "Memuat riwayat transaksi...",
+  "No supplier transactions yet": "Belum ada transaksi supplier",
+  "Purchase order": "Purchase order",
+  "Goods receipt": "Penerimaan barang",
+  "Open transaction": "Buka transaksi",
+  "No transaction items": "Belum ada barang dalam transaksi",
+  "Receipt prices are not recorded":
+    "Harga dan total tidak dicatat pada penerimaan barang ini.",
+  "Partially received": "Diterima sebagian",
+  Received: "Diterima",
+  "Could not load supplier details": "Tidak dapat memuat detail supplier",
+  "Could not load supplier catalog": "Tidak dapat memuat bahan supplier",
+  "Could not load supplier history": "Tidak dapat memuat riwayat supplier",
+  "Supplier not found": "Supplier tidak ditemukan",
+  "Record supplier shopping": "Catat belanja supplier",
+  "Edit shopping record": "Ubah catatan belanja",
+  "Shopping record": "Catatan belanja",
+  Recorded: "Tercatat",
+  "Purchase number": "Nomor PO",
+  "Delivery date": "Tanggal pengiriman",
+  "Payment method": "Metode bayar",
+  "Supplier bank account": "Rekening supplier",
+  "Ship to": "Tujuan pengiriman",
+  Recipient: "Penerima",
+  "Supplier information": "Informasi pemasok (supplier)",
+  "Shipping information": "Alamat pengiriman (ship to)",
+  "Shipping address": "Alamat pengiriman",
+  "Shipping phone": "Telepon pengiriman",
+  "Product description": "Deskripsi produk",
+  "Packaging / Unit": "Kemasan / Satuan",
+  "Enter purchased quantities; zero-quantity items are excluded":
+    "Isi qty barang yang dibeli. Barang dengan qty 0 tidak ikut disimpan.",
+  "Enter a quantity for at least one item":
+    "Isi qty minimal satu barang yang dibeli",
+  "Invalid quantity or price": "Qty atau harga tidak valid",
+  "Delivery date cannot precede purchase date":
+    "Tanggal pengiriman tidak boleh sebelum tanggal belanja",
+  "Purchase number already exists for this supplier":
+    "Nomor PO sudah digunakan untuk supplier ini",
+  "Check shopping dates, items, quantities and prices":
+    "Periksa tanggal, barang, qty, dan harga belanja. Barang harus aktif dan milik supplier ini.",
+  "Could not save shopping record": "Catatan belanja tidak dapat disimpan",
+  "Shopping record saved": "Catatan belanja berhasil disimpan",
+  "selected items": "barang dipilih",
+  "Ingredient subcategory": "Subkategori bahan",
+  "Ingredient subcategories": "Subkategori bahan",
+  "Select ingredient subcategory": "Pilih subkategori bahan",
+  "No subcategories": "Belum ada subkategori",
+  "All subcategories": "Semua subkategori",
+  "Back to ingredient categories": "Kembali ke kategori bahan",
+  "Manage ingredient groups within this category":
+    "Kelola kelompok bahan di dalam kategori ini",
+  "Add subcategory": "Tambah subkategori",
+  "Edit subcategory": "Ubah subkategori",
+  "Delete subcategory": "Hapus subkategori",
+  "Delete this subcategory permanently?":
+    "Hapus subkategori ini secara permanen?",
+  "Update subcategory status": "Ubah status subkategori",
+  "Update subcategory status?": "Ubah status subkategori ini?",
+  "Subcategory name already exists":
+    "Nama subkategori sudah ada dalam kategori ini",
+  "Subcategory is used by ingredients":
+    "Subkategori sedang digunakan oleh bahan atau brand/type",
+  "Save changes to this subcategory?": "Simpan perubahan subkategori ini?",
+  "Create this subcategory?": "Buat subkategori ini?",
+  "Search subcategory...": "Cari subkategori...",
+  "Subcategories found": "subkategori ditemukan",
+  "Invalid subcategory import format":
+    "Format import tidak sesuai. Gunakan file export subkategori bahan.",
+  "Subcategory import category mismatch":
+    "Kategori bahan tidak sesuai dengan halaman subkategori ini",
+  "Subcategory name is too long": "Nama subkategori maksimal 150 karakter",
+  "Subcategory saved": "Subkategori berhasil disimpan",
+  "Subcategories updated": "Subkategori berhasil diperbarui",
+  "Could not load ingredient subcategories":
+    "Tidak dapat memuat subkategori bahan",
+  "Invalid ingredient subcategory":
+    "Subkategori tidak sesuai kategori bahan atau tidak aktif",
   "Name is required": "Nama wajib diisi",
   "Good morning": "Selamat pagi",
   "Good afternoon": "Selamat siang",
@@ -327,8 +450,10 @@ const translations: Record<string, string> = {
   "Could not load inventory counts.": "Gagal memuat stock opname.",
   "Opening Stock": "Stock Awal",
   "Closing Stock": "Stock Akhir",
-  "Physical stock before operational activities": "Stock fisik sebelum operasional dimulai",
-  "Physical stock after operational activities": "Stock fisik setelah operasional selesai",
+  "Physical stock before operational activities":
+    "Stock fisik sebelum operasional dimulai",
+  "Physical stock after operational activities":
+    "Stock fisik setelah operasional selesai",
   "Waiting for stock count": "Menunggu stock opname",
   "Submit opening stock": "Submit stock awal",
   "View closing stock": "Lihat stock akhir",
@@ -362,7 +487,8 @@ const translations: Record<string, string> = {
   "Stock count tasks": "Task stock opname",
   "Opening and closing counts for this business day.":
     "Hitung stock awal dan akhir untuk operasional harian ini.",
-  "No stock counts found for this date": "Stock opname untuk tanggal ini tidak ditemukan",
+  "No stock counts found for this date":
+    "Stock opname untuk tanggal ini tidak ditemukan",
   "No business day found for this date":
     "Bisnis harian untuk tanggal ini belum dibuat",
   "Could not load stock receipts.": "Gagal memuat stock masuk.",
@@ -403,8 +529,7 @@ const translations: Record<string, string> = {
   "Current quantity from opening stock and submitted stock movements.":
     "Jumlah saat ini dari Stock Awal dan mutasi stock yang sudah disubmit.",
   "Could not load current stock.": "Gagal memuat stock saat ini.",
-  "Could not load current stock detail.":
-    "Gagal memuat detail stock saat ini.",
+  "Could not load current stock detail.": "Gagal memuat detail stock saat ini.",
   Current: "Saat Ini",
   "Loading current stock...": "Memuat stock saat ini...",
   "No current stock found": "Stock saat ini tidak ditemukan",
@@ -478,7 +603,8 @@ const translations: Record<string, string> = {
     "Hapus semua item sebelum menghapus Stock Masuk ini",
   "Business Date": "Tanggal Bisnis",
   "Purchase Date": "Tanggal Purchasing",
-  "Used for daily purchasing tracking": "Dipakai untuk tracking purchasing harian",
+  "Used for daily purchasing tracking":
+    "Dipakai untuk tracking purchasing harian",
   "Auto from current open business day":
     "Otomatis dari operasional harian yang sedang buka",
   "Supplier *": "Supplier *",
@@ -489,13 +615,15 @@ const translations: Record<string, string> = {
   "Open a business day and submit Opening Stock before creating stock adjustment.":
     "Buka operasional harian dan submit Stock Awal sebelum membuat Penyesuaian Stock.",
   "Save stock adjustment draft": "Simpan draft Penyesuaian Stock",
-  "Save this stock adjustment as a draft?": "Simpan Penyesuaian Stock ini sebagai draft?",
+  "Save this stock adjustment as a draft?":
+    "Simpan Penyesuaian Stock ini sebagai draft?",
   "Delete stock adjustment": "Hapus Penyesuaian Stock",
   "Delete this empty stock adjustment record?":
     "Hapus data Penyesuaian Stock kosong ini?",
   "Could not delete stock adjustment.": "Gagal menghapus Penyesuaian Stock.",
   "Stock Adjustment": "Penyesuaian Stock",
-  "Record approved inventory corrections.": "Catat koreksi stock yang sudah disetujui.",
+  "Record approved inventory corrections.":
+    "Catat koreksi stock yang sudah disetujui.",
   "Add adjustment": "Tambah Penyesuaian",
   "Stock adjustment can only be added when this business day is open.":
     "Penyesuaian Stock hanya bisa ditambah saat operasional harian ini masih buka.",
@@ -526,7 +654,8 @@ const translations: Record<string, string> = {
   "Could not update category status.": "Gagal mengubah status kategori.",
   "Could not delete category.": "Gagal menghapus kategori.",
   "Menu Categories": "Kategori Menu",
-  "Group menu items by product category.": "Kelompokkan menu item berdasarkan kategori produk.",
+  "Group menu items by product category.":
+    "Kelompokkan menu item berdasarkan kategori produk.",
   "All categories": "Semua kategori",
   "categories found": "kategori ditemukan",
   Used: "Dipakai",
@@ -609,7 +738,7 @@ const translations: Record<string, string> = {
   "Could not load units.": "Gagal memuat satuan isi.",
   "Could not load packaging.": "Gagal memuat satuan kemasan.",
   "Packaging is used by ingredients or prices":
-    "Satuan kemasan masih dipakai di Bahan atau Master Harga",
+    "Satuan kemasan masih dipakai di Bahan",
   "Manage inventory measurement units.": "Kelola satuan isi stok.",
   "Manage purchase packaging conversions.":
     "Kelola kemasan pembelian dan konversinya ke satuan stok.",
@@ -668,19 +797,28 @@ const translations: Record<string, string> = {
   "Activate this packaging?": "Aktifkan satuan kemasan ini?",
   "Could not update unit status.": "Gagal mengubah status satuan isi.",
   "Could not update packaging status.": "Gagal mengubah status satuan kemasan.",
-  "Unit is used by ingredients, unit conversions, or stock movements": "Satuan isi dipakai oleh bahan, satuan kemasan, atau mutasi stok",
-  "Could not verify whether this user can be deleted. Please try again.": "Belum bisa memeriksa apakah akun dapat dihapus. Silakan coba lagi.",
-  "Close the currently open business day first.": "Tutup operasional harian yang masih OPEN sebelum membuka yang baru.",
-  "close the currently open business day before opening another": "Tutup operasional harian yang masih OPEN sebelum membuka yang baru.",
-  "Could not verify the open business day. Refresh and try again.": "Status operasional harian belum bisa diperiksa. Muat ulang dan coba lagi.",
-  "Opening and Closing Stock: Create adds items, Update edits items and notes or submits the count, Delete removes draft items.": "Stock Awal dan Akhir: Create menambah item, Update mengubah item dan catatan atau submit opname, Delete menghapus item draft.",
+  "Unit is used by ingredients, unit conversions, or stock movements":
+    "Satuan isi dipakai oleh bahan, satuan kemasan, atau mutasi stok",
+  "Could not verify whether this user can be deleted. Please try again.":
+    "Belum bisa memeriksa apakah akun dapat dihapus. Silakan coba lagi.",
+  "Close the currently open business day first.":
+    "Tutup operasional harian yang masih OPEN sebelum membuka yang baru.",
+  "close the currently open business day before opening another":
+    "Tutup operasional harian yang masih OPEN sebelum membuka yang baru.",
+  "Could not verify the open business day. Refresh and try again.":
+    "Status operasional harian belum bisa diperiksa. Muat ulang dan coba lagi.",
+  "Opening and Closing Stock: Create adds items, Update edits items and notes or submits the count, Delete removes draft items.":
+    "Stock Awal dan Akhir: Create menambah item, Update mengubah item dan catatan atau submit opname, Delete menghapus item draft.",
   "Cannot delete user": "Pengguna tidak bisa dihapus",
-  "user cannot be deleted because it still has assigned roles": "Akun masih memiliki assignment role. Penghapusan diblokir; akun dan assignment role tetap utuh.",
-  "user cannot be deleted because operational records reference this account; deactivate the account instead": "Akun masih terhubung dengan data operasional. Penghapusan diblokir. Nonaktifkan akun jika sudah tidak digunakan.",
+  "user cannot be deleted because it still has assigned roles":
+    "Akun masih memiliki assignment role. Penghapusan diblokir; akun dan assignment role tetap utuh.",
+  "user cannot be deleted because operational records reference this account; deactivate the account instead":
+    "Akun masih terhubung dengan data operasional. Penghapusan diblokir. Nonaktifkan akun jika sudah tidak digunakan.",
   "Unit is used by ingredients": "Satuan isi sedang dipakai bahan",
   "Could not load ingredients.": "Gagal memuat bahan.",
   "Manage stock ingredients and packaging.": "Kelola bahan stok dan kemasan.",
-  "Manage stock ingredients and base units.": "Kelola bahan stok dan satuan dasar.",
+  "Manage stock ingredients and base units.":
+    "Kelola bahan stok dan satuan dasar.",
   "All ingredients": "Semua bahan",
   "ingredients found": "bahan ditemukan",
   "Base unit": "Satuan dasar",
@@ -698,13 +836,17 @@ const translations: Record<string, string> = {
   "Activate ingredient category": "Aktifkan kategori bahan",
   "Deactivate this ingredient category?": "Nonaktifkan kategori bahan ini?",
   "Activate this ingredient category?": "Aktifkan kategori bahan ini?",
-  "Could not update ingredient category status.": "Gagal mengubah status kategori bahan.",
+  "Could not update ingredient category status.":
+    "Gagal mengubah status kategori bahan.",
   "Delete ingredient category": "Hapus kategori bahan",
-  "Delete this ingredient category permanently?": "Hapus kategori bahan ini permanen?",
+  "Delete this ingredient category permanently?":
+    "Hapus kategori bahan ini permanen?",
   "Could not delete ingredient category.": "Gagal menghapus kategori bahan.",
   "Delete selected ingredient categories": "Hapus kategori bahan terpilih",
-  "Delete selected ingredient categories permanently?": "Hapus kategori bahan terpilih permanen?",
-  "Could not delete selected ingredient categories.": "Gagal menghapus kategori bahan terpilih.",
+  "Delete selected ingredient categories permanently?":
+    "Hapus kategori bahan terpilih permanen?",
+  "Could not delete selected ingredient categories.":
+    "Gagal menghapus kategori bahan terpilih.",
   "Could not export ingredient categories.": "Gagal mengekspor kategori bahan.",
   "Ingredient category name already exists": "Nama kategori bahan sudah ada",
   "Invalid ingredient category input": "Data kategori bahan tidak valid",
@@ -715,9 +857,11 @@ const translations: Record<string, string> = {
   "No ingredient categories found": "Tidak ada kategori bahan",
   "Select ingredient category": "Pilih kategori bahan",
   "Add ingredient category": "Tambah kategori bahan",
-  "Ingredient category is used by ingredients": "Kategori bahan dipakai oleh bahan atau brand/type",
+  "Ingredient category is used by ingredients":
+    "Kategori bahan dipakai oleh bahan atau brand/type",
   "Manage ingredient categories.": "Kelola kategori bahan.",
-  "Name and a valid ingredient category are required": "Nama dan kategori bahan yang valid wajib diisi",
+  "Name and a valid ingredient category are required":
+    "Nama dan kategori bahan yang valid wajib diisi",
   "Packaging unit": "Satuan kemasan",
   "Min stock": "Stock minimum",
   "base unit is required": "satuan dasar wajib dipilih",
@@ -732,7 +876,8 @@ const translations: Record<string, string> = {
   "Activate ingredient": "Aktifkan bahan",
   "Activate this ingredient?": "Aktifkan bahan ini?",
   "Could not update ingredient status.": "Gagal mengubah status bahan.",
-  "Ingredient is used by ingredient units": "Bahan sedang dipakai satuan kemasan",
+  "Ingredient is used by ingredient units":
+    "Bahan sedang dipakai satuan kemasan",
   "Ingredient Detail": "Detail Bahan",
   "Could not load ingredient detail.": "Gagal memuat detail bahan.",
   "Add unit conversion": "Tambah konversi unit",
@@ -776,8 +921,7 @@ const translations: Record<string, string> = {
   "Deactivate this supplier?": "Nonaktifkan supplier ini?",
   "Activate supplier": "Aktifkan supplier",
   "Activate this supplier?": "Aktifkan supplier ini?",
-  "Supplier status updated successfully.":
-    "Status supplier berhasil diubah.",
+  "Supplier status updated successfully.": "Status supplier berhasil diubah.",
   "Could not update supplier status.": "Gagal mengubah status supplier.",
   "Ingredient Units": "Satuan kemasan",
   "Could not connect to the user service. Please try again.":
@@ -828,16 +972,13 @@ const translations: Record<string, string> = {
   "Unnamed role": "Role tanpa nama",
   "Delete role from user": "Hapus role dari user",
   "All roles are already assigned.": "Semua role sudah terpasang.",
-  "Fullname must be at least 3 characters":
-    "Nama lengkap minimal 3 karakter",
+  "Fullname must be at least 3 characters": "Nama lengkap minimal 3 karakter",
   "Enter a valid email address": "Masukkan alamat email yang valid",
   "Phone is required": "Nomor telepon wajib diisi",
   "Address must be at least 3 characters": "Alamat minimal 3 karakter",
   "Position must be at least 2 characters": "Posisi minimal 2 karakter",
-  "Password must be at least 8 characters":
-    "Password minimal 8 karakter",
-  "Could not create user. Please try again.":
-    "Gagal membuat user. Coba lagi.",
+  "Password must be at least 8 characters": "Password minimal 8 karakter",
+  "Could not create user. Please try again.": "Gagal membuat user. Coba lagi.",
   "Hide password": "Sembunyikan password",
   "Show password": "Tampilkan password",
   "Add new user": "Tambah user baru",

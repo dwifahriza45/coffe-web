@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { isAxiosError } from "axios";
 import {
   Download,
@@ -30,6 +31,8 @@ import {
 import { useAuth } from "../../app/AuthContext";
 import { useLanguage } from "../../app/LanguageContext";
 import { userCan } from "../../app/roleAccess";
+import UsageBadge from "../../components/common/UsageBadge";
+import NameFormDialog from "../../components/common/NameFormDialog";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import Navbar from "../../components/layout/Navbar";
 import Sidebar from "../../components/layout/Sidebar";
@@ -723,17 +726,15 @@ export default function CategoryIngredientManagementPage() {
                             </td>
                           )}
                           <td className="px-5 py-4 text-sm font-semibold">
-                            {item.name}
+                            <Link
+                              to={`/category-ingredient-management/${encodeURIComponent(item.category_ingredient_id)}`}
+                              className="text-[#92502f] hover:underline"
+                            >
+                              {item.name}
+                            </Link>
                           </td>
                           <td className="px-5 py-4">
-                            <span
-                              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${inUse ? "bg-amber-50 text-amber-700" : "bg-stone-100 text-stone-500"}`}
-                            >
-                              <span
-                                className={`size-1.5 rounded-full ${inUse ? "bg-amber-500" : "bg-stone-400"}`}
-                              />
-                              {inUse ? t("Used") : t("Unused")}
-                            </span>
+                            <UsageBadge inUse={inUse} />
                           </td>
                           <td className="px-5 py-4">
                             <span
@@ -845,71 +846,21 @@ export default function CategoryIngredientManagementPage() {
         </main>
       </section>
 
-      {modalOpen && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-          <form
-            onSubmit={submitForm}
-            className="w-full max-w-md rounded-2xl bg-white shadow-2xl"
-          >
-            <header className="flex items-start justify-between border-b border-stone-200 p-5">
-              <h2 className="text-lg font-bold">
-                {editingItem
-                  ? t("Update ingredient category")
-                  : t("Add ingredient category")}
-              </h2>
-              <button
-                type="button"
-                onClick={() => setModalOpen(false)}
-                className="grid size-9 place-items-center rounded-lg hover:bg-stone-100"
-              >
-                <X size={18} />
-              </button>
-            </header>
-            <div className="space-y-4 p-5">
-              <label className="block text-sm font-semibold text-stone-700">
-                {t("Name")}
-                <input
-                  value={form.name}
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      name: event.target.value,
-                    }))
-                  }
-                  className="mt-2 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10"
-                  disabled={submitting}
-                />
-                {fieldErrors.name && (
-                  <p className="mt-1.5 text-xs font-medium text-red-600">
-                    {fieldErrors.name}
-                  </p>
-                )}
-              </label>
-              {actionError && (
-                <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">
-                  {actionError}
-                </p>
-              )}
-            </div>
-            <footer className="flex justify-end gap-3 border-t border-stone-200 p-5">
-              <button
-                type="button"
-                onClick={() => setModalOpen(false)}
-                className="rounded-lg border border-stone-300 px-4 py-2.5 text-sm font-semibold hover:bg-stone-50"
-              >
-                {t("Cancel")}
-              </button>
-              <button
-                type="submit"
-                disabled={submitting}
-                className="rounded-lg bg-[#362219] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
-              >
-                {submitting ? t("Saving...") : t("Save")}
-              </button>
-            </footer>
-          </form>
-        </div>
-      )}
+      <NameFormDialog
+        open={modalOpen}
+        title={t(
+          editingItem
+            ? "Update ingredient category"
+            : "Add ingredient category",
+        )}
+        name={form.name}
+        onNameChange={(name) => setForm((current) => ({ ...current, name }))}
+        onSubmit={submitForm}
+        onClose={() => setModalOpen(false)}
+        submitting={submitting}
+        nameError={fieldErrors.name}
+        error={actionError}
+      />
 
       {importDetailOpen && importSummary && (
         <div className="fixed inset-0 z-[85] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">

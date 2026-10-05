@@ -1,5 +1,7 @@
 import {
   getAllCategoryIngredients,
+  getIngredientSubcategories,
+  type IngredientSubcategory,
   type CategoryIngredient,
 } from "../../api/categoryIngredient.api";
 import { isAxiosError } from "axios";
@@ -22,12 +24,14 @@ import {
   type FormEvent,
 } from "react";
 import * as XLSX from "xlsx-js-style";
+import { brandTypeImportChanged } from "../../utils/brandTypeImport";
 import { addIngredientCategoryDropdown } from "../../utils/ingredientCategoryDropdown";
 import {
   createBrandType,
   deleteBrandType,
   getBrandTypeUsage,
   getBrandTypes,
+  getAllBrandTypes,
   updateBrandType,
   type BrandType,
   type BrandTypePayload,
@@ -35,12 +39,14 @@ import {
 import { useAuth } from "../../app/AuthContext";
 import { useLanguage } from "../../app/LanguageContext";
 import { userCan } from "../../app/roleAccess";
+import UsageBadge from "../../components/common/UsageBadge";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import Navbar from "../../components/layout/Navbar";
 import Sidebar from "../../components/layout/Sidebar";
 
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50];
 const emptyForm: BrandTypePayload = {
+  subcategory_ingredient_id: "",
   category_ingredient_id: "",
   name: "",
   active: true,
@@ -73,6 +79,10 @@ export default function BrandTypeManagementPage() {
   const [categoryIngredients, setCategoryIngredients] = useState<
     CategoryIngredient[]
   >([]);
+  const [subcategories, setSubcategories] = useState<IngredientSubcategory[]>(
+    [],
+  );
+  const [subcategoryFilter, setSubcategoryFilter] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [items, setItems] = useState<BrandType[]>([]);
   const [brandTypeUsage, setBrandTypeUsage] = useState<Record<string, boolean>>(
@@ -109,9 +119,12 @@ export default function BrandTypeManagementPage() {
 
   useEffect(() => {
     let current = true;
-    getAllCategoryIngredients()
-      .then((items) => {
-        if (current) setCategoryIngredients(items);
+    Promise.all([getAllCategoryIngredients(), getIngredientSubcategories()])
+      .then(([items, sub]) => {
+        if (current) {
+          setCategoryIngredients(items);
+          setSubcategories(sub.data ?? []);
+        }
       })
       .catch(() => {
         if (current) setError(t("Action failed."));
@@ -132,6 +145,7 @@ export default function BrandTypeManagementPage() {
           limit: pageSize,
           name: search,
           category_ingredient_id: categoryFilter,
+          subcategory_ingredient_id: subcategoryFilter,
         });
         if (!current) return;
         const nextItems = response.data ?? [];
@@ -172,13 +186,14 @@ export default function BrandTypeManagementPage() {
     return () => {
       current = false;
     };
-  }, [page, pageSize, refreshKey, search, categoryFilter]);
+  }, [page, pageSize, refreshKey, search, categoryFilter, subcategoryFilter]);
 
   function openModal(item?: BrandType) {
     setEditingItem(item ?? null);
     setForm(
       item
         ? {
+            subcategory_ingredient_id: item.subcategory_ingredient_id || "",
             category_ingredient_id: item.category_ingredient_id,
             name: item.name,
             active: item.active,
@@ -200,6 +215,24 @@ export default function BrandTypeManagementPage() {
         category_ingredient_id: !form.category_ingredient_id
           ? t("required")
           : "",
+      });
+      return;
+    }
+    if (
+      subcategories.some(
+        (item) =>
+          item.category_ingredient_id === form.category_ingredient_id &&
+          item.active,
+      ) &&
+      !subcategories.some(
+        (item) =>
+          item.category_ingredient_id === form.category_ingredient_id &&
+          item.active &&
+          item.subcategory_ingredient_id === form.subcategory_ingredient_id,
+      )
+    ) {
+      setFieldErrors({
+        subcategory_ingredient_id: t("Select ingredient subcategory"),
       });
       return;
     }
@@ -258,6 +291,7 @@ export default function BrandTypeManagementPage() {
         try {
           await updateBrandType(item.brand_type_id, {
             name: item.name,
+            subcategory_ingredient_id: item.subcategory_ingredient_id || "",
             category_ingredient_id: item.category_ingredient_id,
             active: !item.active,
           });
@@ -367,8 +401,14 @@ export default function BrandTypeManagementPage() {
   function writeBrandTypesWorkbook(
     exportItems: BrandType[],
     categories = categoryIngredients,
+    exportSubcategories = subcategories,
   ) {
-    const header = ["NAMA BRAND / TYPE", "STATUS", "KATEGORI BAHAN"];
+    const header = [
+      "NAMA BRAND / TYPE",
+      "STATUS",
+      "KATEGORI BAHAN",
+      "SUBKATEGORI BAHAN",
+    ];
     const rows = exportItems.map((item) => [
       item.name,
       item.active ? "Active" : "Inactive",
@@ -376,10 +416,14 @@ export default function BrandTypeManagementPage() {
         (category) =>
           category.category_ingredient_id === item.category_ingredient_id,
       )?.name ?? "",
+      exportSubcategories.find(
+        (sub) =>
+          sub.subcategory_ingredient_id === item.subcategory_ingredient_id,
+      )?.name ?? "",
     ]);
     const worksheet = XLSX.utils.aoa_to_sheet([header, ...rows]);
-    worksheet["!cols"] = [{ wch: 30 }, { wch: 16 }, { wch: 25 }];
-    const range = XLSX.utils.decode_range(worksheet["!ref"] ?? "A1:C1");
+    worksheet["!cols"] = [{ wch: 30 }, { wch: 16 }, { wch: 25 }, { wch: 25 }];
+    const range = XLSX.utils.decode_range(worksheet["!ref"] ?? "A1:D1");
     const border = {
       top: { style: "thin", color: { rgb: "B8A99F" } },
       right: { style: "thin", color: { rgb: "B8A99F" } },
@@ -409,6 +453,7 @@ export default function BrandTypeManagementPage() {
       categories
         .filter((category) => category.active)
         .map((category) => category.name),
+      exportSubcategories.filter((subcategory) => subcategory.active).map((subcategory) => subcategory.name),
     );
     const url = URL.createObjectURL(
       new Blob([file], {
@@ -439,6 +484,7 @@ export default function BrandTypeManagementPage() {
           limit: exportLimit,
           name: search,
           category_ingredient_id: categoryFilter,
+          subcategory_ingredient_id: subcategoryFilter,
         });
         const nextItems = response.data ?? [];
         if (nextItems.length === 0) break;
@@ -447,7 +493,11 @@ export default function BrandTypeManagementPage() {
         exportStart += nextItems.length;
       } while (exportStart < exportTotal);
 
-      writeBrandTypesWorkbook(exportItems, await getAllCategoryIngredients());
+      const [categories, subResponse] = await Promise.all([
+        getAllCategoryIngredients(),
+        getIngredientSubcategories(),
+      ]);
+      writeBrandTypesWorkbook(exportItems, categories, subResponse.data ?? []);
     } catch (requestError) {
       const response = isAxiosError<{ message?: string }>(requestError)
         ? requestError.response?.data
@@ -469,6 +519,8 @@ export default function BrandTypeManagementPage() {
     ) {
       return t("Invalid brand type input");
     }
+    if (normalized === "brand type is in use")
+      return t("Brand type is used by ingredients");
     if (normalized === "internal server error") {
       return t("Internal server error");
     }
@@ -478,13 +530,22 @@ export default function BrandTypeManagementPage() {
   async function importBrandTypes(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = "";
-    if (!file) return;
+    if (!file || importing || (!canCreate && !canUpdate)) return;
 
     setImporting(true);
+    setImportDetailOpen(false);
     setError("");
     setImportSummary(null);
     try {
-      const categories = await getAllCategoryIngredients();
+      const [categories, existingItems, subcategoryResponse] =
+        await Promise.all([
+          getAllCategoryIngredients(),
+          getAllBrandTypes(),
+          getIngredientSubcategories(),
+        ]);
+      const existingByName = new Map(
+        existingItems.map((item) => [item.name.trim().toLowerCase(), item]),
+      );
       const workbook = XLSX.read(await file.arrayBuffer(), { type: "array" });
       const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json<(string | number | null)[]>(
@@ -494,6 +555,14 @@ export default function BrandTypeManagementPage() {
           defval: "",
         },
       );
+      const subcategoryColumn =
+        rows[0]?.findIndex(
+          (cell) =>
+            String(cell ?? "")
+              .trim()
+              .toUpperCase() === "SUBKATEGORI BAHAN",
+        ) ?? -1;
+      const importSubcategories = subcategoryResponse.data ?? [];
       const details: ImportDetail[] = [];
       const seenNames = new Set<string>();
 
@@ -531,16 +600,109 @@ export default function BrandTypeManagementPage() {
 
         seenNames.add(normalizedName);
         try {
-          await createBrandType({
+          const existing = existingByName.get(normalizedName);
+          const subcategoryName =
+            subcategoryColumn >= 0
+              ? String(row[subcategoryColumn] ?? "")
+                  .trim()
+                  .toLowerCase()
+              : "";
+          const subcategory = subcategoryName
+            ? importSubcategories.find(
+                (item) =>
+                  item.active &&
+                  item.category_ingredient_id ===
+                    category.category_ingredient_id &&
+                  item.name.trim().toLowerCase() === subcategoryName,
+              )
+            : undefined;
+          if (subcategoryName && !subcategory) {
+            details.push({
+              row: rowNumber,
+              name,
+              status: "failed",
+              reason: t("Invalid ingredient subcategory"),
+            });
+            continue;
+          }
+          const statusValue = String(row[1] ?? "")
+            .trim()
+            .toLowerCase();
+          if (
+            statusValue &&
+            !["active", "inactive", "aktif", "nonaktif"].includes(statusValue)
+          ) {
+            details.push({
+              row: rowNumber,
+              name,
+              status: "failed",
+              reason: t("Invalid brand type status"),
+            });
+            continue;
+          }
+          const payload: BrandTypePayload = {
             name,
-            active: true,
+            active: statusValue
+              ? ["active", "aktif"].includes(statusValue)
+              : (existing?.active ?? true),
             category_ingredient_id: category.category_ingredient_id,
-          });
+            subcategory_ingredient_id:
+              subcategoryColumn >= 0
+                ? subcategory?.subcategory_ingredient_id || ""
+                : existing?.category_ingredient_id ===
+                    category.category_ingredient_id
+                  ? existing.subcategory_ingredient_id || ""
+                  : "",
+          };
+          if (existing && !brandTypeImportChanged(existing, payload)) continue;
+          if (
+            importSubcategories.some(
+              (item) =>
+                item.active &&
+                item.category_ingredient_id === category.category_ingredient_id,
+            ) &&
+            !payload.subcategory_ingredient_id
+          ) {
+            details.push({
+              row: rowNumber,
+              name,
+              status: "failed",
+              reason: t("Select ingredient subcategory"),
+            });
+            continue;
+          }
+          if (existing) {
+            if (!canUpdate) {
+              details.push({
+                row: rowNumber,
+                name,
+                status: "failed",
+                reason: t("You do not have permission to update brand types"),
+              });
+              continue;
+            }
+            await updateBrandType(existing.brand_type_id, payload);
+          } else {
+            if (!canCreate) {
+              details.push({
+                row: rowNumber,
+                name,
+                status: "failed",
+                reason: t("You do not have permission to create brand types"),
+              });
+              continue;
+            }
+            await createBrandType(payload);
+          }
           details.push({
             row: rowNumber,
             name,
             status: "success",
-            reason: t("Imported successfully"),
+            reason: t(
+              existing
+                ? "Brand type updated successfully"
+                : "Imported successfully",
+            ),
           });
         } catch (requestError) {
           const response = isAxiosError<{ message?: string }>(requestError)
@@ -574,7 +736,7 @@ export default function BrandTypeManagementPage() {
             row: 0,
             name: "",
             status: "failed",
-            reason: t("Could not read import file."),
+            reason: t("Could not prepare brand type import"),
           },
         ],
       });
@@ -593,7 +755,7 @@ export default function BrandTypeManagementPage() {
     );
   const partiallyChecked = selectedItemIDs.length > 0 && !allChecked;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const columnCount = 4 + (canDelete ? 1 : 0) + (showActions ? 1 : 0);
+  const columnCount = 5 + (canDelete ? 1 : 0) + (showActions ? 1 : 0);
 
   return (
     <div className="flex min-h-screen bg-[#f8f5f0]">
@@ -639,6 +801,7 @@ export default function BrandTypeManagementPage() {
                   value={categoryFilter}
                   onChange={(event) => {
                     setCategoryFilter(event.target.value);
+                    setSubcategoryFilter("");
                     setPage(1);
                   }}
                   className="h-11 rounded-lg border border-stone-200 px-3 text-sm"
@@ -652,6 +815,30 @@ export default function BrandTypeManagementPage() {
                       {category.name}
                     </option>
                   ))}
+                </select>
+                <select
+                  aria-label={t("Ingredient subcategory")}
+                  value={subcategoryFilter}
+                  disabled={!categoryFilter}
+                  onChange={(event) => {
+                    setPage(1);
+                    setSubcategoryFilter(event.target.value);
+                  }}
+                  className="h-11 rounded-lg border border-stone-200 bg-white px-3 text-sm outline-none disabled:opacity-50"
+                >
+                  <option value="">{t("All subcategories")}</option>
+                  {subcategories
+                    .filter(
+                      (item) => item.category_ingredient_id === categoryFilter,
+                    )
+                    .map((item) => (
+                      <option
+                        key={item.subcategory_ingredient_id}
+                        value={item.subcategory_ingredient_id}
+                      >
+                        {item.name}
+                      </option>
+                    ))}
                 </select>
                 <form
                   onSubmit={(event) => {
@@ -669,7 +856,7 @@ export default function BrandTypeManagementPage() {
                     placeholder={t("Search brand type...")}
                   />
                 </form>
-                {canCreate && (
+                {(canCreate || canUpdate) && (
                   <>
                     <input
                       ref={importInputRef}
@@ -753,6 +940,7 @@ export default function BrandTypeManagementPage() {
                     {canDelete && <th className="w-12 px-5 py-3"></th>}
                     <th className="px-5 py-3">{t("Name")}</th>
                     <th className="px-5 py-3">{t("Ingredient Category")}</th>
+                    <th className="px-5 py-3">{t("Ingredient subcategory")}</th>
                     <th className="px-5 py-3">{t("Usage")}</th>
                     <th className="px-5 py-3">{t("Status")}</th>
                     {showActions && (
@@ -797,7 +985,7 @@ export default function BrandTypeManagementPage() {
                                 title={
                                   inUse
                                     ? t(
-                                        "Brand type is used by ingredient prices",
+                                        "Brand type is used by ingredients",
                                       )
                                     : t("Select brand type")
                                 }
@@ -814,15 +1002,15 @@ export default function BrandTypeManagementPage() {
                                 item.category_ingredient_id,
                             )?.name ?? "-"}
                           </td>
+                          <td className="px-5 py-4 text-sm">
+                            {subcategories.find(
+                              (sub) =>
+                                sub.subcategory_ingredient_id ===
+                                item.subcategory_ingredient_id,
+                            )?.name ?? "-"}
+                          </td>
                           <td className="px-5 py-4">
-                            <span
-                              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${inUse ? "bg-amber-50 text-amber-700" : "bg-stone-100 text-stone-500"}`}
-                            >
-                              <span
-                                className={`size-1.5 rounded-full ${inUse ? "bg-amber-500" : "bg-stone-400"}`}
-                              />
-                              {inUse ? t("Used") : t("Unused")}
-                            </span>
+                            <UsageBadge inUse={inUse} />
                           </td>
                           <td className="px-5 py-4">
                             <span
@@ -853,7 +1041,7 @@ export default function BrandTypeManagementPage() {
                                     title={
                                       item.active && inUse
                                         ? t(
-                                            "Brand type is used by ingredient prices",
+                                            "Brand type is used by ingredients",
                                           )
                                         : item.active
                                           ? t("Deactivate brand type")
@@ -872,7 +1060,7 @@ export default function BrandTypeManagementPage() {
                                     title={
                                       inUse
                                         ? t(
-                                            "Brand type is used by ingredient prices",
+                                            "Brand type is used by ingredients",
                                           )
                                         : t("Delete brand type")
                                     }
@@ -969,6 +1157,7 @@ export default function BrandTypeManagementPage() {
                     setForm((current) => ({
                       ...current,
                       category_ingredient_id: event.target.value,
+                      subcategory_ingredient_id: "",
                     }))
                   }
                   className="mt-2 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm"
@@ -987,6 +1176,72 @@ export default function BrandTypeManagementPage() {
                 {fieldErrors.category_ingredient_id && (
                   <p className="mt-1.5 text-xs text-red-600">
                     {fieldErrors.category_ingredient_id}
+                  </p>
+                )}
+              </label>
+              <label className="block text-sm font-semibold text-stone-700">
+                {t("Ingredient subcategory")}
+                <select
+                  value={form.subcategory_ingredient_id || ""}
+                  disabled={
+                    submitting ||
+                    !form.category_ingredient_id ||
+                    !subcategories.some(
+                      (item) =>
+                        item.active &&
+                        item.category_ingredient_id ===
+                          form.category_ingredient_id,
+                    ) ||
+                    !!(
+                      editingItem?.subcategory_ingredient_id &&
+                      brandTypeUsage[editingItem.brand_type_id]
+                    )
+                  }
+                  onChange={(event) => {
+                    setForm((current) => ({
+                      ...current,
+                      subcategory_ingredient_id: event.target.value,
+                    }));
+                    setFieldErrors((current) => ({
+                      ...current,
+                      subcategory_ingredient_id: "",
+                    }));
+                  }}
+                  className="mt-2 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm disabled:bg-stone-50"
+                >
+                  <option value="">
+                    {t(
+                      !form.category_ingredient_id
+                        ? "Select ingredient category first"
+                        : subcategories.some(
+                              (item) =>
+                                item.active &&
+                                item.category_ingredient_id ===
+                                  form.category_ingredient_id,
+                            )
+                          ? "Select ingredient subcategory"
+                          : "No subcategories",
+                    )}
+                  </option>
+                  {subcategories
+                    .filter(
+                      (item) =>
+                        item.category_ingredient_id ===
+                        form.category_ingredient_id,
+                    )
+                    .map((item) => (
+                      <option
+                        key={item.subcategory_ingredient_id}
+                        value={item.subcategory_ingredient_id}
+                        disabled={!item.active}
+                      >
+                        {item.name}
+                      </option>
+                    ))}
+                </select>
+                {fieldErrors.subcategory_ingredient_id && (
+                  <p className="mt-1.5 text-xs text-red-600">
+                    {fieldErrors.subcategory_ingredient_id}
                   </p>
                 )}
               </label>

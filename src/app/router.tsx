@@ -1,7 +1,10 @@
+import IngredientDetailPage from "../pages/IngredientDetail/IngredientDetailPage";
+import IngredientSubcategoriesPage from "../pages/IngredientSubcategories/IngredientSubcategoriesPage";
 import CategoryIngredientManagementPage from "../pages/CategoryIngredientManagement/CategoryIngredientManagementPage";
 import PackagingManagementPage from "../pages/PackagingManagement/PackagingManagementPage";
 import InventoryCountEntryPage from "../pages/InventoryCount/InventoryCountEntryPage";
 import StockMovementPage from "../pages/StockMovement/StockMovementPage";
+import SupplierDetailPage from "../pages/SupplierDetail/SupplierDetailPage";
 import SupplierManagementPage from "../pages/SupplierManagement/SupplierManagementPage";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import LoginPage from "../pages/auth/LoginPage";
@@ -13,7 +16,6 @@ import DashboardPage from "../pages/Dashboard/DashboardPage";
 import CurrentStockPage from "../pages/CurrentStock/CurrentStockPage";
 import CurrentStockDetailPage from "../pages/CurrentStock/CurrentStockDetailPage";
 import IngredientManagementPage from "../pages/IngredientManagement/IngredientManagementPage";
-import IngredientPriceManagementPage from "../pages/IngredientPriceManagement/IngredientPriceManagementPage";
 import InventoryCountPage from "../pages/InventoryCount/InventoryCountPage";
 import InventoryCountDetailPage from "../pages/InventoryCountDetail/InventoryCountDetailPage";
 import HomePage from "../pages/Home/HomePage";
@@ -40,6 +42,8 @@ export default function AppRouter() {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="/ingredient-management/:ingredientID" element={<RequireAuth><RequirePermission menuKey="ingredients"><IngredientDetailPage /></RequirePermission></RequireAuth>} />
+        <Route path="/category-ingredient-management/:categoryID" element={<RequireAuth><RequirePermission menuKey="category_ingredient"><IngredientSubcategoriesPage /></RequirePermission></RequireAuth>} />
         <Route path="/category-ingredient-management" element={<RequireAuth><RequirePermission menuKey="category_ingredient"><CategoryIngredientManagementPage /></RequirePermission></RequireAuth>} />
         <Route path="/packaging-management" element={<RequireAuth><RequirePermission menuKey="packagings"><PackagingManagementPage /></RequirePermission></RequireAuth>} />
         <Route
@@ -176,6 +180,7 @@ export default function AppRouter() {
             </RequireAuth>
           }
         />
+        <Route path="/supplier-management/:supplierID" element={<RequireAuth><RequirePermission menuKey="suppliers"><SupplierDetailPage /></RequirePermission></RequireAuth>} />
         <Route path="/supplier-management" element={<RequireAuth><RequirePermission menuKey="suppliers"><SupplierManagementPage /></RequirePermission></RequireAuth>} />
         <Route path="/stock-adjustments" element={<RequireAuth><RequirePermission menuKey="stock_adjustments"><StockAdjustmentPage /></RequirePermission></RequireAuth>} />
         <Route path="/stock-adjustments/:adjustmentID" element={<RequireAuth><RequirePermission menuKey="stock_adjustments"><StockAdjustmentDetailPage /></RequirePermission></RequireAuth>} />
@@ -209,16 +214,6 @@ export default function AppRouter() {
             <RequireAuth>
               <RequirePermission menuKey="brand_types">
                 <BrandTypeManagementPage />
-              </RequirePermission>
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/ingredient-price-management"
-          element={
-            <RequireAuth>
-              <RequirePermission menuKey="ingredient_prices">
-                <IngredientPriceManagementPage />
               </RequirePermission>
             </RequireAuth>
           }

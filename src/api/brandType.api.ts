@@ -2,6 +2,7 @@ import api from "./client";
 import type { ApiResponse } from "../types/auth";
 
 export interface BrandType {
+  subcategory_ingredient_id: string;
   brand_type_id: string;
   category_ingredient_id: string;
   name: string;
@@ -9,6 +10,7 @@ export interface BrandType {
 }
 
 export interface BrandTypePayload {
+  subcategory_ingredient_id?: string;
   category_ingredient_id: string;
   name: string;
   active: boolean;
@@ -19,6 +21,7 @@ export const getBrandTypes = async (payload: {
   limit: number;
   name: string;
   category_ingredient_id?: string;
+  subcategory_ingredient_id?: string;
 }) =>
   (await api.post<ApiResponse<BrandType[]>>("/brand-types/list", payload)).data;
 

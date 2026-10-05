@@ -22,3 +22,10 @@ export function normalizeNumberInput(value: string, allowDecimal = true) {
     ? `${whole}.${decimalParts.join("")}`
     : whole;
 }
+
+// Keep the fractional text intact while the user is typing (e.g. "1,000.").
+export function formatNumberInput(value: string) {
+  const [whole, fraction] = stripNumberCommas(value).split(".");
+  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return fraction === undefined ? grouped : `${grouped}.${fraction}`;
+}

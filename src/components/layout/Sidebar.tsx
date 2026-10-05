@@ -66,7 +66,6 @@ export default function Sidebar({
   const canReadUnits = userCan(user, "units");
   const canReadIngredients = userCan(user, "ingredients");
   const canReadBrandTypes = userCan(user, "brand_types");
-  const canReadIngredientPrices = userCan(user, "ingredient_prices");
   const canReadSuppliers = userCan(user, "suppliers");
   const canReadCategories = userCan(user, "categories");
   const canReadProducts = userCan(user, "products");
@@ -132,12 +131,6 @@ export default function Sidebar({
       label: t("Ingredients"),
       to: "/ingredient-management",
       icon: PackageOpen,
-    });
-  if (canReadIngredientPrices)
-    inventoryMasterLinks.push({
-      label: t("Master Price & PAR"),
-      to: "/ingredient-price-management",
-      icon: Scale,
     });
   if (canReadInventoryCounts)
     inventoryOperationLinks.push({

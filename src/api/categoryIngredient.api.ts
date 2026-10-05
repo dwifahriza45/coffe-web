@@ -73,3 +73,49 @@ export const getAllCategoryIngredients = async () => {
     if (!page.length || start >= (response.total ?? start)) return items;
   }
 };
+
+export interface IngredientSubcategory {
+  subcategory_ingredient_id: string;
+  category_ingredient_id: string;
+  name: string;
+  active: boolean;
+  in_use: boolean;
+}
+export const getIngredientSubcategories = async (categoryID = "") =>
+  (
+    await api.get<ApiResponse<IngredientSubcategory[]>>(
+      categoryID
+        ? `/category-ingredients/${encodeURIComponent(categoryID)}/subcategories`
+        : "/category-ingredients/subcategories",
+    )
+  ).data;
+export const getCategoryIngredient = async (categoryID: string) =>
+  (
+    await api.get<ApiResponse<CategoryIngredient>>(
+      `/category-ingredients/${encodeURIComponent(categoryID)}`,
+    )
+  ).data;
+export const saveIngredientSubcategory = async (
+  categoryID: string,
+  payload: CategoryIngredientPayload,
+  subcategoryID?: string,
+) => {
+  const path = `/category-ingredients/${encodeURIComponent(categoryID)}/subcategories`;
+  return (
+    subcategoryID
+      ? await api.put<ApiResponse<null>>(
+          `${path}/${encodeURIComponent(subcategoryID)}`,
+          payload,
+        )
+      : await api.post<ApiResponse<null>>(path, payload)
+  ).data;
+};
+export const deleteIngredientSubcategory = async (
+  categoryID: string,
+  subcategoryID: string,
+) =>
+  (
+    await api.delete<ApiResponse<null>>(
+      `/category-ingredients/${encodeURIComponent(categoryID)}/subcategories/${encodeURIComponent(subcategoryID)}`,
+    )
+  ).data;

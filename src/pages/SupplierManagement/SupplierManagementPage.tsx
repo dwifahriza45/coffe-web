@@ -1,4 +1,5 @@
-import { Download, Pencil, Plus, Power, Truck, Search, Trash2, Upload, X } from "lucide-react";
+import { Link } from "react-router-dom";
+import { ExternalLink, Download, Pencil, Plus, Power, Truck, Search, Trash2, Upload, X } from "lucide-react";
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { isAxiosError } from "axios";
 import * as XLSX from "xlsx-js-style";
@@ -18,12 +19,26 @@ import { useAuth } from "../../app/AuthContext";
 import { useLanguage } from "../../app/LanguageContext";
 import { userCan } from "../../app/roleAccess";
 
+import { supplierImportChanged } from "../../utils/supplierImport";
+import { isValidSupplierPhone, normalizeSupplierPhone, supplierWhatsAppUrl } from "../../utils/supplierPhone";
+
+function isValidSupplierLink(link: string): boolean {
+  if (!link.trim()) return true;
+  try {
+    const parsed = new URL(link.trim());
+    return /^https?:\/\//i.test(link.trim()) && ["http:", "https:"].includes(parsed.protocol) && !!parsed.hostname && !parsed.username && !parsed.password && link.trim().length <= 2048;
+  } catch {
+    return false;
+  }
+}
+
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50];
 const emptyForm: SupplierPayload = {
   name: "",
   phone: "",
   email: "",
   address: "",
+  link: "",
   active: true,
 };
 
@@ -35,6 +50,7 @@ interface ImportDetail {
   phone: string;
   email: string;
   address: string;
+  link: string;
   status: ImportStatus;
   reason: string;
 }
@@ -143,9 +159,10 @@ export default function SupplierManagementPage() {
       supplier
         ? {
             name: supplier.name,
-            phone: supplier.phone,
+            phone: normalizeSupplierPhone(supplier.phone),
             email: supplier.email,
             address: supplier.address,
+        link: supplier.link || "",
             active: supplier.active,
           }
         : emptyForm,
@@ -161,6 +178,14 @@ export default function SupplierManagementPage() {
     setActionError("");
     if (!form.name.trim()) {
       setFieldErrors({ name: t("Name is required") });
+      return;
+    }
+    if (!isValidSupplierPhone(form.phone)) {
+      setFieldErrors({ phone: t("Phone must start with 08 and contain 10–13 digits only") });
+      return;
+    }
+    if (!isValidSupplierLink(form.link)) {
+      setFieldErrors({ link: t("Link must be a valid http:// or https:// URL") });
       return;
     }
     setConfirm({
@@ -258,9 +283,10 @@ export default function SupplierManagementPage() {
     try {
       await updateSupplier(supplier.supplier_id, {
         name: supplier.name,
-        phone: supplier.phone,
+        phone: normalizeSupplierPhone(supplier.phone),
         email: supplier.email,
         address: supplier.address,
+        link: supplier.link || "",
         active: !supplier.active,
       });
       setNotice(t("Supplier status updated successfully."));
@@ -335,17 +361,18 @@ export default function SupplierManagementPage() {
   }
 
   function writeSuppliersWorkbook(exportItems: Supplier[]) {
-    const header = ["NAMA", "PHONE", "EMAIL", "ADDRESS", "STATUS"];
+    const header = ["NAMA", "PHONE", "EMAIL", "ADDRESS", "STATUS", "LINK"];
     const rows = exportItems.map((supplier) => [
       supplier.name,
-      supplier.phone,
+      normalizeSupplierPhone(supplier.phone),
       supplier.email,
       supplier.address,
       supplier.active ? "Active" : "Inactive",
+      supplier.link || "",
     ]);
     const worksheet = XLSX.utils.aoa_to_sheet([header, ...rows]);
-    worksheet["!cols"] = [{ wch: 30 }, { wch: 18 }, { wch: 32 }, { wch: 42 }, { wch: 14 }];
-    const range = XLSX.utils.decode_range(worksheet["!ref"] ?? "A1:E1");
+    worksheet["!cols"] = [{ wch: 30 }, { wch: 18 }, { wch: 32 }, { wch: 42 }, { wch: 14 }, { wch: 48 }];
+    const range = XLSX.utils.decode_range(worksheet["!ref"] ?? "A1:F1");
     const border = {
       top: { style: "thin", color: { rgb: "B8A99F" } },
       right: { style: "thin", color: { rgb: "B8A99F" } },
@@ -408,6 +435,7 @@ export default function SupplierManagementPage() {
     const normalized = (message ?? "").toLowerCase().trim();
     if (normalized === "supplier name already exists") return t("Supplier name already exists");
     if (normalized === "invalid input") return t("Invalid supplier input");
+    if (normalized === "supplier is in use") return t("Supplier is used by purchases or prices");
     if (normalized === "internal server error") return t("Internal server error");
     return t("Import failed");
   }
@@ -415,9 +443,10 @@ export default function SupplierManagementPage() {
   async function importSuppliers(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     event.target.value = "";
-    if (!file) return;
+    if (!file || importing || (!canCreateSuppliers && !canUpdateSuppliers)) return;
 
     setImporting(true);
+    setImportDetailOpen(false);
     setError("");
     setImportSummary(null);
     try {
@@ -427,6 +456,16 @@ export default function SupplierManagementPage() {
         header: 1,
         defval: "",
       });
+      const linkColumn = rows[0]?.findIndex((cell) => String(cell ?? "").trim().toUpperCase() === "LINK") ?? -1;
+      const statusColumn = rows[0]?.findIndex((cell) => String(cell ?? "").trim().toUpperCase() === "STATUS") ?? -1;
+      const existingByName = new Map<string, Supplier>();
+      for (let start = 0; ;) {
+        const response = await getSuppliers({ start, limit: 100, name: "" });
+        const items = response.data ?? [];
+        items.forEach((item) => existingByName.set(item.name.trim().toLowerCase(), item));
+        start += items.length;
+        if (!items.length || start >= (response.total ?? start)) break;
+      }
       const details: ImportDetail[] = [];
       const seenNames = new Set<string>();
 
@@ -436,27 +475,60 @@ export default function SupplierManagementPage() {
         const phone = String(row[1] ?? "").trim();
         const email = String(row[2] ?? "").trim();
         const address = String(row[3] ?? "").trim();
+        const link = linkColumn >= 0 ? String(row[linkColumn] ?? "").trim() : "";
         const normalizedName = name.toLowerCase();
 
-        if (!name && !phone && !email && !address) continue;
+        if (!name && !phone && !email && !address && !link) continue;
         if (!name) {
-          details.push({ row: rowNumber, name, phone, email, address, status: "failed", reason: t("Name is required") });
+          details.push({ row: rowNumber, name, phone, email, address, link, status: "failed", reason: t("Name is required") });
+          continue;
+        }
+        if (!isValidSupplierPhone(phone)) {
+          details.push({ row: rowNumber, name, phone, email, address, link, status: "failed", reason: t("Phone must start with 08 and contain 10–13 digits only") });
+          continue;
+        }
+        if (!isValidSupplierLink(link)) {
+          details.push({ row: rowNumber, name, phone, email, address, link, status: "failed", reason: t("Link must be a valid http:// or https:// URL") });
           continue;
         }
         if (seenNames.has(normalizedName)) {
-          details.push({ row: rowNumber, name, phone, email, address, status: "failed", reason: t("Duplicate name in import file") });
+          details.push({ row: rowNumber, name, phone, email, address, link, status: "failed", reason: t("Duplicate name in import file") });
           continue;
         }
 
         seenNames.add(normalizedName);
         try {
-          await createSupplier({ name, phone, email, address, active: true });
-          details.push({ row: rowNumber, name, phone, email, address, status: "success", reason: t("Imported successfully") });
+          const existing = existingByName.get(normalizedName);
+          const statusValue = statusColumn >= 0 ? String(row[statusColumn] ?? "").trim().toLowerCase() : "";
+          if (statusValue && !["active", "inactive", "aktif", "nonaktif"].includes(statusValue)) {
+            details.push({ row: rowNumber, name, phone, email, address, link, status: "failed", reason: t("Invalid supplier status") });
+            continue;
+          }
+          const payload: SupplierPayload = {
+            name, phone, email, address,
+            link: linkColumn >= 0 ? link : existing?.link || "",
+            active: statusValue ? ["active", "aktif"].includes(statusValue) : existing?.active ?? true,
+          };
+          if (existing) {
+            if (!supplierImportChanged(existing, payload)) continue;
+            if (!canUpdateSuppliers) {
+              details.push({ row: rowNumber, name, phone, email, address, link, status: "failed", reason: t("You do not have permission to update suppliers") });
+              continue;
+            }
+            await updateSupplier(existing.supplier_id, payload);
+          } else {
+            if (!canCreateSuppliers) {
+              details.push({ row: rowNumber, name, phone, email, address, link, status: "failed", reason: t("You do not have permission to create suppliers") });
+              continue;
+            }
+            await createSupplier(payload);
+          }
+          details.push({ row: rowNumber, name, phone, email, address, link, status: "success", reason: t(existing ? "Supplier updated successfully" : "Imported successfully") });
         } catch (requestError) {
           const response = isAxiosError<{ message?: string }>(requestError)
             ? requestError.response?.data
             : undefined;
-          details.push({ row: rowNumber, name, phone, email, address, status: "failed", reason: getImportReason(response?.message) });
+          details.push({ row: rowNumber, name, phone, email, address, link, status: "failed", reason: getImportReason(response?.message) });
         }
       }
 
@@ -474,7 +546,7 @@ export default function SupplierManagementPage() {
       setImportSummary({
         success: 0,
         failed: 1,
-        details: [{ row: 0, name: "", phone: "", email: "", address: "", status: "failed", reason: t("Could not read import file.") }],
+        details: [{ row: 0, name: "", phone: "", email: "", address: "", link: "", status: "failed", reason: t("Could not prepare supplier import") }],
       });
     } finally {
       setImporting(false);
@@ -487,7 +559,7 @@ export default function SupplierManagementPage() {
     selectableSuppliers.every((supplier) => selectedSupplierIDs.includes(supplier.supplier_id));
   const partiallyChecked = selectedSupplierIDs.length > 0 && !allSelectableChecked;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const columnCount = 6 + (canDeleteSuppliers ? 1 : 0) + (showActions ? 1 : 0);
+  const columnCount = 7 + (canDeleteSuppliers ? 1 : 0) + (showActions ? 1 : 0);
   return (
     <div className="flex min-h-screen bg-[#f8f5f0]">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
@@ -539,7 +611,7 @@ export default function SupplierManagementPage() {
                     placeholder={t("Search supplier...")}
                   />
                 </form>
-                {canCreateSuppliers && (
+                {(canCreateSuppliers || canUpdateSuppliers) && (
                   <>
                     <input ref={importInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={(event) => void importSuppliers(event)} />
                     <button type="button" onClick={() => importInputRef.current?.click()} disabled={importing} className="flex h-11 items-center justify-center gap-2 rounded-lg border border-stone-200 px-4 text-sm font-semibold text-stone-700 hover:bg-stone-50 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent">
@@ -599,6 +671,7 @@ export default function SupplierManagementPage() {
                     <th className="px-5 py-3">{t("Phone")}</th>
                     <th className="px-5 py-3">{t("Email")}</th>
                     <th className="px-5 py-3">{t("Address")}</th>
+                    <th className="px-5 py-3">{t("Link")}</th>
                     <th className="px-5 py-3">{t("Usage")}</th>
                     <th className="px-5 py-3">{t("Status")}</th>
                     {showActions && <th className="px-5 py-3 text-right">{t("Action")}</th>}
@@ -620,6 +693,8 @@ export default function SupplierManagementPage() {
                   ) : (
                     suppliers.map((supplier) => {
                       const inUse = Boolean(supplierUsage[supplier.supplier_id]);
+                      const phone = normalizeSupplierPhone(supplier.phone);
+                      const whatsappUrl = supplierWhatsAppUrl(phone);
                       return (
                       <tr key={supplier.supplier_id} className="hover:bg-stone-50/70">
                         {canDeleteSuppliers && (
@@ -635,12 +710,26 @@ export default function SupplierManagementPage() {
                           </td>
                         )}
                         <td className="px-5 py-4">
-                          <p className="text-sm font-semibold">{supplier.name}</p>
+                          <Link to={`/supplier-management/${encodeURIComponent(supplier.supplier_id)}`} className="text-sm font-semibold text-[#92502f] hover:underline">{supplier.name}</Link>
                           <p className="mt-1 text-xs text-stone-500">{supplier.supplier_id}</p>
                         </td>
-                        <td className="px-5 py-4 text-sm">{supplier.phone || "-"}</td>
+                        <td className="px-5 py-4 text-sm">
+                          {whatsappUrl ? (
+                            <a href={whatsappUrl} target="_blank" rel="noopener noreferrer" className="font-medium text-green-700 underline underline-offset-4 hover:text-green-900" aria-label={`WhatsApp ${supplier.name}: ${phone}`}>
+                              {phone}
+                            </a>
+                          ) : phone || "-"}
+                        </td>
                         <td className="px-5 py-4 text-sm">{supplier.email || "-"}</td>
                         <td className="max-w-xs whitespace-pre-wrap break-words px-5 py-4 text-sm">{supplier.address || "-"}</td>
+                        <td className="px-5 py-4 text-sm">
+                          {supplier.link && isValidSupplierLink(supplier.link) ? (
+                            <a href={supplier.link.trim()} target="_blank" rel="noopener noreferrer" title={supplier.link} aria-label={`${t("Open link")}: ${supplier.name}`} className="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-stone-300 bg-white px-3 py-2 text-xs font-semibold text-stone-700 hover:border-stone-400 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b86b42]">
+                              <ExternalLink size={14} />
+                              {t("Open link")}
+                            </a>
+                          ) : "-"}
+                        </td>
                         <td className="px-5 py-4">
                           <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${inUse ? "bg-amber-50 text-amber-700" : "bg-stone-100 text-stone-500"}`}>
                             <span className={`size-1.5 rounded-full ${inUse ? "bg-amber-500" : "bg-stone-400"}`} />
@@ -743,15 +832,16 @@ export default function SupplierManagementPage() {
               </button>
             </header>
             <div className="space-y-4 p-5">
-              {(["name", "phone", "email", "address"] as const).map((field) => (
+              {(["name", "phone", "email", "address", "link"] as const).map((field) => (
                 <label key={field} className="block text-sm font-semibold text-stone-700">
-                  {({ name: t("Name"), phone: t("Phone"), email: t("Email"), address: t("Address") })[field]}{field === "name" ? " *" : ""}
+                  {({ name: t("Name"), phone: t("Phone"), email: t("Email"), address: t("Address"), link: t("Link") })[field]}{field === "name" ? " *" : ""}
                   <input
-                    type={field === "email" ? "email" : field === "phone" ? "tel" : "text"}
+                    type={field === "link" ? "url" : field === "email" ? "email" : field === "phone" ? "tel" : "text"}
                     required={field === "name"}
                     minLength={field === "name" ? 2 : undefined}
-                    maxLength={({ name: 120, phone: 30, email: 254, address: 1000 })[field]}
+                    maxLength={({ name: 120, phone: 30, email: 254, address: 1000, link: 2048 })[field]}
                     value={form[field]}
+                    placeholder={field === "phone" ? "08xxxxxxxxxx" : field === "link" ? "https://shopee.co.id/..." : undefined}
                     onChange={(event) => {
                       setForm((current) => ({ ...current, [field]: event.target.value }));
                       setFieldErrors((current) => ({ ...current, [field]: "" }));

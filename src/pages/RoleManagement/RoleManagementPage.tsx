@@ -61,7 +61,6 @@ const PERMISSION_MENUS = [
   { key: "packagings", label: "Packaging unit" },
   { key: "category_ingredient", label: "Ingredient Categories" },
   { key: "brand_types", label: "Brand / Type" },
-  { key: "ingredient_prices", label: "Master Price & PAR" },
   { key: "suppliers", label: "Suppliers" },
   { key: "categories", label: "Categories" },
   { key: "products", label: "Products" },
@@ -102,7 +101,7 @@ const READ_DEPENDENCIES: Record<string, string[]> = {
   stock_movements: [],
   inventory_closing_counts: ["inventory_counts"],
   brand_types: ["category_ingredient"],
-  ingredients: ["brand_types", "ingredient_prices", "category_ingredient"],
+  ingredients: ["brand_types", "category_ingredient"],
   categories: ["products", "recipes", "recipe_items"],
   products: ["categories", "recipes", "recipe_items"],
   recipes: ["categories", "products", "recipe_items"],
@@ -115,7 +114,7 @@ const LINKED_READ_GROUPS: string[][] = [
     "inventory_closing_counts",
   ],
   ["categories", "products", "recipes", "recipe_items"],
-  ["ingredients", "brand_types", "ingredient_prices"],
+  ["ingredients", "brand_types"],
 ];
 
 export default function RoleManagementPage() {
