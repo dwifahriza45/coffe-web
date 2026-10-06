@@ -1,3 +1,4 @@
+import ManagementTable from "../../components/common/ManagementTable";
 import { ingredientExportHeaders, ingredientImportChanged, parseIngredientQuantity, resolveImportOption } from "../../utils/ingredientImport";
 import { createExportWorksheet } from "../../utils/exportWorksheet";
 import { Link } from "react-router-dom";
@@ -713,10 +714,11 @@ export default function IngredientManagementPage() {
                 {error}
               </div>
             )}
-            <div className="overflow-x-auto" tabIndex={0} role="region" aria-label={t("Ingredient Management")}>
-              <table className="w-full min-w-[1600px] whitespace-nowrap text-left">
-                <thead className="bg-stone-50 text-xs uppercase tracking-wider text-stone-500">
-                  <tr>
+            <ManagementTable
+              label={t("Ingredient Management")}
+              className="min-w-[1600px] whitespace-nowrap"
+              headers={<>
+
                     <th className="px-5 py-3">{t("Ingredient")}</th>
                     <th className="px-5 py-3">{t("Ingredient Category")}</th>
                     <th className="px-5 py-3">{t("Ingredient subcategory")}</th>
@@ -730,9 +732,9 @@ export default function IngredientManagementPage() {
                     {showActions && (
                       <th className="px-5 py-3 text-right">{t("Action")}</th>
                     )}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-stone-100">
+              </>}
+            >
+
                   {loading ? (
                     <tr>
                       <td
@@ -873,9 +875,7 @@ export default function IngredientManagementPage() {
                       );
                     })
                   )}
-                </tbody>
-              </table>
-            </div>
+            </ManagementTable>
             <footer className="flex items-center justify-between border-t border-stone-200 px-5 py-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                 <p className="text-xs text-stone-500">

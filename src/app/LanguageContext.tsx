@@ -47,28 +47,43 @@ const translations: Record<string, string> = {
   Packaging: "Satuan kemasan",
   "Brand / Type": "Brand / Type",
   "Back to ingredients": "Kembali ke bahan",
-  "Choose the active price for this ingredient": "Kelola pilihan harga aktif dan nonaktif untuk bahan ini.",
+  "Choose the active price for this ingredient":
+    "Kelola pilihan harga aktif dan nonaktif untuk bahan ini.",
   "Active price": "Harga aktif",
   "Ingredient price history": "Riwayat harga bahan",
   "No ingredient prices yet": "Belum ada harga bahan",
-  "Ingredient has no active price. Select an active price in ingredient details first.": "Bahan belum punya harga aktif. Pilih harga aktif di detail bahan terlebih dahulu.",
-  "Price follows the active ingredient price": "Harga mengikuti harga aktif bahan; transaksi lama memakai harga tersimpan",
+  "Ingredient has no active price. Select an active price in ingredient details first.":
+    "Bahan belum punya harga aktif. Pilih harga aktif di detail bahan terlebih dahulu.",
+  "Price follows the active ingredient price":
+    "Harga mengikuti harga aktif bahan; transaksi lama memakai harga tersimpan",
   "Ingredient price saved": "Harga bahan berhasil disimpan",
   "Use as active price": "Gunakan sebagai harga aktif",
-  "Enter a valid price and date": "Isi harga valid (maksimal 2 desimal) dan tanggal",
-  "Price per packaging unit. Used as the default for new supplier shopping records.": "Harga per satuan kemasan. Dipakai sebagai harga awal saat mencatat belanja supplier baru.",
-  "Activating a price automatically deactivates the previous price. Saved shopping records keep their prices.": "Mengaktifkan harga akan menonaktifkan harga sebelumnya. Harga pada belanja yang sudah disimpan tetap.",
-  "Save this price as active? The previous active price will become inactive.": "Simpan sebagai harga aktif? Harga aktif sebelumnya akan dinonaktifkan.",
+  "Enter a valid price and date":
+    "Isi harga valid (maksimal 2 desimal) dan tanggal",
+  "Price per packaging unit. Used as the default for new supplier shopping records.":
+    "Harga per satuan kemasan. Dipakai sebagai harga awal saat mencatat belanja supplier baru.",
+  "Activating a price automatically deactivates the previous price. Saved shopping records keep their prices.":
+    "Mengaktifkan harga akan menonaktifkan harga sebelumnya. Harga pada belanja yang sudah disimpan tetap.",
+  "Save this price as active? The previous active price will become inactive.":
+    "Simpan sebagai harga aktif? Harga aktif sebelumnya akan dinonaktifkan.",
   "Save this inactive price?": "Simpan harga ini sebagai nonaktif?",
   "Deactivate ingredient price": "Nonaktifkan harga bahan",
   "Activate ingredient price": "Aktifkan harga bahan",
-  "Deactivate this price? No price will be selected.": "Nonaktifkan harga ini? Bahan tidak akan memiliki harga aktif.",
-  "Use this price? The previous active price will become inactive.": "Gunakan harga ini? Harga aktif sebelumnya akan dinonaktifkan.",
+  "Deactivate this price? No price will be selected.":
+    "Nonaktifkan harga ini? Bahan tidak akan memiliki harga aktif.",
+  "Use this price? The previous active price will become inactive.":
+    "Gunakan harga ini? Harga aktif sebelumnya akan dinonaktifkan.",
   "Master Price & PAR": "Master Harga & PAR",
-  "Could not load ingredient prices.": "Gagal memuat Master Harga & PAR.",
+  "Could not load ingredient prices.": "Gagal memuat riwayat harga bahan.",
   "Add ingredient price": "Tambah harga bahan",
   "Update ingredient price": "Update harga bahan",
   "Create ingredient price": "Buat harga bahan",
+  "Delete this price? Saved PO prices remain unchanged. Deleting an active price leaves no active price.":
+    "Hapus harga ini? Harga PO tersimpan tetap. Menghapus harga aktif membuat bahan tidak punya harga aktif.",
+  "Price already used in PO":
+    "Harga sudah dipakai di PO dan tidak bisa dihapus",
+  "Delete this unused price? Deleting an active price leaves no active price.":
+    "Hapus harga yang belum dipakai ini? Menghapus harga aktif membuat bahan tidak punya harga aktif.",
   "Delete ingredient price": "Hapus harga bahan",
   "All ingredient prices": "Semua harga bahan",
   "prices found": "harga ditemukan",
@@ -818,17 +833,24 @@ const translations: Record<string, string> = {
   "Could not load ingredients.": "Gagal memuat bahan.",
   "Could not export ingredients.": "Gagal mengekspor bahan.",
   "No changes": "Tidak ada perubahan",
-  "Skipped": "Dilewati",
+  Skipped: "Dilewati",
   "No ingredient rows to import": "Tidak ada baris bahan untuk diimport.",
-  "Could not prepare ingredient import": "Tidak dapat membaca file atau memuat data bahan untuk import.",
+  "Could not prepare ingredient import":
+    "Tidak dapat membaca file atau memuat data bahan untuk import.",
   "Ingredient updated successfully": "Bahan berhasil diperbarui.",
-  "You do not have permission to create ingredients": "Anda tidak memiliki izin membuat bahan.",
-  "You do not have permission to update ingredients": "Anda tidak memiliki izin memperbarui bahan.",
+  "You do not have permission to create ingredients":
+    "Anda tidak memiliki izin membuat bahan.",
+  "You do not have permission to update ingredients":
+    "Anda tidak memiliki izin memperbarui bahan.",
   "Invalid minimum stock": "Stok minimum harus berupa angka nol atau lebih.",
-  "Invalid ingredient quantity": "Jumlah harus lebih dari nol dan diikuti nama satuan, misalnya 1 Kardus atau 1000 g.",
-  "Ambiguous ingredient reference": "Nama referensi bahan ambigu. Pastikan nama unik pada kategori dan subkategori yang dipilih.",
-  "Unknown ingredient reference": "Kategori, subkategori, brand, supplier, atau satuan tidak ditemukan atau tidak aktif.",
-  "Invalid ingredient import format": "Format import tidak sesuai. Gunakan file export bahan.",
+  "Invalid ingredient quantity":
+    "Jumlah harus lebih dari nol dan diikuti nama satuan, misalnya 1 Kardus atau 1000 g.",
+  "Ambiguous ingredient reference":
+    "Nama referensi bahan ambigu. Pastikan nama unik pada kategori dan subkategori yang dipilih.",
+  "Unknown ingredient reference":
+    "Kategori, subkategori, brand, supplier, atau satuan tidak ditemukan atau tidak aktif.",
+  "Invalid ingredient import format":
+    "Format import tidak sesuai. Gunakan file export bahan.",
   "Manage stock ingredients and packaging.": "Kelola bahan stok dan kemasan.",
   "Manage stock ingredients and base units.":
     "Kelola bahan stok dan satuan dasar.",

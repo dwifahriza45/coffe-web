@@ -1,8 +1,15 @@
+import UsageBadge from "../../components/common/UsageBadge";
+import TableActionButton from "../../components/common/TableActionButton";
+import ManagementTable from "../../components/common/ManagementTable";
 import { isAxiosError } from "axios";
-import { ArrowLeft, Power } from "lucide-react";
+import { ArrowLeft, Pencil, Power, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
+  createIngredientPrice,
+  updateIngredientPrice,
+  deleteIngredientPrice,
+  type IngredientPricePayload,
   getIngredient,
   getIngredientPrices,
   setIngredientPriceActive,
@@ -15,16 +22,24 @@ import { userCan } from "../../app/roleAccess";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import Navbar from "../../components/layout/Navbar";
 import Sidebar from "../../components/layout/Sidebar";
+import { formatNumber } from "../../utils/numberFormat";
 import {
-  formatNumber,
-} from "../../utils/numberFormat";
-import { formatBusinessDate } from "../../utils/businessDate";
+  currentBusinessDate,
+  formatBusinessDate,
+} from "../../utils/businessDate";
 
 export default function IngredientDetailPage() {
   const { ingredientID = "" } = useParams();
   const { user } = useAuth();
   const { t } = useLanguage();
+  const canCreate = userCan(user, "ingredients", "create");
+  const canDelete = userCan(user, "ingredients", "delete");
+  const canManage = userCan(user, "ingredients", "update") || canDelete;
   const canUpdate = userCan(user, "ingredients", "update");
+  const [editor, setEditor] = useState<{
+    id: string;
+    data: IngredientPricePayload;
+  } | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [ingredient, setIngredient] = useState<Ingredient | null>(null);
   const [prices, setPrices] = useState<IngredientPriceOption[]>([]);
@@ -42,20 +57,17 @@ export default function IngredientDetailPage() {
     let current = true;
     setLoading(true);
     setError("");
-    Promise.all([
+    Promise.allSettled([
       getIngredient(ingredientID),
       getIngredientPrices(ingredientID),
     ])
       .then(([item, list]) => {
-        if (current) {
-          setIngredient(item.data ?? null);
-          setPrices(list.data ?? []);
-        }
-      })
-      .catch(() => {
-        if (current) {
-          setIngredient(null);
-          setPrices([]);
+        if (!current) return;
+        setIngredient(
+          item.status === "fulfilled" ? (item.value.data ?? null) : null,
+        );
+        setPrices(list.status === "fulfilled" ? (list.value.data ?? []) : []);
+        if (item.status === "rejected" || list.status === "rejected") {
           setError(t("Could not load ingredient prices."));
         }
       })
@@ -109,6 +121,27 @@ export default function IngredientDetailPage() {
                 {t("Choose the active price for this ingredient")}
               </p>
             </div>
+            {canCreate && (
+              <button
+                disabled={saving || loading || !ingredient}
+                onClick={() => {
+                  setError("");
+                  setNotice("");
+                  setEditor({
+                    id: "",
+                    data: {
+                      price: "",
+                      effective_date: currentBusinessDate(),
+                      notes: "",
+                      active: false,
+                    },
+                  });
+                }}
+                className="rounded-lg bg-[#362219] px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
+              >
+                {t("Add ingredient price")}
+              </button>
+            )}
           </header>
           {error && (
             <p
@@ -125,6 +158,126 @@ export default function IngredientDetailPage() {
             >
               {notice}
             </p>
+          )}
+          {editor && (
+            <form
+              className="mt-6 space-y-4 rounded-xl border border-stone-200 bg-white p-5"
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (
+                  !/^[0-9]{1,16}(\.[0-9]{1,2})?$/.test(editor.data.price) ||
+                  !editor.data.effective_date
+                ) {
+                  setError(t("Enter a valid price and date"));
+                  return;
+                }
+                void run(async () => {
+                  if (editor.id)
+                    await updateIngredientPrice(
+                      ingredientID,
+                      editor.id,
+                      editor.data,
+                    );
+                  else await createIngredientPrice(ingredientID, editor.data);
+                  setEditor(null);
+                });
+              }}
+            >
+              <h2 className="font-bold">
+                {t(
+                  editor.id
+                    ? "Update ingredient price"
+                    : "Add ingredient price",
+                )}
+              </h2>
+              <fieldset disabled={saving} className="grid gap-4 sm:grid-cols-2">
+                <label className="text-sm">
+                  {t("Price")} (Rp)
+                  <input
+                    autoFocus
+                    required
+                    type="number"
+                    min="0"
+                    max="9999999999999999.99"
+                    step="0.01"
+                    value={editor.data.price}
+                    onChange={(e) =>
+                      setEditor({
+                        ...editor,
+                        data: { ...editor.data, price: e.target.value },
+                      })
+                    }
+                    className="mt-1 block w-full rounded-lg border border-stone-300 p-2"
+                  />
+                </label>
+                <label className="text-sm">
+                  {t("Effective Date")}
+                  <input
+                    required
+                    type="date"
+                    value={editor.data.effective_date}
+                    onChange={(e) =>
+                      setEditor({
+                        ...editor,
+                        data: {
+                          ...editor.data,
+                          effective_date: e.target.value,
+                        },
+                      })
+                    }
+                    className="mt-1 block w-full rounded-lg border border-stone-300 p-2"
+                  />
+                </label>
+                <label className="text-sm sm:col-span-2">
+                  {t("Notes")}
+                  <textarea
+                    maxLength={1000}
+                    value={editor.data.notes}
+                    onChange={(e) =>
+                      setEditor({
+                        ...editor,
+                        data: { ...editor.data, notes: e.target.value },
+                      })
+                    }
+                    className="mt-1 block w-full rounded-lg border border-stone-300 p-2"
+                  />
+                </label>
+                <label className="flex items-center gap-2 text-sm sm:col-span-2">
+                  <input
+                    type="checkbox"
+                    checked={editor.data.active}
+                    onChange={(e) =>
+                      setEditor({
+                        ...editor,
+                        data: { ...editor.data, active: e.target.checked },
+                      })
+                    }
+                  />
+                  {t("Use as active price")}
+                </label>
+              </fieldset>
+              <p className="text-xs text-stone-500">
+                {t(
+                  "Activating a price automatically deactivates the previous price. Saved shopping records keep their prices.",
+                )}
+              </p>
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => setEditor(null)}
+                  className="rounded-lg border px-4 py-2 text-sm"
+                >
+                  {t("Cancel")}
+                </button>
+                <button
+                  disabled={saving}
+                  className="rounded-lg bg-[#362219] px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
+                >
+                  {t(saving ? "Saving..." : "Save")}
+                </button>
+              </div>
+            </form>
           )}
           <div className="mt-6 rounded-xl border border-stone-200 bg-white p-5">
             <p className="text-sm text-stone-500">{t("Active price")}</p>
@@ -146,56 +299,118 @@ export default function IngredientDetailPage() {
                 )}
               </p>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[650px] text-left text-sm">
-                <thead className="bg-stone-50 text-xs uppercase text-stone-500">
-                  <tr>
-                    {["Price", "Effective Date", "Notes", "Status"].map(
-                      (label) => (
-                        <th key={label} className="px-5 py-3">
-                          {t(label)}
-                        </th>
-                      ),
+            <ManagementTable
+              label={t("Ingredient price history")}
+              headers={
+                <>
+                  {["Price", "Effective Date", "Notes", "Usage", "Status"].map(
+                    (label) => (
+                      <th key={label} className="px-5 py-3">
+                        {t(label)}
+                      </th>
+                    ),
+                  )}
+                  {canManage && (
+                    <th className="px-5 py-3 text-right">{t("Action")}</th>
+                  )}
+                </>
+              }
+            >
+              {loading || !prices.length ? (
+                <tr>
+                  <td
+                    colSpan={canManage ? 6 : 5}
+                    className="px-5 py-14 text-center text-sm text-stone-500"
+                  >
+                    {t(
+                      loading
+                        ? "Loading..."
+                        : error
+                          ? "Could not load ingredient prices."
+                          : "No ingredient prices yet",
                     )}
-                    {canUpdate && (
-                      <th className="px-5 py-3 text-right">{t("Action")}</th>
-                    )}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-stone-100">
-                  {loading || !prices.length ? (
-                    <tr>
-                      <td
-                        colSpan={canUpdate ? 5 : 4}
-                        className="p-10 text-center text-stone-500"
+                  </td>
+                </tr>
+              ) : (
+                prices.map((price) => (
+                  <tr
+                    key={price.price_option_id}
+                    className="hover:bg-stone-50/70"
+                  >
+                    <td className="whitespace-nowrap px-5 py-4 font-semibold">
+                      Rp {formatNumber(price.price, 2)}
+                    </td>
+                    <td className="whitespace-nowrap px-5 py-4">
+                      {formatBusinessDate(price.effective_date)}
+                    </td>
+                    <td className="max-w-sm whitespace-pre-wrap break-words px-5 py-4">
+                      {price.notes || "—"}
+                    </td>
+                    <td className="px-5 py-4">
+                      <UsageBadge inUse={price.in_use} />
+                    </td>
+                    <td className="px-5 py-4">
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-xs font-semibold ${price.active ? "bg-green-50 text-green-700" : "bg-stone-100 text-stone-500"}`}
                       >
-                        {t(loading ? "Loading..." : "No ingredient prices yet")}
-                      </td>
-                    </tr>
-                  ) : (
-                    prices.map((price) => (
-                      <tr key={price.price_option_id}>
-                        <td className="whitespace-nowrap px-5 py-4 font-semibold">
-                          Rp {formatNumber(price.price, 2)}
-                        </td>
-                        <td className="whitespace-nowrap px-5 py-4">
-                          {formatBusinessDate(price.effective_date)}
-                        </td>
-                        <td className="max-w-sm whitespace-pre-wrap break-words px-5 py-4">
-                          {price.notes || "—"}
-                        </td>
-                        <td className="px-5 py-4">
-                          <span
-                            className={`rounded-full px-2.5 py-1 text-xs font-semibold ${price.active ? "bg-green-50 text-green-700" : "bg-stone-100 text-stone-500"}`}
-                          >
-                            {t(price.active ? "Active" : "Inactive")}
-                          </span>
-                        </td>
-                        {canUpdate && (
-                          <td className="px-5 py-4 text-right">
-                            <button
-                              disabled={saving}
-                              title={t(
+                        {t(price.active ? "Active" : "Inactive")}
+                      </span>
+                    </td>
+                    {canManage && (
+                      <td className="px-5 py-4">
+                        <div className="flex justify-end gap-1.5">
+                          {canUpdate && (
+                            <TableActionButton
+                              disabled={saving || !!editor}
+                              onClick={() => {
+                                setError("");
+                                setNotice("");
+                                setEditor({
+                                  id: price.price_option_id,
+                                  data: {
+                                    price: price.price,
+                                    effective_date: price.effective_date,
+                                    notes: price.notes,
+                                    active: price.active,
+                                  },
+                                });
+                              }}
+                              label={t("Update ingredient price")}
+                            >
+                              <Pencil size={15} />
+                            </TableActionButton>
+                          )}
+                          {canDelete && (
+                            <TableActionButton
+                              disabled={saving || !!editor || price.in_use}
+                              onClick={() =>
+                                setConfirm({
+                                  title: t("Delete ingredient price"),
+                                  message: t(
+                                    "Delete this unused price? Deleting an active price leaves no active price.",
+                                  ),
+                                  action: async () => {
+                                    await deleteIngredientPrice(
+                                      ingredientID,
+                                      price.price_option_id,
+                                    );
+                                  },
+                                })
+                              }
+                              label={t(
+                                price.in_use
+                                  ? "Price already used in PO"
+                                  : "Delete ingredient price",
+                              )}
+                              variant="danger"
+                            >
+                              <Trash2 size={15} />
+                            </TableActionButton>
+                          )}
+                          {canUpdate && (
+                            <TableActionButton
+                              disabled={saving || !!editor}
+                              label={t(
                                 price.active ? "Deactivate" : "Activate",
                               )}
                               onClick={() =>
@@ -219,19 +434,17 @@ export default function IngredientDetailPage() {
                                   },
                                 })
                               }
-                              className="inline-flex items-center gap-2 rounded-lg border border-stone-200 px-3 py-2 text-xs font-semibold hover:bg-stone-50 disabled:opacity-40"
                             >
                               <Power size={14} />
-                              {t(price.active ? "Deactivate" : "Activate")}
-                            </button>
-                          </td>
-                        )}
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+                            </TableActionButton>
+                          )}
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                ))
+              )}
+            </ManagementTable>
           </section>
         </main>
       </section>

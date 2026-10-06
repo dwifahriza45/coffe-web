@@ -550,7 +550,7 @@ export default function SupplierDetailPage() {
                                       "Content Qty",
                                       "Content unit",
                                       "Total",
-                                      "Notes",
+                                      ...(transaction.source === "shopping" ? [] : ["Notes"]),
                                     ].map((label) => (
                                       <th key={label} className="px-3 py-3">
                                         {t(label)}
@@ -562,7 +562,7 @@ export default function SupplierDetailPage() {
                                   {transaction.items.length === 0 ? (
                                     <tr>
                                       <td
-                                        colSpan={10}
+                                        colSpan={transaction.source === "shopping" ? 9 : 10}
                                         className="p-5 text-center text-stone-500"
                                       >
                                         {t("No transaction items")}
@@ -600,9 +600,11 @@ export default function SupplierDetailPage() {
                                         <td className="whitespace-nowrap px-3 py-3">
                                           {money(item.total)}
                                         </td>
-                                        <td className="max-w-xs whitespace-pre-wrap px-3 py-3">
-                                          {item.notes || "—"}
-                                        </td>
+                                        {transaction.source !== "shopping" && (
+                                          <td className="max-w-xs whitespace-pre-wrap px-3 py-3">
+                                            {item.notes || "—"}
+                                          </td>
+                                        )}
                                       </tr>
                                     ))
                                   )}

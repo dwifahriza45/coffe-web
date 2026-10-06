@@ -71,6 +71,7 @@ export const deleteIngredient = async (ingredientID: string) =>
   (await api.delete<ApiResponse<null>>(`/ingredients/${ingredientID}`)).data;
 
 export interface IngredientPriceOption {
+  in_use: boolean;
   supplier_name: string;
   purchase_no: string;
   price_option_id: string;
@@ -94,5 +95,40 @@ export const setIngredientPriceActive = async (
     await api.put<ApiResponse<null>>(
       `/ingredients/${encodeURIComponent(ingredientID)}/prices/${encodeURIComponent(priceID)}/active`,
       { active },
+    )
+  ).data;
+
+export type IngredientPricePayload = Pick<
+  IngredientPriceOption,
+  "price" | "effective_date" | "notes" | "active"
+>;
+export const createIngredientPrice = async (
+  ingredientID: string,
+  payload: IngredientPricePayload,
+) =>
+  (
+    await api.post<ApiResponse<null>>(
+      `/ingredients/${encodeURIComponent(ingredientID)}/prices`,
+      payload,
+    )
+  ).data;
+export const updateIngredientPrice = async (
+  ingredientID: string,
+  priceID: string,
+  payload: IngredientPricePayload,
+) =>
+  (
+    await api.put<ApiResponse<null>>(
+      `/ingredients/${encodeURIComponent(ingredientID)}/prices/${encodeURIComponent(priceID)}`,
+      payload,
+    )
+  ).data;
+export const deleteIngredientPrice = async (
+  ingredientID: string,
+  priceID: string,
+) =>
+  (
+    await api.delete<ApiResponse<null>>(
+      `/ingredients/${encodeURIComponent(ingredientID)}/prices/${encodeURIComponent(priceID)}`,
     )
   ).data;
