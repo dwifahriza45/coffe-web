@@ -1,3 +1,4 @@
+import { createExportWorksheet } from "../../utils/exportWorksheet";
 import { Download, Pencil, Plus, Power, Ruler, Search, Trash2, Upload, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { isAxiosError } from "axios";
@@ -310,31 +311,7 @@ export default function UnitManagementPage() {
   function writeUnitsWorkbook(exportItems: Unit[]) {
     const header = ["KODE", "NAMA", "TYPE SATUAN ISI"];
     const rows = exportItems.map((unit) => [unit.code, unit.name, unit.unit_type]);
-    const worksheet = XLSX.utils.aoa_to_sheet([header, ...rows]);
-    worksheet["!cols"] = [{ wch: 16 }, { wch: 28 }, { wch: 22 }];
-    const range = XLSX.utils.decode_range(worksheet["!ref"] ?? "A1:C1");
-    const border = {
-      top: { style: "thin", color: { rgb: "B8A99F" } },
-      right: { style: "thin", color: { rgb: "B8A99F" } },
-      bottom: { style: "thin", color: { rgb: "B8A99F" } },
-      left: { style: "thin", color: { rgb: "B8A99F" } },
-    };
-    for (let row = range.s.r; row <= range.e.r; row += 1) {
-      for (let column = range.s.c; column <= range.e.c; column += 1) {
-        const address = XLSX.utils.encode_cell({ r: row, c: column });
-        if (!worksheet[address]) continue;
-        worksheet[address].s = {
-          border,
-          alignment: { horizontal: "center", vertical: "center" },
-          ...(row === 0
-            ? {
-                font: { bold: true, color: { rgb: "FFFFFF" } },
-                fill: { fgColor: { rgb: "362219" }, patternType: "solid" },
-              }
-            : {}),
-        };
-      }
-    }
+    const worksheet = createExportWorksheet(header, rows, [16, 28, 22]);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Satuan Isi");
     XLSX.writeFile(workbook, "satuan-isi.xlsx");

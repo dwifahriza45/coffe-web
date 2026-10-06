@@ -1,3 +1,5 @@
+import { ingredientExportHeaders, ingredientImportChanged, parseIngredientQuantity, resolveImportOption } from "../../utils/ingredientImport";
+import { createExportWorksheet } from "../../utils/exportWorksheet";
 import { Link } from "react-router-dom";
 import {
   getAllCategoryIngredients,
@@ -8,9 +10,10 @@ import {
 import { getPackagings, type Packaging } from "../../api/packaging.api";
 import { getAllSuppliers, type Supplier } from "../../api/supplier.api";
 import { getAllBrandTypes, type BrandType } from "../../api/brandType.api";
-import { Boxes, Pencil, Plus, Power, Search, Trash2, X } from "lucide-react";
+import * as XLSX from "xlsx-js-style";
+import { Boxes, Download, Pencil, Plus, Power, Search, Trash2, Upload, X } from "lucide-react";
 import { isAxiosError } from "axios";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import {
   createIngredient,
   deleteIngredient,
@@ -71,6 +74,11 @@ export default function IngredientManagementPage() {
   const [pageSize, setPageSize] = useState(10);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const importInputRef = useRef<HTMLInputElement>(null);
+  const [importDetails, setImportDetails] = useState<{ row: number; name: string; status: "success" | "failed" | "skipped"; reason: string }[] | null>(null);
+  const [importDetailOpen, setImportDetailOpen] = useState(false);
   const [error, setError] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [editingIngredient, setEditingIngredient] = useState<Ingredient | null>(
@@ -402,6 +410,157 @@ export default function IngredientManagementPage() {
     }
   }
 
+  async function exportIngredients() {
+    setExporting(true);
+    setError("");
+    try {
+      const items: Ingredient[] = [];
+      let exportTotal = total;
+      do {
+        const response = await getIngredients({
+          start: items.length,
+          limit: 100,
+          name: search,
+          category_ingredient_id: categoryFilter,
+          subcategory_ingredient_id: subcategoryFilter,
+          supplier_id: supplierFilter,
+        });
+        const nextItems = response.data ?? [];
+        if (nextItems.length === 0) break;
+        items.push(...nextItems);
+        exportTotal = response.total ?? items.length;
+      } while (items.length < exportTotal);
+
+      const headers = ingredientExportHeaders.map((label) => t(label).toUpperCase());
+      const rows = items.map((item) => [
+        item.name,
+        categoryIngredients.find((category) => category.category_ingredient_id === item.category_ingredient_id)?.name ?? item.category_ingredient_name ?? item.category_ingredient_id,
+        subcategories.find((subcategory) => subcategory.subcategory_ingredient_id === item.subcategory_ingredient_id)?.name ?? item.subcategory_ingredient_id,
+        brandTypes.find((brand) => brand.brand_type_id === item.brand_type_id)?.name ?? item.brand_type_id,
+        suppliers.find((supplier) => supplier.supplier_id === item.supplier_id)?.name ?? item.supplier_id,
+        `${formatNumber(item.package_qty, 6)} ${packagings.find((packaging) => packaging.packaging_id === item.packaging_id)?.name ?? item.packaging_id}`,
+        `${formatNumber(item.content_qty, 6)} ${unitOptions.find((unit) => unit.unit_id === item.content_unit_id)?.code ?? item.content_unit_id}`,
+        Number(item.minimum_stock),
+      ]);
+      const sheet = createExportWorksheet(headers, rows, [30, 25, 25, 25, 30, 22, 22, 16]);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, sheet, t("Ingredients"));
+      XLSX.writeFile(workbook, "bahan.xlsx");
+    } catch (requestError) {
+      const response = isAxiosError<{ message?: string }>(requestError)
+        ? requestError.response?.data
+        : undefined;
+      setError(response?.message || t("Could not export ingredients."));
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  async function importIngredients(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || importing || (!canCreateIngredients && !canUpdateIngredients)) return;
+    setImporting(true);
+    setError("");
+    setImportDetails(null);
+    setImportDetailOpen(false);
+    const details: NonNullable<typeof importDetails> = [];
+    try {
+      const workbook = XLSX.read(await file.arrayBuffer(), { type: "array" });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      if (!sheet) throw new Error("Invalid ingredient import format");
+      const rows = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: "" });
+      const header = (rows[0] ?? []).map((cell) => String(cell).trim().toLowerCase());
+      const indices = ingredientExportHeaders.map((label) => header.findIndex((cell) =>
+        [label.toLowerCase(), t(label).toLowerCase(), ...({
+          Ingredient: ["bahan"], "Ingredient Category": ["kategori bahan"],
+          "Ingredient subcategory": ["subkategori bahan"], "Brand / Type": ["brand / type"],
+          Supplier: ["supplier"], "Packaging unit": ["satuan kemasan"],
+          Content: ["isi"], "Min stock": ["stok minimum", "stock minimum", "min stok"],
+        }[label] ?? [])].includes(cell),
+      ));
+      if (indices.some((index) => index < 0) || new Set(header).size !== header.length) throw new Error("Invalid ingredient import format");
+      async function allPages<T>(load: (start: number) => Promise<{ data?: T[] | null; total?: number }>) {
+        const items: T[] = [];
+        for (;;) {
+          const response = await load(items.length);
+          const next = response.data ?? [];
+          items.push(...next);
+          if (!next.length || items.length >= (response.total ?? items.length)) return items;
+        }
+      }
+      const [existingItems, categories, subResponse, brands, supplierItems, packagingItems, units] = await Promise.all([
+        allPages((start) => getIngredients({ start, limit: 100, name: "" })),
+        getAllCategoryIngredients(), getIngredientSubcategories(), getAllBrandTypes(), getAllSuppliers(),
+        allPages((start) => getPackagings({ start, limit: 100, name: "" })),
+        allPages((start) => getUnits({ start, limit: 100, name: "" })),
+      ]);
+      const subs = subResponse.data ?? [];
+      const seen = new Set<string>();
+      for (const [index, row] of rows.slice(1).entries()) {
+        if (row.every((cell) => !String(cell ?? "").trim())) continue;
+        const cells = indices.map((column) => String(row[column] ?? "").trim());
+        const [name, categoryName, subcategoryName, brandName, supplierName, packageValue, contentValue, stockValue] = cells;
+        const entry = { row: index + 2, name };
+        try {
+          if (!name) throw new Error("Name is required");
+          const normalizedName = name.toLowerCase();
+          if (seen.has(normalizedName)) throw new Error("Duplicate name in import file");
+          seen.add(normalizedName);
+          const matches = existingItems.filter((item) => item.name.trim().toLowerCase() === normalizedName);
+          if (matches.length > 1) throw new Error("Ambiguous ingredient reference");
+          const existing = matches[0];
+          const category = resolveImportOption(categories.filter((item) => item.active), categoryName, (item) => item.name);
+          const categorySubs = subs.filter((item) => item.active && item.category_ingredient_id === category.category_ingredient_id);
+          const subcategory = subcategoryName && subcategoryName !== "-"
+            ? resolveImportOption(categorySubs, subcategoryName, (item) => item.name) : undefined;
+          if (categorySubs.length && !subcategory) throw new Error("Select ingredient subcategory");
+          const brand = resolveImportOption(brands.filter((item) => item.active && item.category_ingredient_id === category.category_ingredient_id && (item.subcategory_ingredient_id || "") === (subcategory?.subcategory_ingredient_id || "")), brandName, (item) => item.name);
+          const supplier = resolveImportOption(supplierItems.filter((item) => item.active), supplierName, (item) => item.name);
+          const packaging = parseIngredientQuantity(packageValue);
+          const content = parseIngredientQuantity(contentValue);
+          const packagingOption = resolveImportOption(packagingItems.filter((item) => item.active), packaging.unit, (item) => item.name);
+          const unit = resolveImportOption(units.filter((item) => item.active), content.unit, (item) => item.code);
+          const stock = stockValue.replace(/,/g, "");
+          if (!/^\d+(?:\.\d+)?$/.test(stock) || !Number.isFinite(Number(stock))) throw new Error("Invalid minimum stock");
+          const payload: IngredientPayload = {
+            name, category_ingredient_id: category.category_ingredient_id,
+            subcategory_ingredient_id: subcategory?.subcategory_ingredient_id || "",
+            brand_type_id: brand.brand_type_id, supplier_id: supplier.supplier_id,
+            packaging_id: packagingOption.packaging_id, package_qty: packaging.quantity,
+            content_qty: content.quantity, content_unit_id: unit.unit_id,
+            minimum_stock: stock, active: existing?.active ?? true,
+          };
+          if (existing && !ingredientImportChanged(existing, payload)) {
+            details.push({ ...entry, status: "skipped", reason: t("No changes") });
+            continue;
+          }
+          if (existing) {
+            if (!canUpdateIngredients) throw new Error("You do not have permission to update ingredients");
+            await updateIngredient(existing.ingredient_id, payload);
+          } else {
+            if (!canCreateIngredients) throw new Error("You do not have permission to create ingredients");
+            await createIngredient(payload);
+          }
+          details.push({ ...entry, status: "success", reason: t(existing ? "Ingredient updated successfully" : "Imported successfully") });
+        } catch (requestError) {
+          const message = isAxiosError<{ message?: string }>(requestError)
+            ? requestError.response?.data?.message
+            : requestError instanceof Error ? requestError.message : undefined;
+          details.push({ ...entry, status: "failed", reason: t(message || "Import failed") });
+        }
+      }
+      if (!details.length) setError(t("No ingredient rows to import"));
+      setImportDetails(details);
+    } catch (requestError) {
+      setError(t(requestError instanceof Error && requestError.message === "Invalid ingredient import format"
+        ? requestError.message : "Could not prepare ingredient import"));
+    } finally {
+      if (details.some((item) => item.status === "success")) setRefreshKey((value) => value + 1);
+      setImporting(false);
+    }
+  }
+
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const columnCount = showActions ? 11 : 10;
 
@@ -513,8 +672,42 @@ export default function IngredientManagementPage() {
                     placeholder={t("Search ingredient...")}
                   />
                 </form>
+                {(canCreateIngredients || canUpdateIngredients) && (
+                  <>
+                    <input ref={importInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={(event) => void importIngredients(event)} />
+                    <button type="button" onClick={() => importInputRef.current?.click()} disabled={importing || submitting || exporting} className="flex h-11 shrink-0 items-center justify-center gap-2 rounded-lg border border-stone-200 px-4 text-sm font-semibold text-stone-700 hover:bg-stone-50 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent">
+                      <Upload size={16} />
+                      {importing ? t("Importing...") : t("Import")}
+                    </button>
+                  </>
+                )}
+                <button
+                  type="button"
+                  onClick={() => void exportIngredients()}
+                  disabled={loading || exporting || importing || total === 0}
+                  className="flex h-11 shrink-0 items-center justify-center gap-2 rounded-lg border border-stone-200 px-4 text-sm font-semibold text-stone-700 hover:bg-stone-50 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent"
+                >
+                  <Download size={16} />
+                  {exporting ? t("Exporting...") : t("Export")}
+                </button>
               </div>
             </div>
+            {importDetails && (
+              <div className="m-4 rounded-lg border border-stone-200 p-4 text-sm">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p>{t("Import finished")}: {t("Success")} {importDetails.filter((item) => item.status === "success").length}, {t("Failed")} {importDetails.filter((item) => item.status === "failed").length}, {t("Skipped")} {importDetails.filter((item) => item.status === "skipped").length}</p>
+                  <button type="button" onClick={() => setImportDetailOpen((value) => !value)} aria-expanded={importDetailOpen} className="font-semibold text-[#92502f]">{t("Import detail")}</button>
+                </div>
+                {importDetailOpen && (
+                  <div className="mt-4 max-h-80 overflow-auto">
+                    <table className="w-full text-left text-sm">
+                      <thead><tr>{["Row", "Ingredient", "Status", "Reason"].map((label) => <th key={label} className="px-3 py-2">{t(label)}</th>)}</tr></thead>
+                      <tbody>{importDetails.map((item) => <tr key={item.row} className="border-t border-stone-100"><td className="px-3 py-2">{item.row}</td><td className="px-3 py-2">{item.name || "—"}</td><td className={`px-3 py-2 ${item.status === "failed" ? "text-red-700" : item.status === "success" ? "text-green-700" : "text-stone-500"}`}>{t(item.status === "success" ? "Success" : item.status === "failed" ? "Failed" : "Skipped")}</td><td className="px-3 py-2">{item.reason}</td></tr>)}</tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
             {error && (
               <div className="m-4 rounded-lg bg-red-50 p-4 text-sm text-red-700">
                 {error}

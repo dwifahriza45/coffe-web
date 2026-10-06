@@ -23,6 +23,7 @@ import { useAuth } from "../../app/AuthContext";
 import { useLanguage } from "../../app/LanguageContext";
 import { userCan } from "../../app/roleAccess";
 import Navbar from "../../components/layout/Navbar";
+import WhatsAppIcon from "../../components/common/WhatsAppIcon";
 import Sidebar from "../../components/layout/Sidebar";
 import { formatBusinessDate } from "../../utils/businessDate";
 import {
@@ -233,8 +234,10 @@ export default function SupplierDetailPage() {
                           href={whatsapp}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-green-700 underline"
+                          className="inline-flex items-center gap-1.5 font-medium text-green-700 no-underline hover:text-green-900"
+                          aria-label={`WhatsApp ${supplier.name}: ${phone}`}
                         >
+                          <WhatsAppIcon />
                           {phone}
                         </a>
                       ) : (

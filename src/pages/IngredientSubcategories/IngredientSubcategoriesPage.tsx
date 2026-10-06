@@ -1,3 +1,4 @@
+import { createExportWorksheet } from "../../utils/exportWorksheet";
 import { isAxiosError } from "axios";
 import {
   ArrowLeft,
@@ -190,20 +191,15 @@ function IngredientSubcategoriesPage() {
     }
   }
   function exportItems() {
-    const sheet = XLSX.utils.aoa_to_sheet([
+    const sheet = createExportWorksheet(
       ["NAMA SUBKATEGORI BAHAN", "STATUS", "KATEGORI BAHAN"],
-      ...filtered.map((item) => [
+      filtered.map((item) => [
         item.name,
         item.active ? "Active" : "Inactive",
         parent?.name ?? "",
       ]),
-    ]);
-    sheet["!cols"] = [{ wch: 32 }, { wch: 16 }, { wch: 28 }];
-    for (const address of ["A1", "B1", "C1"])
-      sheet[address].s = {
-        font: { bold: true, color: { rgb: "FFFFFF" } },
-        fill: { fgColor: { rgb: "362219" }, patternType: "solid" },
-      };
+      [32, 16, 28],
+    );
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, sheet, "Subkategori Bahan");
     XLSX.writeFile(workbook, "subkategori-bahan.xlsx");
