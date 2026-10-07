@@ -54,12 +54,12 @@ export default function StockMovementPage() {
   useEffect(() => {
     let current = true;
     setLoading(true); setError("");
-    getStockMovements({ start: (page - 1) * limit, limit, business_day_id: businessDayID, business_date: scopedDate, movement_type: type, name: search })
+    getStockMovements({ start: (page - 1) * limit, limit, business_day_id: businessDayID, business_date: scopedDate, movement_type: type, name: search, ingredient_id: params.get("ingredientID") ?? "" })
       .then((response) => { if (current) { setItems(response.data ?? []); setTotal(response.total ?? 0); } })
       .catch((error) => { if (current) { setItems([]); setTotal(0); setError(isAxiosError<{message?: string}>(error) ? error.response?.data.message || t("Could not load stock movements.") : t("Could not load stock movements.")); } })
       .finally(() => { if (current) setLoading(false); });
     return () => { current = false; };
-  }, [businessDayID, scopedDate, page, limit, type, search, refresh]);
+  }, [businessDayID, scopedDate, page, limit, type, search, refresh, params]);
 
   const pages = Math.max(1, Math.ceil(total / limit));
   const displayDate = businessDayID ? ((items[0]?.business_date ?? queryDate) || businessDayID) : todayOnly ? currentBusinessDate() : t("Inventory quantity changes");

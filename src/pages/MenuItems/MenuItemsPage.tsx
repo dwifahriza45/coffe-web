@@ -15,6 +15,7 @@ export default function MenuItemsPage() {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
+  const [refreshKey, setRefreshKey] = useState(0);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -36,7 +37,9 @@ export default function MenuItemsPage() {
           category_id: "",
         });
         if (!current) return;
-        setProducts(response.data ?? []);
+        const nextProducts = response.data ?? [];
+        if (!current) return;
+        setProducts(nextProducts);
         setTotal(response.total ?? 0);
       } catch (requestError) {
         if (!current) return;
@@ -54,7 +57,7 @@ export default function MenuItemsPage() {
     return () => {
       current = false;
     };
-  }, [page, pageSize, search]);
+  }, [page, pageSize, search, refreshKey]);
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
@@ -72,6 +75,7 @@ export default function MenuItemsPage() {
               <h1 className="font-serif text-3xl font-bold">{t("Menu Items")}</h1>
               <p className="mt-2 text-sm text-stone-500">{t("View products, recipe versions, and recipe items.")}</p>
             </div>
+            <button type="button" disabled={loading} onClick={() => setRefreshKey(value => value + 1)} className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">Perbarui menu</button>
           </header>
 
           <section className="mt-7 overflow-hidden rounded-xl border border-stone-200 bg-white">
@@ -122,6 +126,7 @@ export default function MenuItemsPage() {
                             {product.active ? t("Active") : t("Inactive")}
                           </span>
                         </td>
+
                       </tr>
                     ))
                   )}

@@ -3,8 +3,8 @@ import { isAxiosError } from "axios";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { getIngredient, type Ingredient } from "../../api/ingredient.api";
-import { getInventoryCounts } from "../../api/inventoryCount.api";
-import { getInventoryCountItems } from "../../api/inventoryCountItem.api";
+import { getStockSnapshot, type StockSnapshot } from "../../api/currentStock.api";
+import StockDateFilter from "../../components/common/StockDateFilter";
 import { getStockMovements, type StockMovement } from "../../api/stockMovement.api";
 import { useLanguage } from "../../app/LanguageContext";
 import Navbar from "../../components/layout/Navbar";
@@ -17,7 +17,8 @@ function toNumber(value?: string) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function formatQuantity(value: number, unit?: string) {
+function formatQuantity(value: number | null, unit?: string) {
+  if (value === null) return "Belum diketahui";
   return `${formatNumber(String(value), 3)}${unit ? ` ${unit}` : ""}`;
 }
 
@@ -44,7 +45,8 @@ export default function CurrentStockDetailPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const date = searchParams.get("date") || currentBusinessDate();
   const [ingredient, setIngredient] = useState<Ingredient | null>(null);
-  const [opening, setOpening] = useState(0);
+  const [opening, setOpening] = useState<number | null>(null);
+  const [snapshot, setSnapshot] = useState<StockSnapshot | null>(null);
   const [closing, setClosing] = useState<number | null>(null);
   const [movements, setMovements] = useState<StockMovement[]>([]);
   const [loading, setLoading] = useState(true);
@@ -56,58 +58,24 @@ export default function CurrentStockDetailPage() {
       setLoading(true);
       setError("");
       try {
-        const [ingredientResponse, countResponse, movementResponse] =
-          await Promise.all([
-            getIngredient(ingredientID),
-            getInventoryCounts({
-              start: 0,
-              limit: 10,
-              business_day_id: "",
-              count_type: "",
-              status: "",
-              name: "",
-            }),
-            getStockMovements({
-              start: 0,
-              limit: 100,
-              business_day_id: "",
-              business_date: date,
-              ingredient_id: ingredientID,
-              movement_type: "",
-              name: "",
-            }),
-          ]);
-        if (!current) return;
-        const countsForDate = (countResponse.data ?? []).filter(
-          (count) => count.business_day_info?.business_date === date,
-        );
-        const openingCount = countsForDate.find((count) => count.count_type === "OPENING");
-        const closingCount = countsForDate.find((count) => count.count_type === "CLOSING");
-        const [openingItems, closingItems] = await Promise.all([
-          openingCount
-            ? getInventoryCountItems({
-              start: 0,
-              limit: 100,
-              inventory_count_id: openingCount.inventory_count_id,
-              ingredient_id: ingredientID,
-              name: "",
-            })
-            : Promise.resolve({ data: [] }),
-          closingCount
-            ? getInventoryCountItems({
-              start: 0,
-              limit: 100,
-              inventory_count_id: closingCount.inventory_count_id,
-              ingredient_id: ingredientID,
-              name: "",
-            })
-            : Promise.resolve({ data: [] }),
+        async function loadMovements() {
+          const all: StockMovement[] = [];
+          for (let start = 0; ; start += 100) {
+            const response = await getStockMovements({ start, limit: 100, business_day_id: "", business_date: date, ingredient_id: ingredientID, movement_type: "", name: "" });
+            all.push(...(response.data ?? []));
+            if ((response.data ?? []).length < 100) return all;
+          }
+        }
+        const [ingredientResponse, snapshotResponse, movementItems] = await Promise.all([
+          getIngredient(ingredientID), getStockSnapshot(date, ingredientID), loadMovements(),
         ]);
         if (!current) return;
+        const stock = snapshotResponse.data?.items[0] ?? null;
+        setSnapshot(stock);
         setIngredient(ingredientResponse.data ?? null);
-        setOpening(openingItems.data?.[0]?.section_status === "SUBMITTED" ? toNumber(openingItems.data[0].actual_quantity) : 0);
-        setClosing(closingItems.data?.[0]?.section_status === "SUBMITTED" ? toNumber(closingItems.data[0].actual_quantity) : null);
-        setMovements(movementResponse.data ?? []);
+        setOpening(stock?.opening_quantity == null ? null : toNumber(stock.opening_quantity));
+        setClosing(stock?.closing_quantity == null ? null : toNumber(stock.closing_quantity));
+        setMovements(movementItems);
       } catch (requestError) {
         if (!current) return;
         const response = isAxiosError<{ message?: string }>(requestError)
@@ -126,24 +94,22 @@ export default function CurrentStockDetailPage() {
 
   const unit = ingredient?.base_unit_info?.code ?? ingredient?.base_unit ?? "";
   const unitName = ingredient?.base_unit_info?.name ?? ingredient?.base_unit ?? "-";
-  const minimum = toNumber(ingredient?.minimum_stock);
+  const historical = date !== currentBusinessDate();
+  const minimum = toNumber(historical ? snapshot?.minimum_stock ?? "" : ingredient?.minimum_stock);
   const summary = useMemo(() => {
     const stockIn = movements.filter((item) => isStockIn(item.movement_type));
     const stockOut = movements.filter((item) => isStockOut(item.movement_type));
     const adjustments = movements.filter((item) => isAdjustment(item.movement_type));
-    const stockInTotal = stockIn.reduce((total, item) => total + toNumber(item.quantity), 0);
-    const stockOutTotal = stockOut.reduce((total, item) => total + toNumber(item.quantity), 0);
-    const adjustmentTotal = adjustments.reduce(
-      (total, item) => total + movementSign(item.movement_type) * toNumber(item.quantity),
-      0,
-    );
-    const calculatedCurrent = opening + stockInTotal - stockOutTotal + adjustmentTotal;
-    const current = closing ?? calculatedCurrent;
+    const stockInTotal = toNumber(snapshot?.stock_in);
+    const stockOutTotal = toNumber(snapshot?.stock_out);
+    const adjustmentTotal = toNumber(snapshot?.adjustment);
+    const calculatedCurrent = opening === null ? null : opening + stockInTotal - stockOutTotal + adjustmentTotal;
+    const current = snapshot?.current_quantity == null ? null : toNumber(snapshot.current_quantity);
     return { stockIn, stockOut, adjustments, stockInTotal, stockOutTotal, adjustmentTotal, calculatedCurrent, current };
-  }, [movements, opening, closing]);
-  const low = summary.current < minimum;
-  const difference = summary.current - minimum;
-  const currentSource = closing === null ? t("Calculated from Opening Stock") : t("Taken from Closing Stock");
+  }, [movements, opening, snapshot]);
+  const low = summary.current !== null && summary.current < minimum;
+  const difference = summary.current === null || (historical && snapshot?.minimum_stock == null) ? null : summary.current - minimum;
+  const currentSource = snapshot?.current_quantity == null ? "Belum ada stock count valid pada tanggal ini" : closing === null ? `Dihitung dari stock count ${snapshot?.snapshot_date || ""} dan mutasi setelahnya` : t("Taken from Closing Stock");
   const dateQuery = `date=${encodeURIComponent(date)}`;
   const summaryCardClass = "rounded-lg bg-white px-4 py-3 text-left transition hover:-translate-y-0.5 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-accent)]/30";
 
@@ -158,6 +124,7 @@ export default function CurrentStockDetailPage() {
             {t("Current Stock")}
           </Link>
 
+          <div className="mb-5"><StockDateFilter /></div>
           {error && <div className="mb-5 rounded-lg bg-red-50 p-4 text-sm text-red-700">{error}</div>}
           <section className="rounded-xl border border-stone-200 bg-white p-5">
             {loading ? (
@@ -174,7 +141,7 @@ export default function CurrentStockDetailPage() {
                   </div>
                   <span className={`inline-flex w-fit items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold ${low ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"}`}>
                     <span className={`size-1.5 rounded-full ${low ? "bg-red-500" : "bg-emerald-500"}`} />
-                    {low ? t("Low Stock") : t("Sufficient")}
+                    {summary.current === null ? "Stok belum diketahui" : low ? t("Low Stock") : t("Sufficient")}
                   </span>
                 </div>
                 <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -185,12 +152,12 @@ export default function CurrentStockDetailPage() {
                   </div>
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">{t("Minimum Stock")}</p>
-                    <p className="mt-2 text-lg font-semibold">{formatQuantity(minimum, unit)}</p>
+                    <p className="mt-2 text-lg font-semibold">{historical && snapshot?.minimum_stock == null ? "Belum diketahui" : formatQuantity(minimum, unit)}</p>
                   </div>
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">{difference >= 0 ? t("Difference Above Minimum") : t("Difference Below Minimum")}</p>
-                    <p className={`mt-2 text-lg font-semibold ${difference >= 0 ? "text-emerald-700" : "text-red-700"}`}>
-                      {difference >= 0 ? "+" : ""}{formatQuantity(difference, unit)}
+                    <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">{(difference ?? 0) >= 0 ? t("Difference Above Minimum") : t("Difference Below Minimum")}</p>
+                    <p className={`mt-2 text-lg font-semibold ${(difference ?? 0) >= 0 ? "text-emerald-700" : "text-red-700"}`}>
+                      {(difference ?? 0) >= 0 ? "+" : ""}{formatQuantity(difference, unit)}
                     </p>
                   </div>
                   <div>
@@ -205,7 +172,7 @@ export default function CurrentStockDetailPage() {
           <section className="mt-5 rounded-xl border border-stone-200 bg-white p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <h2 className="font-semibold">{t("Today's Stock Summary")}</h2>
+                <h2 className="font-semibold">{historical ? "Ringkasan stok pada tanggal pilihan" : t("Today's Stock Summary")}</h2>
                 <p className="mt-1 text-sm text-stone-500">{t("Business Day")}: {formatBusinessDate(date)}</p>
               </div>
               <span className="rounded-full border border-stone-200 bg-stone-50 px-3 py-1.5 text-xs font-bold text-stone-600">
@@ -214,7 +181,7 @@ export default function CurrentStockDetailPage() {
             </div>
             <p className="mt-3 text-sm text-stone-500">
               {closing === null
-                ? t("Current Stock is calculated from Opening Stock plus submitted movements because Closing Stock has not been submitted.")
+                ? "Stok dihitung dari stock count terakhir yang disubmit sampai tanggal pilihan, ditambah mutasi setelahnya."
                 : t("Current Stock is taken from submitted Closing Stock.")}
             </p>
             <div className="mt-5 rounded-xl border border-stone-200 bg-stone-50 p-4">
@@ -227,7 +194,7 @@ export default function CurrentStockDetailPage() {
                   <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">{t("Stock In")}</p>
                   <p className="mt-2 text-xl font-bold text-emerald-700">+{formatQuantity(summary.stockInTotal, unit)}</p>
                 </Link>
-                <Link to={`/stock-movements?${dateQuery}`} className={summaryCardClass}>
+                <Link to={`/stock-movements?${dateQuery}&ingredientID=${encodeURIComponent(ingredientID)}`} className={summaryCardClass}>
                   <p className="text-xs font-semibold uppercase tracking-wider text-red-700">{t("Stock Out")}</p>
                   <p className="mt-2 text-xl font-bold text-red-700">-{formatQuantity(summary.stockOutTotal, unit)}</p>
                 </Link>
@@ -265,7 +232,7 @@ export default function CurrentStockDetailPage() {
                     {summary.stockIn.map((item) => (
                       <div key={item.stock_movement_id} className="mt-2 flex max-w-xl justify-between gap-4 text-stone-600">
                         <span>+ {item.po_number || item.reference_id}</span>
-                        <span>{formatQuantity(toNumber(item.quantity), unit)}</span>
+                        <span>{formatQuantity(toNumber(item.quantity), item.unit_code)}</span>
                       </div>
                     ))}
                   </div>
@@ -276,7 +243,7 @@ export default function CurrentStockDetailPage() {
                     {summary.stockOut.map((item) => (
                       <div key={item.stock_movement_id} className="mt-2 flex max-w-xl justify-between gap-4 text-stone-600">
                         <span>- {t(item.movement_type)}</span>
-                        <span>{formatQuantity(toNumber(item.quantity), unit)}</span>
+                        <span>{formatQuantity(toNumber(item.quantity), item.unit_code)}</span>
                       </div>
                     ))}
                   </div>
@@ -289,7 +256,7 @@ export default function CurrentStockDetailPage() {
                       return (
                         <div key={item.stock_movement_id} className="mt-2 flex max-w-xl justify-between gap-4 text-stone-600">
                           <span>{sign > 0 ? "+" : "-"} {t(item.movement_type)}</span>
-                          <span>{formatQuantity(toNumber(item.quantity), unit)}</span>
+                          <span>{formatQuantity(toNumber(item.quantity), item.unit_code)}</span>
                         </div>
                       );
                     })}

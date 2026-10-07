@@ -8,13 +8,16 @@ export interface RecipeItem {
   recipe_id: string;
   recipe_info?: Recipe;
   ingredient_id: string;
+  base_recipe_id?: string;
   ingredient_info?: Ingredient;
+  base_recipe_info?: Recipe;
   quantity: string;
 }
 
 export interface RecipeItemPayload {
   recipe_id: string;
   ingredient_id: string;
+  base_recipe_id?: string;
   quantity: string;
 }
 
@@ -23,6 +26,7 @@ export const getRecipeItems = async (payload: {
   limit: number;
   recipe_id: string;
   ingredient_id: string;
+  base_recipe_id?: string;
   name: string;
 }) => (await api.post<ApiResponse<RecipeItem[]>>("/recipe-items/list", payload)).data;
 
