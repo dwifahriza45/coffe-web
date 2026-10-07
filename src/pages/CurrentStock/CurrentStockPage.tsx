@@ -1,8 +1,15 @@
-import { Boxes, RefreshCw, Search } from "lucide-react";
+import InventoryCategoryFilters from "../../components/common/InventoryCategoryFilters";
+import CurrentStockCharts from "../../components/common/CurrentStockCharts";
+import { getAllCategoryIngredients, getIngredientSubcategories, type CategoryIngredient, type IngredientSubcategory } from "../../api/categoryIngredient.api";
+import { getBusinessDays } from "../../api/businessDay.api";
+import { inventorySectionLabel, stockDisplayUnits } from "../../utils/stockDisplay";
+import { Bean, Boxes, Download, LayoutGrid, List, Package, RefreshCw, Search } from "lucide-react";
+import * as XLSX from "xlsx-js-style";
+import { createExportWorksheet } from "../../utils/exportWorksheet";
 import { isAxiosError } from "axios";
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
-import { getIngredients, type Ingredient } from "../../api/ingredient.api";
+import { Link, useSearchParams } from "react-router-dom";
+import { getIngredients, getStockItemMetadata, type StockItemMetadata, type Ingredient } from "../../api/ingredient.api";
 import { getInventoryCounts } from "../../api/inventoryCount.api";
 import { getInventoryCountItems } from "../../api/inventoryCountItem.api";
 import { getStockMovements } from "../../api/stockMovement.api";
@@ -15,6 +22,8 @@ import { formatNumber } from "../../utils/numberFormat";
 type CurrentStockRow = {
   ingredient: Ingredient;
   current: number;
+  metadata?: StockItemMetadata;
+  unitPrice: number | null;
 };
 
 function toNumber(value?: string) {
@@ -33,15 +42,23 @@ function movementSign(type: string) {
 export default function CurrentStockPage() {
   const { t } = useLanguage();
   const [searchParams, setSearchParams] = useSearchParams();
-  const navigate = useNavigate();
+  const [view,setView]=useState<"list" | "grid">(() => {try {return localStorage.getItem("coffee-current-stock-view")==="grid" ? "grid" : "list";} catch {return "list";}});
+  function changeView(next: "list" | "grid") {setView(next);try {localStorage.setItem("coffee-current-stock-view",next);} catch { /* View selection still works when storage is unavailable. */ }}
+  const [displayUnits, setDisplayUnits] = useState<Record<string, string>>({});
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [date, setDate] = useState(searchParams.get("date") || currentBusinessDate());
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
+  const [categories,setCategories]=useState<CategoryIngredient[]>([]);
+  const [subcategories,setSubcategories]=useState<IngredientSubcategory[]>([]);
+  const [categoryFilter,setCategoryFilter]=useState("");
+  const [subcategoryFilter,setSubcategoryFilter]=useState("");
+  const [supplierFilter,setSupplierFilter]=useState("");
   const [rows, setRows] = useState<CurrentStockRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [refresh, setRefresh] = useState(0);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     if (!searchParams.get("date")) {
@@ -55,28 +72,24 @@ export default function CurrentStockPage() {
       setLoading(true);
       setError("");
       try {
-        const [ingredientResponse, countResponse, movementResponse] =
-          await Promise.all([
-            getIngredients({ start: 0, limit: 100, name: "" }),
-            getInventoryCounts({
-              start: 0,
-              limit: 10,
-              business_day_id: "",
-              count_type: "",
-              status: "SUBMITTED",
-              name: "",
-            }),
-            getStockMovements({
-              start: 0,
-              limit: 100,
-              business_day_id: "",
-              business_date: date,
-              movement_type: "",
-              name: "",
-            }),
-          ]);
+        async function allPages<T>(load: (start: number) => Promise<{data?: T[] | null; total?: number}>) {
+          const data: T[]=[];
+          for (;;) { const response=await load(data.length); const next=response.data ?? []; data.push(...next); if (!next.length || data.length >= (response.total ?? data.length)) return {data}; }
+        }
+        const [ingredientResponse, dayResponse, movementResponse, metadataResponse, categoryResponse, subcategoryResponse] = await Promise.all([
+          allPages((start) => getIngredients({start,limit:100,name:""})),
+          getBusinessDays({start:0,limit:1,status:"",business_date:date}),
+          allPages((start) => getStockMovements({start,limit:100,business_day_id:"",business_date:date,movement_type:"",name:""})),
+          getStockItemMetadata(),
+          getAllCategoryIngredients(),
+          getIngredientSubcategories(),
+        ]);
+        const dayID=dayResponse.data?.[0]?.business_day_id;
+        const countResponse=dayID ? await getInventoryCounts({start:0,limit:10,business_day_id:dayID,count_type:"",status:"",name:""}) : {data:[]};
         if (!current) return;
-
+        setCategories(categoryResponse);
+        setSubcategories(subcategoryResponse.data ?? []);
+        const metadataByID=new Map((metadataResponse.data ?? []).map((item) => [item.ingredient_id,item]));
         const ingredients = (ingredientResponse.data ?? []).filter(
           (ingredient) => ingredient.active,
         );
@@ -87,28 +100,30 @@ export default function CurrentStockPage() {
         const closingCount = countsForDate.find((count) => count.count_type === "CLOSING");
         const [openingItems, closingItems] = await Promise.all([
           openingCount
-            ? getInventoryCountItems({
-              start: 0,
+            ? allPages((start) => getInventoryCountItems({
+              start,
               limit: 100,
               inventory_count_id: openingCount.inventory_count_id,
               ingredient_id: "",
               name: "",
-            })
+            }))
             : Promise.resolve({ data: [] }),
           closingCount
-            ? getInventoryCountItems({
-              start: 0,
+            ? allPages((start) => getInventoryCountItems({
+              start,
               limit: 100,
               inventory_count_id: closingCount.inventory_count_id,
               ingredient_id: "",
               name: "",
-            })
+            }))
             : Promise.resolve({ data: [] }),
         ]);
         if (!current) return;
 
         const quantityByIngredient = new Map<string, number>();
-        (openingItems.data ?? []).forEach((item) => {
+        const savedPrices = new Map<string, number>();
+        (openingItems.data ?? []).filter((item) => item.section_status === "SUBMITTED").forEach((item) => {
+          if (item.valuation_unit_price !== "") savedPrices.set(item.ingredient_id, toNumber(item.valuation_unit_price));
           quantityByIngredient.set(
             item.ingredient_id,
             toNumber(item.actual_quantity),
@@ -122,7 +137,8 @@ export default function CurrentStockPage() {
             currentQuantity + movementSign(movement.movement_type) * toNumber(movement.quantity),
           );
         });
-        (closingItems.data ?? []).forEach((item) => {
+        (closingItems.data ?? []).filter((item) => item.section_status === "SUBMITTED").forEach((item) => {
+          if (item.valuation_unit_price !== "") savedPrices.set(item.ingredient_id, toNumber(item.valuation_unit_price));
           quantityByIngredient.set(
             item.ingredient_id,
             toNumber(item.actual_quantity),
@@ -133,6 +149,8 @@ export default function CurrentStockPage() {
           ingredients.map((ingredient) => ({
             ingredient,
             current: quantityByIngredient.get(ingredient.ingredient_id) ?? 0,
+            metadata: metadataByID.get(ingredient.ingredient_id),
+            unitPrice: date === currentBusinessDate() && metadataByID.get(ingredient.ingredient_id)?.unit_price != null ? toNumber(metadataByID.get(ingredient.ingredient_id)!.unit_price!) : savedPrices.get(ingredient.ingredient_id) ?? null,
           })),
         );
       } catch (requestError) {
@@ -152,23 +170,95 @@ export default function CurrentStockPage() {
     };
   }, [date, refresh, t]);
 
-  const visibleRows = useMemo(() => {
+  const searchedRows = useMemo(() => {
     const keyword = search.trim().toLowerCase();
-    if (!keyword) return rows;
-    return rows.filter((row) =>
-      row.ingredient.name.toLowerCase().includes(keyword),
+    const suppliedRows=supplierFilter ? rows.filter((row) => row.ingredient.supplier_id===supplierFilter) : rows;
+    if (!keyword) return suppliedRows;
+    return suppliedRows.filter((row) =>
+      [row.ingredient.name, row.ingredient.ingredient_id, row.ingredient.category_ingredient_name, row.metadata?.brand, row.metadata?.subcategory, row.metadata?.supplier].filter(Boolean).join(" ").toLowerCase().includes(keyword),
     );
-  }, [rows, search]);
+  }, [rows, search, supplierFilter]);
+
+  const visibleRows = useMemo(() => searchedRows.filter(({ingredient}) => (!categoryFilter || ingredient.category_ingredient_id===categoryFilter) && (!subcategoryFilter || ingredient.subcategory_ingredient_id===subcategoryFilter)),[searchedRows,categoryFilter,subcategoryFilter]);
+  const categoryCounts=useMemo(() => {
+   const counts: Record<string,number>={};
+   for (const row of searchedRows) counts[row.ingredient.category_ingredient_id]=(counts[row.ingredient.category_ingredient_id] ?? 0)+1;
+   return counts;
+  },[searchedRows]);
+  const suppliers=useMemo(() => Array.from(new Map(rows.filter((row) => row.ingredient.supplier_id).map((row) => [row.ingredient.supplier_id,{id:row.ingredient.supplier_id,name:row.metadata?.supplier || row.ingredient.supplier_id}])).values()).sort((a,b) => a.name.localeCompare(b.name)),[rows]);
+
+  const displayRows=useMemo(() => visibleRows.map(({ingredient,current,metadata,unitPrice}) => {
+                    const minimum=toNumber(ingredient.minimum_stock);
+                    const target=toNumber(ingredient.target_stock);
+                    const out=current<=0;
+                    const low=!out && current<minimum;
+                    const base=ingredient.base_unit_info?.code ?? ingredient.base_unit;
+                    const choices=stockDisplayUnits(base,metadata?.packaging ?? "",metadata?.content_unit ?? "",toNumber(ingredient.content_qty),toNumber(ingredient.package_qty));
+                    const choice=choices.find((option) => option.key===displayUnits[ingredient.ingredient_id]) ?? choices[0];
+                    const progress=minimum>0 ? Math.max(0,Math.min(100,current/minimum*100)) : current>0 ? 100 : 0;
+                    const section=inventorySectionLabel(ingredient.category_ingredient_name);
+                    const Icon=section === "Barista" ? Bean : Package;
+                    const packagingInfo=metadata?.packaging && metadata.content_unit ? `${formatQuantity(toNumber(ingredient.package_qty),metadata.packaging)} = ${formatQuantity(toNumber(ingredient.content_qty),metadata.content_unit)}` : "";
+                    const stockValue=unitPrice===null ? "" : `Rp ${formatNumber(String(current*unitPrice),0)}`;
+
+    return {ingredient,current,metadata,unitPrice,minimum,target,out,low,choices,choice,progress,section,Icon,packagingInfo,stockValue};
+  }),[visibleRows,displayUnits]);
+
+  function exportCurrentStock() {
+    if (loading || exporting || !displayRows.length) return;
+    setExporting(true);
+    try {
+      const headers = ["Tanggal", "Kode item", "Item", "Bagian", "Kategori", "Subkategori", "Brand / Type", "Supplier", "Stok saat ini", "Minimum stok", "Target stok", "Satuan stok", "Jumlah kemasan", "Satuan kemasan", "Jumlah isi", "Satuan isi", "Harga per satuan stok (Rp)", "Nilai stok (Rp)", "Status"];
+      const exportRows = displayRows.map(({ingredient,current,metadata,unitPrice,minimum,target,out,low,choice,section}) => [
+        date, ingredient.ingredient_id, ingredient.name, section, ingredient.category_ingredient_name,
+        metadata?.subcategory ?? "", metadata?.brand ?? "", metadata?.supplier ?? "",
+        current / choice.divisor, minimum / choice.divisor, target > 0 ? target / choice.divisor : null, choice.label,
+        toNumber(ingredient.package_qty), metadata?.packaging ?? "", toNumber(ingredient.content_qty), metadata?.content_unit ?? "",
+        unitPrice === null ? null : unitPrice * choice.divisor, unitPrice === null ? null : current * unitPrice,
+        t(out ? "Out of stock" : low ? "Low stock" : "In stock"),
+      ]);
+      const sheet = createExportWorksheet(headers, exportRows, [16, 26, 30, 18, 22, 24, 24, 24, 20, 18, 18, 18, 18, 20, 18, 18, 28, 24, 22]);
+      for (let row = 1; row <= exportRows.length; row++) {
+        for (const column of [8, 9, 10, 12, 14, 16, 17]) {
+          const cell = sheet[XLSX.utils.encode_cell({ r: row, c: column })];
+          if (cell?.t === "n") {
+            const value = Number(cell.v);
+            const rounded = Math.round(value * 1e6) / 1e6;
+            const fractionDigits = Number.isInteger(rounded) ? 0 : (rounded.toFixed(6).replace(/0+$/, "").split(".")[1]?.length ?? 0);
+            cell.z = fractionDigits ? `#,##0.${"0".repeat(fractionDigits)}` : "#,##0";
+          }
+        }
+      }
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, sheet, "Stok Saat Ini");
+      const filterSheet = createExportWorksheet(["Filter", "Pilihan"], [
+        ["Tanggal", date],
+        ["Bagian", categories.find((category) => category.category_ingredient_id === categoryFilter)?.name ?? "Semua bagian"],
+        ["Subkategori", subcategories.find((subcategory) => subcategory.subcategory_ingredient_id === subcategoryFilter)?.name ?? "Semua subkategori"],
+        ["Supplier", suppliers.find((supplier) => supplier.id === supplierFilter)?.name ?? "Semua supplier"],
+        ["Pencarian", search || "—"],
+        ["Jumlah item", exportRows.length],
+        ["Satuan", "Mengikuti pilihan satuan masing-masing item di layar."],
+        ["Harga / nilai kosong", "Belum tersedia harga yang sesuai untuk tanggal dan satuan item."],
+      ], [24, 85]);
+      XLSX.utils.book_append_sheet(workbook, filterSheet, "Informasi Export");
+      XLSX.writeFile(workbook, `stok-saat-ini-${date}.xlsx`);
+    } catch {
+      setError(t("Could not export current stock."));
+    } finally {
+      setExporting(false);
+    }
+  }
 
   return (
-    <div className="flex min-h-screen bg-[#f8f5f0]">
+    <div className="flex min-h-screen bg-[var(--color-brand-cream)]">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <section className="min-w-0 flex-1">
         <Navbar onMenuClick={() => setSidebarOpen(true)} />
         <main className="p-5 sm:p-8">
           <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
             <div>
-              <div className="mb-3 grid size-11 place-items-center rounded-xl bg-[#efe9df] text-[#8a5a3f]">
+              <div className="mb-3 grid size-11 place-items-center rounded-xl bg-[var(--color-brand-soft)] text-[var(--color-brand-hover)]">
                 <Boxes size={22} />
               </div>
               <h1 className="font-serif text-3xl font-bold">{t("Current Stock")}</h1>
@@ -187,12 +277,28 @@ export default function CurrentStockPage() {
             </button>
           </header>
 
-          <section className="mt-7 overflow-hidden rounded-xl border border-stone-200 bg-white">
+          <InventoryCategoryFilters categories={categories} subcategories={subcategories} category={categoryFilter} subcategory={subcategoryFilter} counts={categoryCounts} total={loading ? null : searchedRows.length} onCategory={(id) => {setCategoryFilter(id);setSubcategoryFilter("");}} onSubcategory={setSubcategoryFilter} />
+
+          <CurrentStockCharts rows={displayRows} loading={loading} />
+
+          <section className="mt-6 overflow-hidden rounded-xl border border-stone-200 bg-white">
+            <div className="flex justify-end px-4 pt-4">
+                <div className="inline-flex rounded-full bg-[var(--color-brand-soft)] p-1" role="group" aria-label={t("View mode")}>
+                  {(["list","grid"] as const).map((mode) => {const Icon=mode === "list" ? List : LayoutGrid;return <button key={mode} type="button" aria-pressed={view===mode} onClick={() => changeView(mode)} className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition ${view===mode ? "bg-[var(--color-brand-primary)] text-[var(--color-brand-cream)]" : "text-[var(--color-brand-primary)] hover:bg-[var(--color-brand-sage)]"}`}><Icon size={14} />{t(mode === "list" ? "List" : "Grid")}</button>;})}
+                </div>
+            </div>
             <div className="flex flex-col gap-3 border-b border-stone-200 p-4 lg:flex-row lg:items-center lg:justify-between">
               <p className="text-sm text-stone-500">
-                {visibleRows.length} {t("ingredients")}
+                {visibleRows.length} {t("items")}
               </p>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <button type="button" onClick={exportCurrentStock} disabled={loading || exporting || !displayRows.length || Boolean(error)} className="inline-flex items-center gap-2 rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm font-semibold text-brand-primary disabled:opacity-40">
+                  <Download size={16} />{t(exporting ? "Exporting..." : "Export")}
+                </button>
+                <select aria-label={t("Supplier")} value={supplierFilter} onChange={(event) => setSupplierFilter(event.target.value)} className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm">
+                  <option value="">{t("All suppliers")}</option>
+                  {suppliers.map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}
+                </select>
                 <input
                   aria-label={t("Business Date")}
                   type="date"
@@ -215,67 +321,61 @@ export default function CurrentStockPage() {
                   <input
                     value={searchInput}
                     onChange={(event) => setSearchInput(event.target.value)}
-                    placeholder={t("Search ingredient...")}
+                    placeholder={t("Search item...")}
                     className="min-w-0 bg-transparent text-sm outline-none"
                   />
                 </form>
               </div>
             </div>
             {error && <div className="m-4 rounded-lg bg-red-50 p-4 text-sm text-red-700">{error}</div>}
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-180 text-left">
-                <thead className="bg-stone-50 text-xs uppercase tracking-wider text-stone-500">
-                  <tr>
-                    <th className="px-5 py-3">{t("Ingredient")}</th>
-                    <th className="px-5 py-3">{t("Current")}</th>
-                    <th className="px-5 py-3">{t("Minimum")}</th>
-                    <th className="px-5 py-3">{t("Status")}</th>
-                  </tr>
+            {view === "list" ? <div className="overflow-x-auto px-3 pb-3">
+              <table className="w-full min-w-[1180px] table-fixed border-separate border-spacing-y-2 text-left">
+                <colgroup><col style={{width:"36%"}} /><col style={{width:"18%"}} /><col style={{width:"25%"}} /><col style={{width:"12%"}} /><col style={{width:"9%"}} /></colgroup>
+                <thead className="text-xs uppercase tracking-wider text-stone-500">
+                  <tr><th className="px-4 py-3 font-medium">{t("Item")}</th><th className="px-4 py-3 font-medium">{t("Category")}</th><th className="px-4 py-3 font-medium">{t("Stock")}<span className="mt-1 block text-[10px] normal-case tracking-normal">{t("Current")} / {t("Minimum")}</span></th><th className="px-4 py-3 font-medium">{t("Status")}</th><th className="px-4 py-3 font-medium">{t("Supplier")}</th></tr>
                 </thead>
-                <tbody className="divide-y divide-stone-100">
-                  {loading ? (
-                    <tr>
-                      <td colSpan={4} className="px-5 py-14 text-center text-sm text-stone-500">
-                        {t("Loading current stock...")}
+                <tbody>
+                  {loading ? <tr><td colSpan={5} className="p-14 text-center text-sm text-stone-500">{t("Loading current stock...")}</td></tr> : visibleRows.length===0 ? <tr><td colSpan={5} className="p-14 text-center text-sm text-stone-500">{t("No current stock found")}</td></tr> : displayRows.map(({ingredient,current,metadata,minimum,target,out,low,choices,choice,progress,section,Icon,packagingInfo,stockValue}) => {
+                    return <tr key={ingredient.ingredient_id} className="group text-sm [&>td]:bg-[var(--color-brand-surface)] [&>td]:transition-colors hover:[&>td]:bg-[var(--color-brand-soft)]">
+                      <td className="rounded-l-2xl px-4 py-4">
+                        <div className="flex items-center gap-3"><span className="grid size-10 shrink-0 place-items-center rounded-full bg-[var(--color-brand-cream)] text-[var(--color-brand-primary)]"><Icon size={20} /></span><div className="min-w-0">
+                          <Link to={`/current-stock/${encodeURIComponent(ingredient.ingredient_id)}?date=${encodeURIComponent(date)}`} className="font-semibold text-[var(--color-brand-primary)] hover:underline">{ingredient.name}</Link>
+                          <p className="mt-1 text-xs leading-relaxed text-stone-500">{[ingredient.ingredient_id,metadata?.brand,packagingInfo,stockValue].filter(Boolean).join(" · ")}</p>
+                        </div></div>
                       </td>
-                    </tr>
-                  ) : visibleRows.length === 0 ? (
-                    <tr>
-                      <td colSpan={4} className="px-5 py-14 text-center text-sm text-stone-500">
-                        {t("No current stock found")}
+                      <td className="px-4 py-4 text-stone-600">{[section,metadata?.subcategory].filter(Boolean).join(" · ") || "—"}</td>
+                      <td className="px-4 py-4">
+                        <p className="whitespace-nowrap font-semibold text-[var(--color-brand-primary)]">{formatQuantity(current/choice.divisor,choice.label)} <span className="text-xs font-normal text-stone-500" title={t("Minimum stock")}>/ {formatQuantity(minimum/choice.divisor,choice.label)}</span></p>
+                        <p className="mt-1 text-xs text-stone-500">{t("Target stock")}: {target > 0 ? formatQuantity(target/choice.divisor,choice.label) : "—"}</p>
+                        <div aria-hidden="true" className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--color-brand-cream)]"><div className={`h-full rounded-full ${out ? "bg-red-400" : low ? "bg-amber-500" : "bg-[var(--color-brand-accent)]"}`} style={{width:`${progress}%`}} /></div>
+                        <div className="mt-2 flex flex-wrap gap-1">{choices.map((option) => <button key={option.key} type="button" aria-pressed={choice.key===option.key} onClick={() => setDisplayUnits((values) => ({...values,[ingredient.ingredient_id]:option.key}))} className={`rounded-full border border-[var(--color-brand-primary)] px-2 py-0.5 text-[10px] font-medium ${choice.key===option.key ? "bg-[var(--color-brand-primary)] text-[var(--color-brand-cream)]" : "text-[var(--color-brand-primary)] hover:bg-[var(--color-brand-sage)]"}`}>{option.label}</button>)}</div>
                       </td>
-                    </tr>
-                  ) : (
-                    visibleRows.map(({ ingredient, current }) => {
-                      const minimum = toNumber(ingredient.minimum_stock);
-                      const low = current < minimum;
-                      const unit = ingredient.base_unit_info?.code ?? ingredient.base_unit;
-                      return (
-                        <tr
-                          key={ingredient.ingredient_id}
-                          onClick={() => navigate(`/current-stock/${ingredient.ingredient_id}?date=${date}`)}
-                          className="group cursor-pointer hover:bg-stone-50/70"
-                        >
-                          <td className="px-5 py-4 text-sm font-semibold">
-                            <span className="inline-flex transition-colors group-hover:text-[#92502f] group-hover:underline group-hover:underline-offset-4">
-                              {ingredient.name}
-                            </span>
-                          </td>
-                          <td className="px-5 py-4 text-sm">{formatQuantity(current, unit)}</td>
-                          <td className="px-5 py-4 text-sm">{formatQuantity(minimum, unit)}</td>
-                          <td className="px-5 py-4">
-                            <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${low ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"}`}>
-                              <span className={`size-1.5 rounded-full ${low ? "bg-red-500" : "bg-emerald-500"}`} />
-                              {low ? t("Low Stock") : t("Sufficient")}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
+                      <td className="px-4 py-4"><span className={`inline-flex whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium ${out ? "bg-red-100 text-red-800" : low ? "bg-yellow-200 text-yellow-900" : "bg-[var(--color-brand-sage)] text-[var(--color-brand-primary)]"}`}>{t(out ? "Out of stock" : low ? "Low stock" : "In stock")}</span></td>
+                      <td className="rounded-r-2xl px-4 py-4 text-stone-600">{metadata?.supplier || "—"}</td>
+                    </tr>;
+                  })}
                 </tbody>
               </table>
-            </div>
+            </div> : loading ? <p className="p-14 text-center text-sm text-stone-500">{t("Loading current stock...")}</p> : displayRows.length===0 ? <p className="p-14 text-center text-sm text-stone-500">{t("No current stock found")}</p> : <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 min-[1800px]:grid-cols-6">
+              {displayRows.map(({ingredient,current,metadata,minimum,target,out,low,choices,choice,progress,section,Icon,packagingInfo,stockValue}) => <article key={ingredient.ingredient_id} className="flex min-w-0 flex-col rounded-2xl bg-[var(--color-brand-surface)] p-4">
+                <div className="flex items-start justify-between gap-2">
+                  <span className={`grid size-10 shrink-0 place-items-center rounded-full text-[var(--color-brand-primary)] ${out ? "bg-red-200" : low ? "bg-yellow-200" : "bg-[var(--color-brand-sage)]"}`}><Icon size={20} /></span>
+                  <span className={`rounded-full px-2.5 py-1 text-[10px] font-medium ${out ? "bg-red-100 text-red-800" : low ? "bg-yellow-200 text-yellow-900" : "bg-[var(--color-brand-sage)] text-[var(--color-brand-primary)]"}`}>{t(out ? "Out of stock" : low ? "Low stock" : "In stock")}</span>
+                </div>
+                <div className="mt-4 min-h-24">
+                  <Link to={`/current-stock/${encodeURIComponent(ingredient.ingredient_id)}?date=${encodeURIComponent(date)}`} className="text-sm font-semibold text-[var(--color-brand-primary)] hover:underline">{ingredient.name}</Link>
+                  <p className="mt-1 break-words text-xs leading-relaxed text-stone-500">{[section,metadata?.subcategory,ingredient.ingredient_id,metadata?.brand,packagingInfo].filter(Boolean).join(" · ")}</p>
+                </div>
+                <div className="mt-3">
+                  <div className="flex flex-wrap items-baseline justify-between gap-1"><p className="text-xl font-semibold text-[var(--color-brand-primary)]">{formatQuantity(current/choice.divisor,choice.label)}</p><p className="text-[10px] text-stone-500">{t("Minimum")}: {formatQuantity(minimum/choice.divisor,choice.label)}</p></div>
+                  <p className="mt-1 text-[10px] text-stone-500">{t("Target stock")}: {target > 0 ? formatQuantity(target/choice.divisor,choice.label) : "—"}</p>
+                  <div aria-hidden="true" className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--color-brand-cream)]"><div className={`h-full rounded-full ${out ? "bg-red-400" : low ? "bg-amber-500" : "bg-[var(--color-brand-accent)]"}`} style={{width:`${progress}%`}} /></div>
+                  <div className="mt-2 flex flex-wrap gap-1">{choices.map((option) => <button key={option.key} type="button" aria-pressed={choice.key===option.key} onClick={() => setDisplayUnits((values) => ({...values,[ingredient.ingredient_id]:option.key}))} className={`rounded-full border border-[var(--color-brand-primary)] px-2 py-0.5 text-[10px] font-medium ${choice.key===option.key ? "bg-[var(--color-brand-primary)] text-[var(--color-brand-cream)]" : "text-[var(--color-brand-primary)] hover:bg-[var(--color-brand-sage)]"}`}>{option.label}</button>)}</div>
+                </div>
+                <p className="mt-4 break-words text-xs text-stone-500">{[metadata?.supplier,stockValue].filter(Boolean).join(" · ") || "—"}</p>
+                <Link to={`/current-stock/${encodeURIComponent(ingredient.ingredient_id)}?date=${encodeURIComponent(date)}`} className="mt-4 block rounded-full bg-[var(--color-brand-cream)] px-3 py-2 text-center text-xs font-semibold text-[var(--color-brand-primary)] hover:bg-[var(--color-brand-sage)]">{t("View details")}</Link>
+              </article>)}
+            </div>}
           </section>
         </main>
       </section>

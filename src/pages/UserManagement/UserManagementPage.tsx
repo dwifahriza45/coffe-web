@@ -312,7 +312,7 @@ export default function UserManagementPage() {
   }
 
   function inputClass(name: string) {
-    return `mt-2 w-full rounded-lg border px-3.5 py-3 text-sm outline-none ${fieldError(name) ? "border-red-400 focus:border-red-500 focus:ring-4 focus:ring-red-100" : "border-stone-300 focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10"}`;
+    return `mt-2 w-full rounded-lg border px-3.5 py-3 text-sm outline-none ${fieldError(name) ? "border-red-400 focus:border-red-500 focus:ring-4 focus:ring-red-100" : "border-stone-300 focus:border-[var(--color-brand-accent)] focus:ring-4 focus:ring-[var(--color-brand-accent)]/10"}`;
   }
 
   function clearFieldError(name: string) {
@@ -426,14 +426,14 @@ export default function UserManagementPage() {
     (role) => !assignedRoleIDs.has(role.role_id),
   );
   return (
-    <div className="flex min-h-screen bg-[#f8f5f0]">
+    <div className="flex min-h-screen bg-[var(--color-brand-cream)]">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <section className="min-w-0 flex-1">
         <Navbar onMenuClick={() => setSidebarOpen(true)} />
         <main className="p-5 sm:p-8">
           <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
             <div>
-              <div className="mb-3 flex size-11 items-center justify-center rounded-xl bg-[#f2e2d8] text-[#92502f]">
+              <div className="mb-3 flex size-11 items-center justify-center rounded-xl bg-[var(--color-brand-soft)] text-[var(--color-brand-accent)]">
                 <UserCog size={22} />
               </div>
               <h1 className="font-serif text-3xl font-bold">{t("User Management")}</h1>
@@ -444,7 +444,7 @@ export default function UserManagementPage() {
             {canCreateUsers && (
               <button
                 onClick={() => setFormOpen(true)}
-                className="rounded-lg bg-[#362219] px-5 py-3 text-sm font-semibold text-white"
+                className="rounded-lg bg-[var(--color-brand-primary)] px-5 py-3 text-sm font-semibold text-white"
               >
                 + {t("Add user")}
               </button>
@@ -461,7 +461,7 @@ export default function UserManagementPage() {
               </div>
               <form
                 onSubmit={handleSearch}
-                className="flex w-full max-w-sm items-center gap-2 rounded-lg border border-stone-200 px-3 py-2.5 focus-within:border-[#b86b42] focus-within:ring-4 focus-within:ring-[#b86b42]/10"
+                className="flex w-full max-w-sm items-center gap-2 rounded-lg border border-stone-200 px-3 py-2.5 focus-within:border-[var(--color-brand-accent)] focus-within:ring-4 focus-within:ring-[var(--color-brand-accent)]/10"
               >
                 <Search size={17} className="text-stone-400" />
                 <input
@@ -498,7 +498,7 @@ export default function UserManagementPage() {
                         colSpan={showUserActions ? 5 : 4}
                         className="px-5 py-14 text-center text-sm text-stone-500"
                       >
-                        <span className="mx-auto mb-3 block size-5 animate-spin rounded-full border-2 border-stone-200 border-t-[#92502f]" />
+                        <span className="mx-auto mb-3 block size-5 animate-spin rounded-full border-2 border-stone-200 border-t-[var(--color-brand-accent)]" />
                         {t("Loading users...")}
                       </td>
                     </tr>
@@ -522,7 +522,7 @@ export default function UserManagementPage() {
                         <tr key={user.user_id} className="hover:bg-stone-50/70">
                           <td className="px-5 py-4">
                             <div className="flex items-center gap-3">
-                              <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-[#f2e2d8] text-xs font-bold text-[#92502f]">
+                              <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-[var(--color-brand-soft)] text-xs font-bold text-[var(--color-brand-accent)]">
                                 {user.fullname.slice(0, 2).toUpperCase()}
                               </span>
                               <div>
@@ -639,7 +639,7 @@ export default function UserManagementPage() {
                       setPage(1);
                       setPageSize(Number(event.target.value));
                     }}
-                    className="rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-xs text-stone-700 outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10"
+                    className="rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-xs text-stone-700 outline-none focus:border-[var(--color-brand-accent)] focus:ring-4 focus:ring-[var(--color-brand-accent)]/10"
                   >
                     {PAGE_SIZE_OPTIONS.map((option) => (
                       <option key={option} value={option}>
@@ -855,7 +855,7 @@ export default function UserManagementPage() {
               <button
                 type="submit"
                 disabled={actionSubmitting}
-                className={`rounded-lg px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60 ${actionMode === "delete" ? "bg-red-700" : "bg-[#362219]"}`}
+                className={`rounded-lg px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60 ${actionMode === "delete" ? "bg-red-700" : "bg-[var(--color-brand-primary)]"}`}
               >
                 {actionSubmitting ? t("Saving...") : t("Save")}
               </button>
@@ -869,7 +869,7 @@ export default function UserManagementPage() {
             <h2 id="delete-blocked-title" className="text-lg font-bold">{t("Cannot delete user")}</h2>
             <p id="delete-blocked-reason" className="mt-3 text-sm text-stone-600">{deleteBlockedReason}</p>
             <button type="button" disabled className="mt-6 mr-3 cursor-not-allowed rounded-lg bg-stone-200 px-4 py-2.5 text-sm font-semibold text-stone-400">{t("Delete user")}</button>
-            <button autoFocus type="button" onClick={() => setDeleteBlockedReason("")} className="mt-6 rounded-lg bg-[#362219] px-4 py-2.5 text-sm font-semibold text-white">{t("Close")}</button>
+            <button autoFocus type="button" onClick={() => setDeleteBlockedReason("")} className="mt-6 rounded-lg bg-[var(--color-brand-primary)] px-4 py-2.5 text-sm font-semibold text-white">{t("Close")}</button>
           </section>
         </div>
       )}
@@ -898,7 +898,7 @@ export default function UserManagementPage() {
             <div className="max-h-[calc(100vh-12rem)] space-y-5 overflow-y-auto p-5">
               {rolesLoading ? (
                 <div className="py-8 text-center text-sm text-stone-500">
-                  <span className="mx-auto mb-3 block size-5 animate-spin rounded-full border-2 border-stone-200 border-t-[#92502f]" />
+                  <span className="mx-auto mb-3 block size-5 animate-spin rounded-full border-2 border-stone-200 border-t-[var(--color-brand-accent)]" />
                   {t("Loading roles...")}
                 </div>
               ) : rolesError ? (
@@ -965,7 +965,7 @@ export default function UserManagementPage() {
                                 checked={selectedRoleIDs.includes(role.role_id)}
                                 onChange={() => toggleSelectedRole(role.role_id)}
                                 disabled={rolesSubmitting}
-                                className="size-4 accent-[#92502f]"
+                                className="size-4 accent-[var(--color-brand-accent)]"
                               />
                               <span className="min-w-0">
                                 <span className="block text-sm font-semibold text-stone-800">
@@ -991,7 +991,7 @@ export default function UserManagementPage() {
                     rolesSubmitting ||
                     selectedRoleIDs.length === 0
                   }
-                  className="rounded-lg bg-[#362219] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+                  className="rounded-lg bg-[var(--color-brand-primary)] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
                 >
                   {rolesSubmitting ? t("Saving...") : t("Add selected")}
                 </button>

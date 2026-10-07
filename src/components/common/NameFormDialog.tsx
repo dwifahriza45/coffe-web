@@ -59,7 +59,7 @@ export default function NameFormDialog({
               disabled={submitting}
               aria-invalid={!!nameError}
               aria-describedby={nameError ? "name-form-error" : undefined}
-              className="mt-2 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10"
+              className="mt-2 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm outline-none focus:border-[var(--color-brand-accent)] focus:ring-4 focus:ring-[var(--color-brand-accent)]/10"
             />
             {nameError && (
               <p
@@ -91,7 +91,7 @@ export default function NameFormDialog({
           <button
             type="submit"
             disabled={submitting}
-            className="rounded-lg bg-[#362219] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+            className="rounded-lg bg-[var(--color-brand-primary)] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
           >
             {t(submitting ? "Saving..." : "Save")}
           </button>

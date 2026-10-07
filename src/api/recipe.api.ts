@@ -6,13 +6,13 @@ export interface Recipe {
   recipe_id: string;
   product_id: string;
   product_info?: Product;
-  version: number;
+  version: string;
   active: boolean;
 }
 
 export interface RecipePayload {
   product_id: string;
-  version: number;
+  version: string;
   active: boolean;
 }
 

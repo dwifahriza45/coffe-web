@@ -238,7 +238,7 @@ export default function CategoryDetailPage() {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   return (
-    <div className="flex min-h-screen bg-[#f8f5f0]">
+    <div className="flex min-h-screen bg-[var(--color-brand-cream)]">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <section className="min-w-0 flex-1">
         <Navbar onMenuClick={() => setSidebarOpen(true)} />
@@ -249,13 +249,13 @@ export default function CategoryDetailPage() {
           </Link>
           <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
             <div>
-              <div className="mb-3 flex size-11 items-center justify-center rounded-xl bg-[#f2e2d8] text-[#92502f]">
+              <div className="mb-3 flex size-11 items-center justify-center rounded-xl bg-[var(--color-brand-soft)] text-[var(--color-brand-accent)]">
                 <CupSoda size={22} />
               </div>
               <h1 className="font-serif text-3xl font-bold">{category?.name ?? t("Category Detail")}</h1>
               <p className="mt-2 text-sm text-stone-500">{category?.description || t("Products in this category")}</p>
             </div>
-            {canWriteProducts && <button type="button" onClick={() => openModal()} className="flex items-center gap-2 rounded-lg bg-[#362219] px-5 py-3 text-sm font-semibold text-white">
+            {canWriteProducts && <button type="button" onClick={() => openModal()} className="flex items-center gap-2 rounded-lg bg-[var(--color-brand-primary)] px-5 py-3 text-sm font-semibold text-white">
               <Plus size={17} />
               {t("Add product")}
             </button>}
@@ -273,7 +273,7 @@ export default function CategoryDetailPage() {
                   setPage(1);
                   setSearch(searchInput.trim());
                 }}
-                className="flex w-full max-w-sm items-center gap-2 rounded-lg border border-stone-200 px-3 py-2.5 focus-within:border-[#b86b42] focus-within:ring-4 focus-within:ring-[#b86b42]/10"
+                className="flex w-full max-w-sm items-center gap-2 rounded-lg border border-stone-200 px-3 py-2.5 focus-within:border-[var(--color-brand-accent)] focus-within:ring-4 focus-within:ring-[var(--color-brand-accent)]/10"
               >
                 <Search size={17} className="text-stone-400" />
                 <input value={searchInput} onChange={(event) => setSearchInput(event.target.value)} className="min-w-0 flex-1 bg-transparent text-sm outline-none" placeholder={t("Search product...")} />
@@ -302,7 +302,7 @@ export default function CategoryDetailPage() {
                       return (
                         <tr key={product.product_id} onClick={() => navigate(`/category-management/${categoryID}/products/${product.product_id}`)} className="group cursor-pointer hover:bg-stone-50/70">
                           <td className="px-5 py-4">
-                            <p className="inline-flex text-sm font-semibold transition-colors group-hover:text-[#92502f] group-hover:underline group-hover:underline-offset-4">{product.name}</p>
+                            <p className="inline-flex text-sm font-semibold transition-colors group-hover:text-[var(--color-brand-accent)] group-hover:underline group-hover:underline-offset-4">{product.name}</p>
                             {product.description && <p className="mt-1 max-w-xs truncate text-xs text-stone-500">{product.description}</p>}
                           </td>
                           <td className="px-5 py-4 text-sm font-semibold">{formatPrice(product.price)}</td>
@@ -335,7 +335,7 @@ export default function CategoryDetailPage() {
                 <p className="text-xs text-stone-500">{t("Page")} {page} {t("of")} {totalPages}</p>
                 <label className="flex items-center gap-2 text-xs font-semibold text-stone-500">
                   {t("Limit")}
-                  <select value={pageSize} onChange={(event) => { setPage(1); setPageSize(Number(event.target.value)); }} className="rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-xs text-stone-700 outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10">
+                  <select value={pageSize} onChange={(event) => { setPage(1); setPageSize(Number(event.target.value)); }} className="rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-xs text-stone-700 outline-none focus:border-[var(--color-brand-accent)] focus:ring-4 focus:ring-[var(--color-brand-accent)]/10">
                     {PAGE_SIZE_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
                   </select>
                 </label>
@@ -359,29 +359,29 @@ export default function CategoryDetailPage() {
             <div className="space-y-4 p-5">
               <label className="block text-sm font-semibold text-stone-700">
                 {t("Name")}
-                <input value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} className="mt-2 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10" disabled={submitting} />
+                <input value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} className="mt-2 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm outline-none focus:border-[var(--color-brand-accent)] focus:ring-4 focus:ring-[var(--color-brand-accent)]/10" disabled={submitting} />
                 {fieldErrors.name && <p className="mt-1.5 text-xs font-medium text-red-600">{fieldErrors.name}</p>}
               </label>
               <label className="block text-sm font-semibold text-stone-700">
                 {t("Price")}
-                <input inputMode="decimal" placeholder="0" value={formatPrice(form.price)} onChange={(event) => setForm((current) => ({ ...current, price: normalizeNumberInput(event.target.value) }))} className="mt-2 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10" disabled={submitting} />
+                <input inputMode="decimal" placeholder="0" value={formatPrice(form.price)} onChange={(event) => setForm((current) => ({ ...current, price: normalizeNumberInput(event.target.value) }))} className="mt-2 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm outline-none focus:border-[var(--color-brand-accent)] focus:ring-4 focus:ring-[var(--color-brand-accent)]/10" disabled={submitting} />
                 {fieldErrors.price && <p className="mt-1.5 text-xs font-medium text-red-600">{fieldErrors.price}</p>}
               </label>
               <label className="block text-sm font-semibold text-stone-700">
                 {t("Image URL")}
-                <input value={form.image_url} onChange={(event) => setForm((current) => ({ ...current, image_url: event.target.value }))} className="mt-2 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10" disabled={submitting} />
+                <input value={form.image_url} onChange={(event) => setForm((current) => ({ ...current, image_url: event.target.value }))} className="mt-2 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm outline-none focus:border-[var(--color-brand-accent)] focus:ring-4 focus:ring-[var(--color-brand-accent)]/10" disabled={submitting} />
                 {fieldErrors.image_url && <p className="mt-1.5 text-xs font-medium text-red-600">{fieldErrors.image_url}</p>}
               </label>
               <label className="block text-sm font-semibold text-stone-700">
                 {t("Description")}
-                <textarea value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} className="mt-2 min-h-24 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10" disabled={submitting} />
+                <textarea value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} className="mt-2 min-h-24 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm outline-none focus:border-[var(--color-brand-accent)] focus:ring-4 focus:ring-[var(--color-brand-accent)]/10" disabled={submitting} />
                 {fieldErrors.description && <p className="mt-1.5 text-xs font-medium text-red-600">{fieldErrors.description}</p>}
               </label>
               {actionError && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{actionError}</p>}
             </div>
             <footer className="flex justify-end gap-3 border-t border-stone-200 p-5">
               <button type="button" onClick={() => setModalOpen(false)} className="rounded-lg border border-stone-300 px-4 py-2.5 text-sm font-semibold hover:bg-stone-50">{t("Cancel")}</button>
-              <button type="submit" disabled={submitting} className="rounded-lg bg-[#362219] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">{submitting ? t("Saving...") : t("Save")}</button>
+              <button type="submit" disabled={submitting} className="rounded-lg bg-[var(--color-brand-primary)] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">{submitting ? t("Saving...") : t("Save")}</button>
             </footer>
           </form>
         </div>

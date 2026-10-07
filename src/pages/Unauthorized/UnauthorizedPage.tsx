@@ -7,14 +7,14 @@ export default function UnauthorizedPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="flex min-h-screen bg-[#f8f5f0]">
+    <div className="flex min-h-screen bg-[var(--color-brand-cream)]">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <section className="min-w-0 flex-1">
         <Navbar onMenuClick={() => setSidebarOpen(true)} />
         <main className="flex h-[calc(100vh-4.75rem)] items-center justify-center p-5">
           <section className="max-w-lg text-center">
-            <span className="relative mx-auto grid h-32 w-32 place-items-center rounded-full border border-[#dcbda9] bg-white text-[#92502f] shadow-[0_16px_40px_rgba(146,80,47,.16)]">
-              <span className="absolute inset-5 rounded-full bg-[#b86b42]/25 blur-xl" />
+            <span className="relative mx-auto grid h-32 w-32 place-items-center rounded-full border border-[var(--color-brand-sage)] bg-white text-[var(--color-brand-accent)] shadow-[0_16px_40px_rgba(146,80,47,.16)]">
+              <span className="absolute inset-5 rounded-full bg-[var(--color-brand-accent)]/25 blur-xl" />
               <LockKeyhole className="relative" size={58} strokeWidth={1.6} />
             </span>
             <h1 className="mt-7 font-serif text-3xl font-bold text-stone-900 sm:text-4xl">

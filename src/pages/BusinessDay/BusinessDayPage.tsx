@@ -1,5 +1,4 @@
 import { useSearchParams } from "react-router-dom";
-import { getDraftStockReceiptCount } from "../../api/stockReceipt.api";
 import { CalendarDays, CheckCircle2, ClipboardCheck, Lock, Plus, Search, Trash2 } from "lucide-react";
 import { isAxiosError } from "axios";
 import { useEffect, useState, type FormEvent } from "react";
@@ -48,7 +47,6 @@ export default function BusinessDayPage() {
   const showActions = canUpdateBusinessDay || canDeleteBusinessDay || canReadInventoryCounts;
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [items, setItems] = useState<BusinessDay[]>([]);
-  const [draftStockInCounts, setDraftStockInCounts] = useState<Record<string, number>>({});
   const [draftStockAdjustmentCounts, setDraftStockAdjustmentCounts] = useState<Record<string, number>>({});
   const [closingSubmitted, setClosingSubmitted] = useState<Record<string, boolean>>({});
   const [stockCountExists, setStockCountExists] = useState<Record<string, boolean>>({});
@@ -99,16 +97,14 @@ export default function BusinessDayPage() {
               status: "",
               name: "",
             });
-            const pendingStockIn = item.status === "OPEN" ? await getDraftStockReceiptCount(item.business_day_id) : 0;
             const pendingAdjustment = item.status === "OPEN" ? await getDraftStockAdjustmentCount(item.business_day_id) : 0;
-            return [item.business_day_id, counts.data?.some((count) => count.count_type === "CLOSING" && count.status === "SUBMITTED") ?? false, pendingStockIn, pendingAdjustment, Boolean(counts.data?.length)] as const;
+            return [item.business_day_id, counts.data?.some((count) => count.count_type === "CLOSING" && count.status === "SUBMITTED") ?? false, pendingAdjustment, Boolean(counts.data?.length)] as const;
           }),
         );
         if (!current) return;
         setClosingSubmitted(Object.fromEntries(statusEntries.map(([id, submitted]) => [id, submitted])));
-        setDraftStockInCounts(Object.fromEntries(statusEntries.map(([id, , pending]) => [id, pending])));
-        setDraftStockAdjustmentCounts(Object.fromEntries(statusEntries.map(([id, , , pending]) => [id, pending])));
-        setStockCountExists(Object.fromEntries(statusEntries.map(([id, , , , exists]) => [id, exists])));
+        setDraftStockAdjustmentCounts(Object.fromEntries(statusEntries.map(([id, , pending]) => [id, pending])));
+        setStockCountExists(Object.fromEntries(statusEntries.map(([id, , , exists]) => [id, exists])));
       } catch (requestError) {
         if (!current) return;
         const response = isAxiosError<{ message?: string }>(requestError)
@@ -237,14 +233,14 @@ export default function BusinessDayPage() {
   const canOpenBusinessDay = canCreateBusinessDay && Boolean(businessDate) && selectedDayChecked && !selectedBusinessDay && !submitting && !checkingOpenDay && !openDayCheckFailed && !openDay;
 
   return (
-    <div className="flex min-h-screen bg-[#f8f5f0]">
+    <div className="flex min-h-screen bg-[var(--color-brand-cream)]">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <section className="min-w-0 flex-1">
         <Navbar onMenuClick={() => setSidebarOpen(true)} />
         <main className="p-5 sm:p-8">
           <header className="flex flex-col justify-between gap-4 xl:flex-row xl:items-end">
             <div>
-              <div className="mb-3 flex size-11 items-center justify-center rounded-xl bg-[#e7edf0] text-[#4f6c78]">
+              <div className="mb-3 flex size-11 items-center justify-center rounded-xl bg-[var(--color-brand-soft)] text-[var(--color-brand-hover)]">
                 <CalendarDays size={22} />
               </div>
               <h1 className="font-serif text-3xl font-bold">{t("Business Days")}</h1>
@@ -252,8 +248,8 @@ export default function BusinessDayPage() {
             </div>
             {canCreateBusinessDay && (
               <form onSubmit={submitOpen} className="flex flex-col gap-2 sm:flex-row">
-                <input type="date" value={businessDate} onChange={(event) => setBusinessDate(event.target.value)} className="rounded-lg border border-stone-300 bg-white px-3.5 py-3 text-sm outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10 disabled:bg-stone-100" disabled={submitting || isTodayActionOnly} />
-                <button type="submit" disabled={!canOpenBusinessDay} title={selectedBusinessDay ? t("Business day already exists") : showOpenDayWarning ? t("Close the currently open business day first.") : t("Open business day")} className="flex items-center justify-center gap-2 rounded-lg bg-[#362219] px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60">
+                <input type="date" value={businessDate} onChange={(event) => setBusinessDate(event.target.value)} className="rounded-lg border border-stone-300 bg-white px-3.5 py-3 text-sm outline-none focus:border-[var(--color-brand-accent)] focus:ring-4 focus:ring-[var(--color-brand-accent)]/10 disabled:bg-stone-100" disabled={submitting || isTodayActionOnly} />
+                <button type="submit" disabled={!canOpenBusinessDay} title={selectedBusinessDay ? t("Business day already exists") : showOpenDayWarning ? t("Close the currently open business day first.") : t("Open business day")} className="flex items-center justify-center gap-2 rounded-lg bg-[var(--color-brand-primary)] px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60">
                   <Plus size={17} />
                   {t("Open business day")}
                 </button>
@@ -281,9 +277,9 @@ export default function BusinessDayPage() {
                     else next.delete("date");
                     return next;
                   });
-                }} className="h-11 w-full min-w-0 rounded-lg border border-stone-200 bg-white px-3 text-sm outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10 sm:w-44" />
+                }} className="h-11 w-full min-w-0 rounded-lg border border-stone-200 bg-white px-3 text-sm outline-none focus:border-[var(--color-brand-accent)] focus:ring-4 focus:ring-[var(--color-brand-accent)]/10 sm:w-44" />
               </label>
-              <label className="flex h-11 w-full items-center gap-2 rounded-lg border border-stone-200 px-3 sm:w-52 focus-within:border-[#b86b42] focus-within:ring-4 focus-within:ring-[#b86b42]/10">
+              <label className="flex h-11 w-full items-center gap-2 rounded-lg border border-stone-200 px-3 sm:w-52 focus-within:border-[var(--color-brand-accent)] focus-within:ring-4 focus-within:ring-[var(--color-brand-accent)]/10">
                 <Search size={17} className="text-stone-400" />
                 <select aria-label={t("Status")} value={status} onChange={(event) => { setPage(1); setStatus(event.target.value); }} className="min-w-0 flex-1 bg-transparent text-sm outline-none">
                   <option value="">{t("All status")}</option>
@@ -314,14 +310,11 @@ export default function BusinessDayPage() {
                     <tr><td colSpan={showActions ? 7 : 6} className="px-5 py-14 text-center text-sm text-stone-500">{t("No business days found")}</td></tr>
                   ) : (
                     items.map((item) => {
-                      const pendingStockIn = draftStockInCounts[item.business_day_id] ?? 0;
                       const pendingAdjustment = draftStockAdjustmentCounts[item.business_day_id] ?? 0;
                       const hasStockCount = stockCountExists[item.business_day_id] ?? false;
-                      const canClose = item.status === "OPEN" && closingSubmitted[item.business_day_id] && pendingStockIn === 0 && pendingAdjustment === 0 && (!isTodayActionOnly || item.business_date === today());
+                      const canClose = item.status === "OPEN" && closingSubmitted[item.business_day_id] && pendingAdjustment === 0 && (!isTodayActionOnly || item.business_date === today());
                       const canDelete = !submitting && !hasStockCount;
-                      const closeTitle = pendingStockIn > 0
-                        ? t("Submit all draft Stock In first")
-                        : pendingAdjustment > 0
+                      const closeTitle = pendingAdjustment > 0
                           ? t("Submit all draft Stock Adjustment first")
                           : closingSubmitted[item.business_day_id]
                             ? t("Close business day")
@@ -372,7 +365,7 @@ export default function BusinessDayPage() {
                 <p className="text-xs text-stone-500">{t("Page")} {page} {t("of")} {totalPages}</p>
                 <label className="flex items-center gap-2 text-xs font-semibold text-stone-500">
                   {t("Limit")}
-                  <select value={pageSize} onChange={(event) => { setPage(1); setPageSize(Number(event.target.value)); }} className="rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-xs text-stone-700 outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10">
+                  <select value={pageSize} onChange={(event) => { setPage(1); setPageSize(Number(event.target.value)); }} className="rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-xs text-stone-700 outline-none focus:border-[var(--color-brand-accent)] focus:ring-4 focus:ring-[var(--color-brand-accent)]/10">
                     {PAGE_SIZE_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
                   </select>
                 </label>

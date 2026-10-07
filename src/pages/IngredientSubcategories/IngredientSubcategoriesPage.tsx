@@ -300,7 +300,7 @@ function IngredientSubcategoriesPage() {
     }
   }
   return (
-    <div className="flex min-h-screen bg-[#f8f5f0]">
+    <div className="flex min-h-screen bg-[var(--color-brand-cream)]">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <section className="min-w-0 flex-1">
         <Navbar onMenuClick={() => setSidebarOpen(true)} />
@@ -328,7 +328,7 @@ function IngredientSubcategoriesPage() {
               <button
                 disabled={loading || !parent?.active || busy}
                 onClick={() => open()}
-                className="inline-flex items-center gap-2 rounded-lg bg-[#362219] px-5 py-3 text-sm font-semibold text-white disabled:opacity-40"
+                className="inline-flex items-center gap-2 rounded-lg bg-[var(--color-brand-primary)] px-5 py-3 text-sm font-semibold text-white disabled:opacity-40"
               >
                 <Plus size={17} />
                 {t("Add subcategory")}
@@ -632,7 +632,7 @@ function IngredientSubcategoriesPage() {
             <footer className="flex justify-end border-t p-5">
               <button
                 onClick={() => setDetailOpen(false)}
-                className="rounded-lg bg-[#362219] px-4 py-2 text-sm font-semibold text-white"
+                className="rounded-lg bg-[var(--color-brand-primary)] px-4 py-2 text-sm font-semibold text-white"
               >
                 {t("Close")}
               </button>

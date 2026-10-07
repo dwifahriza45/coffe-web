@@ -59,14 +59,14 @@ export default function MenuItemsPage() {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   return (
-    <div className="flex min-h-screen bg-[#f8f5f0]">
+    <div className="flex min-h-screen bg-[var(--color-brand-cream)]">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <section className="min-w-0 flex-1">
         <Navbar onMenuClick={() => setSidebarOpen(true)} />
         <main className="p-5 sm:p-8">
           <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
             <div>
-              <div className="mb-3 flex size-11 items-center justify-center rounded-xl bg-[#f2e2d8] text-[#92502f]">
+              <div className="mb-3 flex size-11 items-center justify-center rounded-xl bg-[var(--color-brand-soft)] text-[var(--color-brand-accent)]">
                 <CupSoda size={22} />
               </div>
               <h1 className="font-serif text-3xl font-bold">{t("Menu Items")}</h1>
@@ -86,7 +86,7 @@ export default function MenuItemsPage() {
                   setPage(1);
                   setSearch(searchInput.trim());
                 }}
-                className="flex w-full max-w-sm items-center gap-2 rounded-lg border border-stone-200 px-3 py-2.5 focus-within:border-[#b86b42] focus-within:ring-4 focus-within:ring-[#b86b42]/10"
+                className="flex w-full max-w-sm items-center gap-2 rounded-lg border border-stone-200 px-3 py-2.5 focus-within:border-[var(--color-brand-accent)] focus-within:ring-4 focus-within:ring-[var(--color-brand-accent)]/10"
               >
                 <Search size={17} className="text-stone-400" />
                 <input value={searchInput} onChange={(event) => setSearchInput(event.target.value)} className="min-w-0 flex-1 bg-transparent text-sm outline-none" placeholder={t("Search menu item...")} />
@@ -112,7 +112,7 @@ export default function MenuItemsPage() {
                     products.map((product) => (
                       <tr key={product.product_id} onClick={() => navigate(`/menu-items/${product.product_id}`)} className="group cursor-pointer hover:bg-stone-50/70">
                         <td className="px-5 py-4">
-                          <p className="inline-flex text-sm font-semibold transition-colors group-hover:text-[#92502f] group-hover:underline group-hover:underline-offset-4">{product.name}</p>
+                          <p className="inline-flex text-sm font-semibold transition-colors group-hover:text-[var(--color-brand-accent)] group-hover:underline group-hover:underline-offset-4">{product.name}</p>
                           {product.description && <p className="mt-1 max-w-xs truncate text-xs text-stone-500">{product.description}</p>}
                         </td>
                         <td className="px-5 py-4 text-sm">{product.category_info?.name ?? "-"}</td>
@@ -133,7 +133,7 @@ export default function MenuItemsPage() {
                 <p className="text-xs text-stone-500">{t("Page")} {page} {t("of")} {totalPages}</p>
                 <label className="flex items-center gap-2 text-xs font-semibold text-stone-500">
                   {t("Limit")}
-                  <select value={pageSize} onChange={(event) => { setPage(1); setPageSize(Number(event.target.value)); }} className="rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-xs text-stone-700 outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10">
+                  <select value={pageSize} onChange={(event) => { setPage(1); setPageSize(Number(event.target.value)); }} className="rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-xs text-stone-700 outline-none focus:border-[var(--color-brand-accent)] focus:ring-4 focus:ring-[var(--color-brand-accent)]/10">
                     {PAGE_SIZE_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
                   </select>
                 </label>

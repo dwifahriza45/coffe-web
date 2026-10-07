@@ -210,7 +210,7 @@ export default function SupplierShoppingForm({
             [field]: event.target.value,
           }))
         }
-        className="mt-2 w-full rounded-lg border border-stone-300 px-3 py-2.5 text-sm font-normal outline-none focus:border-[#b86b42] disabled:bg-stone-100 disabled:text-stone-500"
+        className="mt-2 w-full rounded-lg border border-stone-300 px-3 py-2.5 text-sm font-normal outline-none focus:border-[var(--color-brand-accent)] disabled:bg-stone-100 disabled:text-stone-500"
       />
     </label>
   );
@@ -237,7 +237,7 @@ export default function SupplierShoppingForm({
         <div className="space-y-5 overflow-auto p-5">
           <fieldset disabled={saving} className="space-y-6">
             <section className="border-b border-stone-200 pb-6">
-              <h3 className="mb-4 text-sm font-bold uppercase text-[#362219]">
+              <h3 className="mb-4 text-sm font-bold uppercase text-[var(--color-brand-primary)]">
                 {t("Purchase order")}
               </h3>
               <div className="grid gap-4 sm:grid-cols-2">
@@ -246,7 +246,7 @@ export default function SupplierShoppingForm({
             </section>
             <div className="grid gap-6 sm:grid-cols-2">
               <section className="rounded-xl border border-stone-200 p-4">
-                <h3 className="mb-4 text-sm font-bold uppercase text-[#362219]">
+                <h3 className="mb-4 text-sm font-bold uppercase text-[var(--color-brand-primary)]">
                   {t("Supplier information")}
                 </h3>
                 <dl className="mb-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-3 text-sm">
@@ -273,7 +273,7 @@ export default function SupplierShoppingForm({
                 {renderField(fields[4])}
               </section>
               <section className="rounded-xl border border-stone-200 p-4">
-                <h3 className="mb-4 text-sm font-bold uppercase text-[#362219]">
+                <h3 className="mb-4 text-sm font-bold uppercase text-[var(--color-brand-primary)]">
                   {t("Shipping information")}
                 </h3>
                 <div className="grid gap-3">
@@ -287,7 +287,7 @@ export default function SupplierShoppingForm({
           </p>
           <div className="overflow-x-auto rounded-lg border border-stone-200">
             <table className="w-full min-w-220 text-left text-sm">
-              <thead className="bg-[#948750] text-xs text-white">
+              <thead className="bg-[var(--color-brand-accent)] text-xs text-white">
                 <tr>
                   {[
                     "Ingredient",
@@ -429,7 +429,7 @@ export default function SupplierShoppingForm({
             <button
               disabled={saving || !form.items.length}
               type="submit"
-              className="rounded-lg bg-[#362219] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+              className="rounded-lg bg-[var(--color-brand-primary)] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
             >
               {t(saving ? "Saving..." : "Save")}
             </button>

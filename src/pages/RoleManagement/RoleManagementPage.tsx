@@ -52,7 +52,6 @@ const PERMISSION_MENUS = [
   { key: "current_stock", label: "Current Stock" },
   { key: "reconciliations", label: "Reconciliation" },
   { key: "inventory_opening_counts", label: "Opening Stock" },
-  { key: "stock_receipts", label: "Purchasing" },
   { key: "stock_adjustments", label: "Stock Adjustments" },
   { key: "stock_movements", label: "Stock Movements" },
   { key: "inventory_closing_counts", label: "Closing Stock" },
@@ -83,20 +82,17 @@ const READ_DEPENDENCIES: Record<string, string[]> = {
   business_days: [
     "inventory_counts",
     "inventory_opening_counts",
-    "stock_receipts",
     "stock_adjustments",
     "stock_movements",
     "inventory_closing_counts",
   ],
   inventory_counts: [
     "inventory_opening_counts",
-    "stock_receipts",
     "stock_adjustments",
     "stock_movements",
     "inventory_closing_counts",
   ],
   inventory_opening_counts: ["inventory_counts"],
-  stock_receipts: ["inventory_counts", "inventory_opening_counts"],
   stock_adjustments: ["inventory_counts", "inventory_opening_counts"],
   stock_movements: [],
   inventory_closing_counts: ["inventory_counts"],
@@ -511,14 +507,14 @@ export default function RoleManagementPage() {
   const canManageUsersRole = canUpdateRoles && (!usersRoleIsAdmin || isCurrentUserAdmin);
 
   return (
-    <div className="flex min-h-screen bg-[#f8f5f0]">
+    <div className="flex min-h-screen bg-[var(--color-brand-cream)]">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <section className="min-w-0 flex-1">
         <Navbar onMenuClick={() => setSidebarOpen(true)} />
         <main className="p-5 sm:p-8">
           <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
             <div>
-              <div className="mb-3 flex size-11 items-center justify-center rounded-xl bg-[#f2e2d8] text-[#92502f]">
+              <div className="mb-3 flex size-11 items-center justify-center rounded-xl bg-[var(--color-brand-soft)] text-[var(--color-brand-accent)]">
                 <Shield size={22} />
               </div>
               <h1 className="font-serif text-3xl font-bold">{t("Role Management")}</h1>
@@ -530,7 +526,7 @@ export default function RoleManagementPage() {
               <button
                 type="button"
                 onClick={() => openRoleModal("create")}
-                className="flex items-center gap-2 rounded-lg bg-[#362219] px-5 py-3 text-sm font-semibold text-white"
+                className="flex items-center gap-2 rounded-lg bg-[var(--color-brand-primary)] px-5 py-3 text-sm font-semibold text-white"
               >
                 <Plus size={17} />
                 {t("Add role")}
@@ -548,7 +544,7 @@ export default function RoleManagementPage() {
               </div>
               <form
                 onSubmit={handleSearch}
-                className="flex w-full max-w-sm items-center gap-2 rounded-lg border border-stone-200 px-3 py-2.5 focus-within:border-[#b86b42] focus-within:ring-4 focus-within:ring-[#b86b42]/10"
+                className="flex w-full max-w-sm items-center gap-2 rounded-lg border border-stone-200 px-3 py-2.5 focus-within:border-[var(--color-brand-accent)] focus-within:ring-4 focus-within:ring-[var(--color-brand-accent)]/10"
               >
                 <Search size={17} className="text-stone-400" />
                 <input
@@ -582,7 +578,7 @@ export default function RoleManagementPage() {
                         colSpan={showRoleActions ? 3 : 2}
                         className="px-5 py-14 text-center text-sm text-stone-500"
                       >
-                        <span className="mx-auto mb-3 block size-5 animate-spin rounded-full border-2 border-stone-200 border-t-[#92502f]" />
+                        <span className="mx-auto mb-3 block size-5 animate-spin rounded-full border-2 border-stone-200 border-t-[var(--color-brand-accent)]" />
                         {t("Loading roles...")}
                       </td>
                     </tr>
@@ -603,7 +599,7 @@ export default function RoleManagementPage() {
                         <tr key={role.role_id} className="hover:bg-stone-50/70">
                           <td className="px-5 py-4">
                             <div className="flex items-center gap-3">
-                              <span className="grid size-9 place-items-center rounded-lg bg-[#f2e2d8] text-[#92502f]">
+                              <span className="grid size-9 place-items-center rounded-lg bg-[var(--color-brand-soft)] text-[var(--color-brand-accent)]">
                                 <Shield size={17} />
                               </span>
                               <div>
@@ -682,7 +678,7 @@ export default function RoleManagementPage() {
                       setPage(1);
                       setPageSize(Number(event.target.value));
                     }}
-                    className="rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-xs text-stone-700 outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10"
+                    className="rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-xs text-stone-700 outline-none focus:border-[var(--color-brand-accent)] focus:ring-4 focus:ring-[var(--color-brand-accent)]/10"
                   >
                     {PAGE_SIZE_OPTIONS.map((option) => (
                       <option key={option} value={option}>
@@ -755,7 +751,7 @@ export default function RoleManagementPage() {
                     setRoleName(event.target.value);
                     setFieldError("");
                   }}
-                  className={`mt-2 w-full rounded-lg border px-3.5 py-3 text-sm outline-none ${fieldError ? "border-red-400 focus:border-red-500 focus:ring-4 focus:ring-red-100" : "border-stone-300 focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10"}`}
+                  className={`mt-2 w-full rounded-lg border px-3.5 py-3 text-sm outline-none ${fieldError ? "border-red-400 focus:border-red-500 focus:ring-4 focus:ring-red-100" : "border-stone-300 focus:border-[var(--color-brand-accent)] focus:ring-4 focus:ring-[var(--color-brand-accent)]/10"}`}
                   disabled={submitting}
                 />
                 {fieldError && (
@@ -822,7 +818,7 @@ export default function RoleManagementPage() {
                                     submitting ||
                                     (action.key === "can_read" && readLocked)
                                   }
-                                  className="size-4 accent-[#92502f]"
+                                  className="size-4 accent-[var(--color-brand-accent)]"
                                   aria-label={`${t(menu.label)} ${t(action.label)}`}
                                   title={
                                     action.key === "can_read" && readLocked
@@ -843,7 +839,7 @@ export default function RoleManagementPage() {
                                   )
                                 }
                                 disabled={submitting}
-                                className="size-4 accent-[#92502f]"
+                                className="size-4 accent-[var(--color-brand-accent)]"
                                 aria-label={`${t(menu.label)} ${t("All")}`}
                               />
                             </td>
@@ -872,7 +868,7 @@ export default function RoleManagementPage() {
               <button
                 type="submit"
                 disabled={submitting}
-                className="rounded-lg bg-[#362219] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+                className="rounded-lg bg-[var(--color-brand-primary)] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
               >
                 {submitting ? t("Saving...") : t("Save")}
               </button>
@@ -906,7 +902,7 @@ export default function RoleManagementPage() {
             <div className="max-h-[calc(100vh-14rem)] space-y-5 overflow-y-auto p-5">
               {usersLoading ? (
                 <div className="py-8 text-center text-sm text-stone-500">
-                  <span className="mx-auto mb-3 block size-5 animate-spin rounded-full border-2 border-stone-200 border-t-[#92502f]" />
+                  <span className="mx-auto mb-3 block size-5 animate-spin rounded-full border-2 border-stone-200 border-t-[var(--color-brand-accent)]" />
                   {t("Loading users...")}
                 </div>
               ) : usersError ? (
@@ -1002,7 +998,7 @@ export default function RoleManagementPage() {
                                 toggleSelectedUser(user.user_id)
                               }
                               disabled={usersSubmitting || !canManageUsersRole}
-                              className="size-4 accent-[#92502f]"
+                              className="size-4 accent-[var(--color-brand-accent)]"
                             />
                               <span className="min-w-0">
                                 <span className="block text-sm font-semibold text-stone-800">
@@ -1027,7 +1023,7 @@ export default function RoleManagementPage() {
                   selectedUserIDs.length === 0 ||
                   !canManageUsersRole
                 }
-                className="rounded-lg bg-[#362219] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+                className="rounded-lg bg-[var(--color-brand-primary)] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50"
               >
                 {usersSubmitting ? t("Saving...") : t("Add selected")}
               </button>

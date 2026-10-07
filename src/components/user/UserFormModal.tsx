@@ -91,7 +91,7 @@ export default function UserFormModal({
   }
 
   const inputClass = (field: keyof CreateUserRequest) =>
-    `mt-2 w-full rounded-lg border bg-white px-3.5 py-3 text-sm outline-none transition disabled:bg-stone-100 ${errors[field] ? "border-red-400 focus:ring-4 focus:ring-red-100" : "border-stone-300 focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10"}`;
+    `mt-2 w-full rounded-lg border bg-white px-3.5 py-3 text-sm outline-none transition disabled:bg-stone-100 ${errors[field] ? "border-red-400 focus:ring-4 focus:ring-red-100" : "border-stone-300 focus:border-[var(--color-brand-accent)] focus:ring-4 focus:ring-[var(--color-brand-accent)]/10"}`;
   const field = (
     name: keyof CreateUserRequest,
     label: string,
@@ -161,7 +161,7 @@ export default function UserFormModal({
       >
         <header className="flex items-start justify-between border-b border-stone-200 p-5 sm:p-6">
           <div className="flex gap-3">
-            <span className="grid size-11 place-items-center rounded-xl bg-[#f2e2d8] text-[#92502f]">
+            <span className="grid size-11 place-items-center rounded-xl bg-[var(--color-brand-soft)] text-[var(--color-brand-accent)]">
               <UserPlus size={21} />
             </span>
             <div>
@@ -228,7 +228,7 @@ export default function UserFormModal({
           <button
             type="submit"
             disabled={submitting}
-            className="rounded-lg bg-[#362219] px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+            className="rounded-lg bg-[var(--color-brand-primary)] px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
           >
             {submitting ? t("Creating user...") : t("Create user")}
           </button>

@@ -32,9 +32,9 @@ function useAuthentication() {
 
 function AuthLoading() {
   return (
-    <main className="grid min-h-screen place-items-center bg-[#f8f5f0]">
-      <div className="flex items-center gap-3 text-sm font-semibold text-[#6b402b]">
-        <span className="size-5 animate-spin rounded-full border-2 border-[#d9b9a5] border-t-[#6b402b]" />
+    <main className="grid min-h-screen place-items-center bg-[var(--color-brand-cream)]">
+      <div className="flex items-center gap-3 text-sm font-semibold text-[var(--color-brand-primary)]">
+        <span className="size-5 animate-spin rounded-full border-2 border-[var(--color-brand-sage)] border-t-[var(--color-brand-primary)]" />
         Checking your session...
       </div>
     </main>

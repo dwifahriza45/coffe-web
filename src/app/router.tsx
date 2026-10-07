@@ -5,8 +5,9 @@ import PackagingManagementPage from "../pages/PackagingManagement/PackagingManag
 import InventoryCountEntryPage from "../pages/InventoryCount/InventoryCountEntryPage";
 import StockMovementPage from "../pages/StockMovement/StockMovementPage";
 import SupplierDetailPage from "../pages/SupplierDetail/SupplierDetailPage";
+import PurchaseOrderPage from "../pages/PurchaseOrder/PurchaseOrderPage";
 import SupplierManagementPage from "../pages/SupplierManagement/SupplierManagementPage";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import LoginPage from "../pages/auth/LoginPage";
 import BusinessDayPage from "../pages/BusinessDay/BusinessDayPage";
 import BrandTypeManagementPage from "../pages/BrandTypeManagement/BrandTypeManagementPage";
@@ -26,8 +27,6 @@ import ReconciliationPage from "../pages/Reconciliation/ReconciliationPage";
 import RoleManagementPage from "../pages/RoleManagement/RoleManagementPage";
 import StockAdjustmentPage from "../pages/StockAdjustment/StockAdjustmentPage";
 import StockAdjustmentDetailPage from "../pages/StockAdjustmentDetail/StockAdjustmentDetailPage";
-import StockReceiptPage from "../pages/StockReceipt/StockReceiptPage";
-import StockReceiptDetailPage from "../pages/StockReceiptDetail/StockReceiptDetailPage";
 import UnitManagementPage from "../pages/UnitManagement/UnitManagementPage";
 import UserManagementPage from "../pages/UserManagement/UserManagementPage";
 import UnauthorizedPage from "../pages/Unauthorized/UnauthorizedPage";
@@ -132,26 +131,8 @@ export default function AppRouter() {
             </RequireAuth>
           }
         />
-        <Route
-          path="/stock-in"
-          element={
-            <RequireAuth>
-              <RequirePermission menuKey="stock_receipts">
-                <StockReceiptPage />
-              </RequirePermission>
-            </RequireAuth>
-          }
-        />
-        <Route
-          path="/stock-in/:stockReceiptID"
-          element={
-            <RequireAuth>
-              <RequirePermission menuKey="stock_receipts">
-                <StockReceiptDetailPage />
-              </RequirePermission>
-            </RequireAuth>
-          }
-        />
+        <Route path="/stock-in" element={<Navigate to="/supplier-management" replace />} />
+        <Route path="/stock-in/:stockReceiptID" element={<Navigate to="/supplier-management" replace />} />
         <Route
           path="/unauthorized"
           element={
@@ -182,6 +163,7 @@ export default function AppRouter() {
         />
         <Route path="/supplier-management/:supplierID" element={<RequireAuth><RequirePermission menuKey="suppliers"><SupplierDetailPage /></RequirePermission></RequireAuth>} />
         <Route path="/supplier-management" element={<RequireAuth><RequirePermission menuKey="suppliers"><SupplierManagementPage /></RequirePermission></RequireAuth>} />
+        <Route path="/purchase-orders" element={<RequireAuth><RequirePermission menuKey="suppliers"><PurchaseOrderPage /></RequirePermission></RequireAuth>} />
         <Route path="/stock-adjustments" element={<RequireAuth><RequirePermission menuKey="stock_adjustments"><StockAdjustmentPage /></RequirePermission></RequireAuth>} />
         <Route path="/stock-adjustments/:adjustmentID" element={<RequireAuth><RequirePermission menuKey="stock_adjustments"><StockAdjustmentDetailPage /></RequirePermission></RequireAuth>} />
         <Route path="/stock-movements" element={<RequireAuth><RequirePermission menuKey="stock_movements"><StockMovementPage /></RequirePermission></RequireAuth>} />

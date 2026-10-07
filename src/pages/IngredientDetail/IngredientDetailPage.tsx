@@ -22,7 +22,7 @@ import { userCan } from "../../app/roleAccess";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 import Navbar from "../../components/layout/Navbar";
 import Sidebar from "../../components/layout/Sidebar";
-import { formatNumber } from "../../utils/numberFormat";
+import { formatNumber, formatNumberInput, normalizeNumberInput } from "../../utils/numberFormat";
 import {
   currentBusinessDate,
   formatBusinessDate,
@@ -99,7 +99,7 @@ export default function IngredientDetailPage() {
     }
   }
   return (
-    <div className="flex min-h-screen bg-[#f8f5f0]">
+    <div className="flex min-h-screen bg-[var(--color-brand-cream)]">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <section className="min-w-0 flex-1">
         <Navbar onMenuClick={() => setSidebarOpen(true)} />
@@ -137,7 +137,7 @@ export default function IngredientDetailPage() {
                     },
                   });
                 }}
-                className="rounded-lg bg-[#362219] px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
+                className="rounded-lg bg-[var(--color-brand-primary)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
               >
                 {t("Add ingredient price")}
               </button>
@@ -196,15 +196,13 @@ export default function IngredientDetailPage() {
                   <input
                     autoFocus
                     required
-                    type="number"
-                    min="0"
-                    max="9999999999999999.99"
-                    step="0.01"
-                    value={editor.data.price}
+                    type="text"
+                    inputMode="decimal"
+                    value={formatNumberInput(editor.data.price)}
                     onChange={(e) =>
                       setEditor({
                         ...editor,
-                        data: { ...editor.data, price: e.target.value },
+                        data: { ...editor.data, price: normalizeNumberInput(e.target.value) },
                       })
                     }
                     className="mt-1 block w-full rounded-lg border border-stone-300 p-2"
@@ -272,7 +270,7 @@ export default function IngredientDetailPage() {
                 </button>
                 <button
                   disabled={saving}
-                  className="rounded-lg bg-[#362219] px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
+                  className="rounded-lg bg-[var(--color-brand-primary)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
                 >
                   {t(saving ? "Saving..." : "Save")}
                 </button>
@@ -281,7 +279,7 @@ export default function IngredientDetailPage() {
           )}
           <div className="mt-6 rounded-xl border border-stone-200 bg-white p-5">
             <p className="text-sm text-stone-500">{t("Active price")}</p>
-            <p className="mt-2 text-2xl font-bold text-[#362219]">
+            <p className="mt-2 text-2xl font-bold text-[var(--color-brand-primary)]">
               {activePrice ? `Rp ${formatNumber(activePrice.price, 2)}` : "—"}
             </p>
             <p className="mt-2 text-xs text-stone-500">
@@ -303,7 +301,7 @@ export default function IngredientDetailPage() {
               label={t("Ingredient price history")}
               headers={
                 <>
-                  {["Price", "Effective Date", "Notes", "Usage", "Status"].map(
+                  {["Price", "Unit Price", "Effective Date", "Notes", "Usage", "Status"].map(
                     (label) => (
                       <th key={label} className="px-5 py-3">
                         {t(label)}
@@ -319,7 +317,7 @@ export default function IngredientDetailPage() {
               {loading || !prices.length ? (
                 <tr>
                   <td
-                    colSpan={canManage ? 6 : 5}
+                    colSpan={canManage ? 7 : 6}
                     className="px-5 py-14 text-center text-sm text-stone-500"
                   >
                     {t(
@@ -339,6 +337,12 @@ export default function IngredientDetailPage() {
                   >
                     <td className="whitespace-nowrap px-5 py-4 font-semibold">
                       Rp {formatNumber(price.price, 2)}
+                    </td>
+                    <td className="whitespace-nowrap px-5 py-4 font-semibold">
+                      Rp {formatNumber(price.unit_price, 2)}
+                      {price.price_content_unit && (
+                        <span className="ml-1 text-xs font-normal text-stone-500">/ {price.price_content_unit}</span>
+                      )}
                     </td>
                     <td className="whitespace-nowrap px-5 py-4">
                       {formatBusinessDate(price.effective_date)}

@@ -1,5 +1,8 @@
+import InventoryCategoryFilters from "../../components/common/InventoryCategoryFilters";
+import ImportResults, { type ImportResultRow } from "../../components/common/ImportResults";
+import { addWorkbookDropdowns, downloadWorkbookFile } from "../../utils/workbookDropdown";
 import ManagementTable from "../../components/common/ManagementTable";
-import { ingredientExportHeaders, ingredientImportChanged, parseIngredientQuantity, resolveImportOption } from "../../utils/ingredientImport";
+import { ingredientExportHeaders, ingredientImportKey, ingredientImportChanged, parseIngredientQuantity, parseIngredientTarget, resolveImportOption } from "../../utils/ingredientImport";
 import { createExportWorksheet } from "../../utils/exportWorksheet";
 import { Link } from "react-router-dom";
 import {
@@ -19,6 +22,7 @@ import {
   createIngredient,
   deleteIngredient,
   getIngredients,
+  getInventoryCategoryCounts,
   updateIngredient,
   type Ingredient,
   type IngredientPayload,
@@ -44,6 +48,7 @@ const emptyForm: IngredientPayload = {
   content_qty: "",
   content_unit_id: "",
   minimum_stock: "",
+  target_stock: "0",
   active: true,
 };
 
@@ -74,12 +79,13 @@ export default function IngredientManagementPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [total, setTotal] = useState(0);
+  const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({});
+  const [inventoryTotal, setInventoryTotal] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
   const importInputRef = useRef<HTMLInputElement>(null);
-  const [importDetails, setImportDetails] = useState<{ row: number; name: string; status: "success" | "failed" | "skipped"; reason: string }[] | null>(null);
-  const [importDetailOpen, setImportDetailOpen] = useState(false);
+  const [importDetails, setImportDetails] = useState<ImportResultRow[] | null>(null);
   const [error, setError] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [editingIngredient, setEditingIngredient] = useState<Ingredient | null>(
@@ -97,6 +103,17 @@ export default function IngredientManagementPage() {
     tone?: "default" | "danger";
     onConfirm: () => void | Promise<void>;
   } | null>(null);
+
+  useEffect(() => {
+    let current = true;
+    setInventoryTotal(null);
+    getInventoryCategoryCounts({name: search, supplier_id: supplierFilter}).then((response) => {
+      if (!current) return;
+      setCategoryCounts(Object.fromEntries((response.data?.categories ?? []).map((category) => [category.category_id, category.count])));
+      setInventoryTotal(response.data?.total ?? 0);
+    }).catch(() => { if (current) {setCategoryCounts({});setInventoryTotal(null);} });
+    return () => {current = false;};
+  }, [search, supplierFilter, refreshKey]);
 
   useEffect(() => {
     let current = true;
@@ -193,6 +210,7 @@ export default function IngredientManagementPage() {
             content_qty: ingredient.content_qty,
             content_unit_id: ingredient.content_unit_id,
             minimum_stock: ingredient.minimum_stock,
+            target_stock: ingredient.target_stock ?? "0",
             active: ingredient.active,
           }
         : emptyForm,
@@ -216,9 +234,12 @@ export default function IngredientManagementPage() {
       return;
     }
     const combinationErrors: Record<string, string> = {};
+    const targetStock = Number(form.target_stock || "0");
+    if (!Number.isFinite(targetStock) || targetStock < 0 || (targetStock > 0 && targetStock < Number(form.minimum_stock))) {
+      combinationErrors.target_stock = "Target stok harus 0 atau minimal sebesar minimum stok.";
+    }
     for (const key of [
       "category_ingredient_id",
-      "brand_type_id",
       "supplier_id",
       "packaging_id",
       "content_unit_id",
@@ -233,7 +254,7 @@ export default function IngredientManagementPage() {
         item.active,
     );
     if (
-      availableSubcategories.length &&
+      !!form.subcategory_ingredient_id &&
       !availableSubcategories.some(
         (item) =>
           item.subcategory_ingredient_id === form.subcategory_ingredient_id,
@@ -249,7 +270,7 @@ export default function IngredientManagementPage() {
           item.category_ingredient_id === form.category_ingredient_id &&
           item.active,
       ),
-      brand_type_id: brandTypes.some(
+      brand_type_id: !form.brand_type_id || brandTypes.some(
         (item) =>
           item.brand_type_id === form.brand_type_id &&
           (item.subcategory_ingredient_id || "") ===
@@ -315,6 +336,7 @@ export default function IngredientManagementPage() {
         content_unit_id: form.content_unit_id,
 
         minimum_stock: form.minimum_stock,
+        target_stock: form.target_stock || "0",
         active: form.active,
       };
       if (editingIngredient) {
@@ -398,6 +420,7 @@ export default function IngredientManagementPage() {
         content_unit_id: ingredient.content_unit_id,
 
         minimum_stock: ingredient.minimum_stock,
+            target_stock: ingredient.target_stock ?? "0",
         active: !ingredient.active,
       });
       setRefreshKey((value) => value + 1);
@@ -432,21 +455,50 @@ export default function IngredientManagementPage() {
         exportTotal = response.total ?? items.length;
       } while (items.length < exportTotal);
 
-      const headers = ingredientExportHeaders.map((label) => t(label).toUpperCase());
+      async function allOptions<T>(load: (start: number) => Promise<{ data?: T[] | null; total?: number }>) {
+        const options: T[] = [];
+        for (;;) {
+          const response = await load(options.length);
+          const next = response.data ?? [];
+          options.push(...next);
+          if (!next.length || options.length >= (response.total ?? options.length)) return options;
+        }
+      }
+      const [categories, subResponse, brands, supplierItems, packagingItems, units] = await Promise.all([
+        getAllCategoryIngredients(), getIngredientSubcategories(), getAllBrandTypes(), getAllSuppliers(),
+        allOptions((start) => getPackagings({ start, limit: 100, name: "" })),
+        allOptions((start) => getUnits({ start, limit: 100, name: "" })),
+      ]);
+      const subs = subResponse.data ?? [];
+      const labels = ["Ingredient", "Ingredient Category", "Ingredient subcategory", "Brand / Type", "Supplier", "Package quantity", "Packaging unit", "Content quantity", "Content unit", "Min stock", "Target stock"];
+      const headers = labels.map((label) => t(label).toUpperCase());
       const rows = items.map((item) => [
         item.name,
-        categoryIngredients.find((category) => category.category_ingredient_id === item.category_ingredient_id)?.name ?? item.category_ingredient_name ?? item.category_ingredient_id,
-        subcategories.find((subcategory) => subcategory.subcategory_ingredient_id === item.subcategory_ingredient_id)?.name ?? item.subcategory_ingredient_id,
-        brandTypes.find((brand) => brand.brand_type_id === item.brand_type_id)?.name ?? item.brand_type_id,
-        suppliers.find((supplier) => supplier.supplier_id === item.supplier_id)?.name ?? item.supplier_id,
-        `${formatNumber(item.package_qty, 6)} ${packagings.find((packaging) => packaging.packaging_id === item.packaging_id)?.name ?? item.packaging_id}`,
-        `${formatNumber(item.content_qty, 6)} ${unitOptions.find((unit) => unit.unit_id === item.content_unit_id)?.code ?? item.content_unit_id}`,
+        categories.find((category) => category.category_ingredient_id === item.category_ingredient_id)?.name ?? item.category_ingredient_name ?? item.category_ingredient_id,
+        subs.find((subcategory) => subcategory.subcategory_ingredient_id === item.subcategory_ingredient_id)?.name ?? item.subcategory_ingredient_id,
+        brands.find((brand) => brand.brand_type_id === item.brand_type_id)?.name ?? item.brand_type_id,
+        supplierItems.find((supplier) => supplier.supplier_id === item.supplier_id)?.name ?? item.supplier_id,
+        Number(item.package_qty),
+        packagingItems.find((packaging) => packaging.packaging_id === item.packaging_id)?.name ?? item.packaging_id,
+        Number(item.content_qty),
+        units.find((unit) => unit.unit_id === item.content_unit_id)?.code ?? item.content_unit_id,
         Number(item.minimum_stock),
+        Number(item.target_stock || 0),
       ]);
-      const sheet = createExportWorksheet(headers, rows, [30, 25, 25, 25, 30, 22, 22, 16]);
+      const sheet = createExportWorksheet(headers, rows, [30, 25, 25, 25, 30, 18, 22, 18, 18, 16, 16]);
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, sheet, t("Ingredients"));
-      XLSX.writeFile(workbook, "bahan.xlsx");
+      const activeCategories = categories.filter((item) => item.active);
+      const activeSubs = subs.filter((item) => item.active && activeCategories.some((category) => category.category_ingredient_id === item.category_ingredient_id));
+      const bytes = addWorkbookDropdowns(workbook, [
+        { column: "B", name: "IngredientCategories", options: activeCategories.map((item) => item.name) },
+        { column: "C", name: "IngredientSubcategories", options: activeSubs.map((item) => item.name) },
+        { column: "D", name: "IngredientBrands", options: brands.filter((item) => item.active && activeCategories.some((category) => category.category_ingredient_id === item.category_ingredient_id) && (!item.subcategory_ingredient_id || activeSubs.some((sub) => sub.subcategory_ingredient_id === item.subcategory_ingredient_id))).map((item) => item.name) },
+        { column: "E", name: "IngredientSuppliers", options: supplierItems.filter((item) => item.active).map((item) => item.name) },
+        { column: "G", name: "IngredientPackagings", options: packagingItems.filter((item) => item.active).map((item) => item.name) },
+        { column: "I", name: "IngredientUnits", options: units.filter((item) => item.active).map((item) => item.code) },
+      ]);
+      downloadWorkbookFile(bytes, "bahan.xlsx");
     } catch (requestError) {
       const response = isAxiosError<{ message?: string }>(requestError)
         ? requestError.response?.data
@@ -464,7 +516,6 @@ export default function IngredientManagementPage() {
     setImporting(true);
     setError("");
     setImportDetails(null);
-    setImportDetailOpen(false);
     const details: NonNullable<typeof importDetails> = [];
     try {
       const workbook = XLSX.read(await file.arrayBuffer(), { type: "array" });
@@ -480,7 +531,15 @@ export default function IngredientManagementPage() {
           Content: ["isi"], "Min stock": ["stok minimum", "stock minimum", "min stok"],
         }[label] ?? [])].includes(cell),
       ));
-      if (indices.some((index) => index < 0) || new Set(header).size !== header.length) throw new Error("Invalid ingredient import format");
+      const findColumn = (label: string, aliases: string[]) => header.findIndex((cell) => [label.toLowerCase(), t(label).toLowerCase(), ...aliases].includes(cell));
+      const targetStockColumn = findColumn("Target stock", ["target stok", "target stock", "stok target"]);
+      const packageQtyColumn = findColumn("Package quantity", ["jumlah kemasan"]);
+      const contentQtyColumn = findColumn("Content quantity", ["jumlah isi"]);
+      const contentUnitColumn = findColumn("Content unit", ["satuan isi"]);
+      const separateQuantities = packageQtyColumn >= 0 || contentQtyColumn >= 0 || contentUnitColumn >= 0;
+      if (indices.some((index, position) => index < 0 && !(separateQuantities && position === 6)) ||
+          (separateQuantities && [packageQtyColumn, contentQtyColumn, contentUnitColumn].some((index) => index < 0)) ||
+          new Set(header).size !== header.length) throw new Error("Invalid ingredient import format");
       async function allPages<T>(load: (start: number) => Promise<{ data?: T[] | null; total?: number }>) {
         const items: T[] = [];
         for (;;) {
@@ -497,6 +556,13 @@ export default function IngredientManagementPage() {
         allPages((start) => getUnits({ start, limit: 100, name: "" })),
       ]);
       const subs = subResponse.data ?? [];
+      const existingByKey = new Map<string, Ingredient[]>();
+      for (const item of existingItems) {
+        const key = ingredientImportKey(item);
+        const group = existingByKey.get(key) ?? [];
+        group.push(item);
+        existingByKey.set(key, group);
+      }
       const seen = new Set<string>();
       for (const [index, row] of rows.slice(1).entries()) {
         if (row.every((cell) => !String(cell ?? "").trim())) continue;
@@ -505,32 +571,34 @@ export default function IngredientManagementPage() {
         const entry = { row: index + 2, name };
         try {
           if (!name) throw new Error("Name is required");
-          const normalizedName = name.toLowerCase();
-          if (seen.has(normalizedName)) throw new Error("Duplicate name in import file");
-          seen.add(normalizedName);
-          const matches = existingItems.filter((item) => item.name.trim().toLowerCase() === normalizedName);
-          if (matches.length > 1) throw new Error("Ambiguous ingredient reference");
-          const existing = matches[0];
           const category = resolveImportOption(categories.filter((item) => item.active), categoryName, (item) => item.name);
           const categorySubs = subs.filter((item) => item.active && item.category_ingredient_id === category.category_ingredient_id);
           const subcategory = subcategoryName && subcategoryName !== "-"
             ? resolveImportOption(categorySubs, subcategoryName, (item) => item.name) : undefined;
-          if (categorySubs.length && !subcategory) throw new Error("Select ingredient subcategory");
-          const brand = resolveImportOption(brands.filter((item) => item.active && item.category_ingredient_id === category.category_ingredient_id && (item.subcategory_ingredient_id || "") === (subcategory?.subcategory_ingredient_id || "")), brandName, (item) => item.name);
+          const brand = brandName && brandName !== "-" ? resolveImportOption(brands.filter((item) => item.active && item.category_ingredient_id === category.category_ingredient_id && (item.subcategory_ingredient_id || "") === (subcategory?.subcategory_ingredient_id || "")), brandName, (item) => item.name) : undefined;
           const supplier = resolveImportOption(supplierItems.filter((item) => item.active), supplierName, (item) => item.name);
-          const packaging = parseIngredientQuantity(packageValue);
-          const content = parseIngredientQuantity(contentValue);
+          const packaging = parseIngredientQuantity(separateQuantities
+            ? `${String(row[packageQtyColumn] ?? "").trim()} ${packageValue}` : packageValue);
+          const content = parseIngredientQuantity(separateQuantities
+            ? `${String(row[contentQtyColumn] ?? "").trim()} ${String(row[contentUnitColumn] ?? "").trim()}` : contentValue);
           const packagingOption = resolveImportOption(packagingItems.filter((item) => item.active), packaging.unit, (item) => item.name);
           const unit = resolveImportOption(units.filter((item) => item.active), content.unit, (item) => item.code);
+          const key = ingredientImportKey({ name, content_qty: content.quantity, content_unit_id: unit.unit_id });
+          if (seen.has(key)) throw new Error("Duplicate ingredient variant in import file");
+          seen.add(key);
+          const matches = existingByKey.get(key) ?? [];
+          if (matches.length > 1) throw new Error("Ambiguous ingredient reference");
+          const existing = matches[0];
           const stock = stockValue.replace(/,/g, "");
           if (!/^\d+(?:\.\d+)?$/.test(stock) || !Number.isFinite(Number(stock))) throw new Error("Invalid minimum stock");
+          const target = parseIngredientTarget(targetStockColumn < 0 ? undefined : row[targetStockColumn], stock);
           const payload: IngredientPayload = {
             name, category_ingredient_id: category.category_ingredient_id,
             subcategory_ingredient_id: subcategory?.subcategory_ingredient_id || "",
-            brand_type_id: brand.brand_type_id, supplier_id: supplier.supplier_id,
+            brand_type_id: brand?.brand_type_id || "", supplier_id: supplier.supplier_id,
             packaging_id: packagingOption.packaging_id, package_qty: packaging.quantity,
             content_qty: content.quantity, content_unit_id: unit.unit_id,
-            minimum_stock: stock, active: existing?.active ?? true,
+            minimum_stock: stock, ...(target === undefined ? {} : { target_stock: target }), active: existing?.active ?? true,
           };
           if (existing && !ingredientImportChanged(existing, payload)) {
             details.push({ ...entry, status: "skipped", reason: t("No changes") });
@@ -563,96 +631,53 @@ export default function IngredientManagementPage() {
   }
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const columnCount = showActions ? 11 : 10;
+  const columnCount = showActions ? 14 : 13;
 
   return (
-    <div className="flex min-h-screen bg-[#f8f5f0]">
+    <div className="flex min-h-screen bg-[var(--color-brand-cream)]">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <section className="min-w-0 flex-1">
         <Navbar onMenuClick={() => setSidebarOpen(true)} />
         <main className="p-5 sm:p-8">
           <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
             <div>
-              <div className="mb-3 flex size-11 items-center justify-center rounded-xl bg-[#e8efe5] text-[#547144]">
+              <div className="mb-3 flex size-11 items-center justify-center rounded-xl bg-[var(--color-brand-soft)] text-[var(--color-brand-hover)]">
                 <Boxes size={22} />
               </div>
               <h1 className="font-serif text-3xl font-bold">
-                {t("Ingredient Management")}
+                Inventory
               </h1>
               <p className="mt-2 text-sm text-stone-500">
-                {t("Manage stock ingredients and packaging.")}
+                {inventoryTotal === null ? "…" : formatNumber(String(inventoryTotal), 0)} {t("items")} · {t("Manage stock ingredients and packaging.")}
               </p>
             </div>
             {canCreateIngredients && (
               <button
                 type="button"
                 onClick={() => openModal()}
-                className="flex items-center gap-2 rounded-lg bg-[#362219] px-5 py-3 text-sm font-semibold text-white"
+                className="flex items-center gap-2 rounded-lg bg-[var(--color-brand-primary)] px-5 py-3 text-sm font-semibold text-white"
               >
                 <Plus size={17} />
                 {t("Add ingredient")}
               </button>
             )}
           </header>
+          <InventoryCategoryFilters categories={categoryIngredients} subcategories={subcategories} category={categoryFilter} subcategory={subcategoryFilter} counts={categoryCounts} total={inventoryTotal} onCategory={(id) => {setCategoryFilter(id);setSubcategoryFilter("");setPage(1);}} onSubcategory={(id) => {setSubcategoryFilter(id);setPage(1);}} />
 
           <section className="mt-7 overflow-hidden rounded-xl border border-stone-200 bg-white">
             <div className="flex flex-col gap-4 border-b border-stone-200 p-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="shrink-0">
-                <h2 className="font-semibold">{t("All ingredients")}</h2>
+                <h2 className="font-semibold">{t("All items")}</h2>
                 <p className="text-xs text-stone-500">
-                  {total} {t("ingredients found")}
+                  {total} {t("items found")}
                 </p>
               </div>
               <div className="grid min-w-0 w-full grid-cols-1 gap-3 sm:grid-cols-2 lg:w-auto lg:flex lg:flex-1 lg:items-center lg:justify-end">
                 <select
-                  aria-label={t("Ingredient Category")}
-                  value={categoryFilter}
-                  onChange={(event) => {
-                    setPage(1);
-                    setCategoryFilter(event.target.value);
-                    setSubcategoryFilter("");
-                  }}
-                  className="h-11 min-w-0 w-full lg:w-40 xl:w-44 rounded-lg border border-stone-200 bg-white px-3 text-sm outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10"
-                >
-                  <option value="">{t("All categories")}</option>
-                  {categoryIngredients.map((category) => (
-                    <option
-                      key={category.category_ingredient_id}
-                      value={category.category_ingredient_id}
-                    >
-                      {category.name}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  aria-label={t("Ingredient subcategory")}
-                  value={subcategoryFilter}
-                  disabled={!categoryFilter}
-                  onChange={(event) => {
-                    setPage(1);
-                    setSubcategoryFilter(event.target.value);
-                  }}
-                  className="h-11 min-w-0 w-full lg:w-40 xl:w-44 rounded-lg border border-stone-200 bg-white px-3 text-sm outline-none disabled:opacity-50"
-                >
-                  <option value="">{t("All subcategories")}</option>
-                  {subcategories
-                    .filter(
-                      (item) => item.category_ingredient_id === categoryFilter,
-                    )
-                    .map((item) => (
-                      <option
-                        key={item.subcategory_ingredient_id}
-                        value={item.subcategory_ingredient_id}
-                      >
-                        {item.name}
-                      </option>
-                    ))}
-                </select>
-                <select
                   aria-label={t("Supplier")}
                   value={supplierFilter}
                   onChange={event => { setPage(1); setSupplierFilter(event.target.value); }}
-                  className="h-11 min-w-0 w-full lg:w-40 xl:w-44 rounded-lg border border-stone-200 bg-white px-3 text-sm outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10"
+                  className="h-11 min-w-0 w-full lg:w-40 xl:w-44 rounded-lg border border-stone-200 bg-white px-3 text-sm outline-none focus:border-[var(--color-brand-accent)] focus:ring-4 focus:ring-[var(--color-brand-accent)]/10"
                 >
                   <option value="">{t("All suppliers")}</option>
                   {suppliers.map(supplier => <option key={supplier.supplier_id} value={supplier.supplier_id}>{supplier.name}</option>)}
@@ -663,14 +688,14 @@ export default function IngredientManagementPage() {
                     setPage(1);
                     setSearch(searchInput.trim());
                   }}
-                  className="flex h-11 min-w-0 w-full lg:w-48 xl:w-60 items-center gap-2 rounded-lg border border-stone-200 px-3 py-2.5 focus-within:border-[#b86b42] focus-within:ring-4 focus-within:ring-[#b86b42]/10"
+                  className="flex h-11 min-w-0 w-full lg:w-48 xl:w-60 items-center gap-2 rounded-lg border border-stone-200 px-3 py-2.5 focus-within:border-[var(--color-brand-accent)] focus-within:ring-4 focus-within:ring-[var(--color-brand-accent)]/10"
                 >
                   <Search size={17} className="shrink-0 text-stone-400" />
                   <input
                     value={searchInput}
                     onChange={(event) => setSearchInput(event.target.value)}
                     className="min-w-0 flex-1 bg-transparent text-sm outline-none"
-                    placeholder={t("Search ingredient...")}
+                    placeholder={t("Search item...")}
                   />
                 </form>
                 {(canCreateIngredients || canUpdateIngredients) && (
@@ -693,22 +718,7 @@ export default function IngredientManagementPage() {
                 </button>
               </div>
             </div>
-            {importDetails && (
-              <div className="m-4 rounded-lg border border-stone-200 p-4 text-sm">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <p>{t("Import finished")}: {t("Success")} {importDetails.filter((item) => item.status === "success").length}, {t("Failed")} {importDetails.filter((item) => item.status === "failed").length}, {t("Skipped")} {importDetails.filter((item) => item.status === "skipped").length}</p>
-                  <button type="button" onClick={() => setImportDetailOpen((value) => !value)} aria-expanded={importDetailOpen} className="font-semibold text-[#92502f]">{t("Import detail")}</button>
-                </div>
-                {importDetailOpen && (
-                  <div className="mt-4 max-h-80 overflow-auto">
-                    <table className="w-full text-left text-sm">
-                      <thead><tr>{["Row", "Ingredient", "Status", "Reason"].map((label) => <th key={label} className="px-3 py-2">{t(label)}</th>)}</tr></thead>
-                      <tbody>{importDetails.map((item) => <tr key={item.row} className="border-t border-stone-100"><td className="px-3 py-2">{item.row}</td><td className="px-3 py-2">{item.name || "—"}</td><td className={`px-3 py-2 ${item.status === "failed" ? "text-red-700" : item.status === "success" ? "text-green-700" : "text-stone-500"}`}>{t(item.status === "success" ? "Success" : item.status === "failed" ? "Failed" : "Skipped")}</td><td className="px-3 py-2">{item.reason}</td></tr>)}</tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            )}
+            <ImportResults details={importDetails} showSkipped />
             {error && (
               <div className="m-4 rounded-lg bg-red-50 p-4 text-sm text-red-700">
                 {error}
@@ -716,17 +726,20 @@ export default function IngredientManagementPage() {
             )}
             <ManagementTable
               label={t("Ingredient Management")}
-              className="min-w-[1600px] whitespace-nowrap"
+              className="min-w-[1950px] whitespace-nowrap"
               headers={<>
 
-                    <th className="px-5 py-3">{t("Ingredient")}</th>
+                    <th className="px-5 py-3">{t("Item")}</th>
                     <th className="px-5 py-3">{t("Ingredient Category")}</th>
                     <th className="px-5 py-3">{t("Ingredient subcategory")}</th>
                     <th className="px-5 py-3">{t("Brand / Type")}</th>
                     <th className="px-5 py-3">{t("Supplier")}</th>
+                    <th className="px-5 py-3">{t("Package quantity")}</th>
                     <th className="px-5 py-3">{t("Packaging unit")}</th>
-                    <th className="px-5 py-3">{t("Content")}</th>
+                    <th className="px-5 py-3">{t("Content quantity")}</th>
+                    <th className="px-5 py-3">{t("Content unit")}</th>
                     <th className="px-5 py-3">{t("Min stock")}</th>
+                    <th className="px-5 py-3">{t("Target stock")}</th>
                     <th className="px-5 py-3">{t("Usage")}</th>
                     <th className="px-5 py-3">{t("Status")}</th>
                     {showActions && (
@@ -750,7 +763,7 @@ export default function IngredientManagementPage() {
                         colSpan={columnCount}
                         className="px-5 py-14 text-center text-sm text-stone-500"
                       >
-                        {t("No ingredients found")}
+                        {t("No items found")}
                       </td>
                     </tr>
                   ) : (
@@ -761,7 +774,7 @@ export default function IngredientManagementPage() {
                           className="hover:bg-stone-50/70"
                         >
                           <td className="px-5 py-4">
-                            <Link to={`/ingredient-management/${encodeURIComponent(ingredient.ingredient_id)}`} className="text-sm font-semibold text-[#92502f] hover:underline">
+                            <Link to={`/ingredient-management/${encodeURIComponent(ingredient.ingredient_id)}`} className="text-sm font-semibold text-[var(--color-brand-accent)] hover:underline">
                               {ingredient.name}
                             </Link>
                           </td>
@@ -792,14 +805,18 @@ export default function IngredientManagementPage() {
                             )?.name ?? "-"}
                           </td>
                           <td className="px-5 py-4 text-sm">
-                            {formatNumber(ingredient.package_qty, 3)}{" "}
+                            {formatNumber(ingredient.package_qty, 6)}
+                          </td>
+                          <td className="px-5 py-4 text-sm">
                             {packagings.find(
                               (item) =>
                                 item.packaging_id === ingredient.packaging_id,
                             )?.name ?? "-"}
                           </td>
                           <td className="px-5 py-4 text-sm">
-                            {formatNumber(ingredient.content_qty, 3)}{" "}
+                            {formatNumber(ingredient.content_qty, 6)}
+                          </td>
+                          <td className="px-5 py-4 text-sm">
                             {unitOptions.find(
                               (item) =>
                                 item.unit_id === ingredient.content_unit_id,
@@ -807,6 +824,9 @@ export default function IngredientManagementPage() {
                           </td>
                           <td className="px-5 py-4 text-sm">
                             {formatNumber(ingredient.minimum_stock, 3)}
+                          </td>
+                          <td className="px-5 py-4 text-sm">
+                            {Number(ingredient.target_stock || 0) > 0 ? formatNumber(ingredient.target_stock!, 3) : "—"}
                           </td>
                           <td className="px-5 py-4">
                             <span
@@ -889,7 +909,7 @@ export default function IngredientManagementPage() {
                       setPage(1);
                       setPageSize(Number(event.target.value));
                     }}
-                    className="rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-xs text-stone-700 outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10"
+                    className="rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-xs text-stone-700 outline-none focus:border-[var(--color-brand-accent)] focus:ring-4 focus:ring-[var(--color-brand-accent)]/10"
                   >
                     {PAGE_SIZE_OPTIONS.map((option) => (
                       <option key={option} value={option}>
@@ -951,7 +971,7 @@ export default function IngredientManagementPage() {
                       name: event.target.value,
                     }))
                   }
-                  className="mt-2 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10"
+                  className="mt-2 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm outline-none focus:border-[var(--color-brand-accent)] focus:ring-4 focus:ring-[var(--color-brand-accent)]/10"
                   disabled={submitting}
                 />
                 {fieldErrors.name && (
@@ -972,7 +992,7 @@ export default function IngredientManagementPage() {
                       minimum_stock: normalizeNumberInput(event.target.value),
                     }))
                   }
-                  className="mt-2 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10"
+                  className="mt-2 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm outline-none focus:border-[var(--color-brand-accent)] focus:ring-4 focus:ring-[var(--color-brand-accent)]/10"
                   disabled={submitting}
                 />
                 {fieldErrors.minimum_stock && (
@@ -980,6 +1000,12 @@ export default function IngredientManagementPage() {
                     {fieldErrors.minimum_stock}
                   </p>
                 )}
+              </label>
+              <label className="block text-sm font-semibold text-stone-700">
+                Target stok (opsional)
+                <input inputMode="decimal" placeholder="0" value={formatNumber(form.target_stock || "", 3)} onChange={(event) => setForm((current) => ({ ...current, target_stock: normalizeNumberInput(event.target.value) }))} disabled={submitting} className="mt-2 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm outline-none focus:border-brand-accent" />
+                <p className="mt-2 text-xs font-normal text-stone-500">Dalam satuan isi yang sama dengan minimum stok. Target harus minimal sebesar minimum. Isi 0 jika belum diatur.</p>
+                {fieldErrors.target_stock && <p className="mt-1.5 text-xs font-medium text-red-600">{fieldErrors.target_stock}</p>}
               </label>
               <SelectField
                 label={t("Ingredient Category")}
@@ -1009,6 +1035,7 @@ export default function IngredientManagementPage() {
               />
               <SelectField
                 label={t("Ingredient subcategory")}
+                optional
                 value={form.subcategory_ingredient_id || ""}
                 error={fieldErrors.subcategory_ingredient_id}
                 disabled={
@@ -1056,6 +1083,7 @@ export default function IngredientManagementPage() {
               />
               <SelectField
                 label={t("Brand / Type")}
+                optional
                 value={form.brand_type_id}
                 error={fieldErrors.brand_type_id}
                 disabled={
@@ -1204,7 +1232,7 @@ export default function IngredientManagementPage() {
               <button
                 type="submit"
                 disabled={submitting}
-                className="rounded-lg bg-[#362219] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+                className="rounded-lg bg-[var(--color-brand-primary)] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
               >
                 {submitting ? t("Saving...") : t("Save")}
               </button>
@@ -1245,7 +1273,7 @@ function InputField({
         inputMode="decimal"
         value={formatNumber(value, 3)}
         onChange={(event) => onChange(event.target.value)}
-        className="mt-2 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10"
+        className="mt-2 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm outline-none focus:border-[var(--color-brand-accent)] focus:ring-4 focus:ring-[var(--color-brand-accent)]/10"
       />
       {error && (
         <p className="mt-1.5 text-xs font-medium text-red-600">{error}</p>
@@ -1280,7 +1308,7 @@ function SelectField({
         value={options.some((option) => option.value === value) ? value : ""}
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
-        className="mt-2 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10"
+        className="mt-2 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm outline-none focus:border-[var(--color-brand-accent)] focus:ring-4 focus:ring-[var(--color-brand-accent)]/10"
       >
         <option value="">{placeholder ?? (optional ? "-" : "Select")}</option>
         {options.map((option) => (

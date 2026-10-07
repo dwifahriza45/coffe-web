@@ -23,6 +23,11 @@ export function normalizeNumberInput(value: string, allowDecimal = true) {
     : whole;
 }
 
+// Remove database decimal padding before editing, preserving meaningful fractions.
+export function storedNumberInput(value?: string | null) {
+  return (value ?? "").replace(/(\.\d*?[1-9])0+$|\.0+$/, "$1");
+}
+
 // Keep the fractional text intact while the user is typing (e.g. "1,000.").
 export function formatNumberInput(value: string) {
   const [whole, fraction] = stripNumberCommas(value).split(".");

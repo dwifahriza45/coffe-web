@@ -1,3 +1,4 @@
+import ImportResults from "../../components/common/ImportResults";
 import { createExportWorksheet } from "../../utils/exportWorksheet";
 import { Link } from "react-router-dom";
 import { ExternalLink, Download, Pencil, Plus, Power, Truck, Search, Trash2, Upload, X } from "lucide-react";
@@ -92,7 +93,6 @@ export default function SupplierManagementPage() {
   const [importing, setImporting] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [importSummary, setImportSummary] = useState<ImportSummary | null>(null);
-  const [importDetailOpen, setImportDetailOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [confirm, setConfirm] = useState<{
     title: string;
@@ -424,7 +424,6 @@ export default function SupplierManagementPage() {
     if (!file || importing || (!canCreateSuppliers && !canUpdateSuppliers)) return;
 
     setImporting(true);
-    setImportDetailOpen(false);
     setError("");
     setImportSummary(null);
     try {
@@ -539,14 +538,14 @@ export default function SupplierManagementPage() {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const columnCount = 7 + (canDeleteSuppliers ? 1 : 0) + (showActions ? 1 : 0);
   return (
-    <div className="flex min-h-screen bg-[#f8f5f0]">
+    <div className="flex min-h-screen bg-[var(--color-brand-cream)]">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <section className="min-w-0 flex-1">
         <Navbar onMenuClick={() => setSidebarOpen(true)} />
         <main className="p-5 sm:p-8">
           <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
             <div>
-              <div className="mb-3 flex size-11 items-center justify-center rounded-xl bg-[#f2e2d8] text-[#92502f]">
+              <div className="mb-3 flex size-11 items-center justify-center rounded-xl bg-[var(--color-brand-soft)] text-[var(--color-brand-accent)]">
                 <Truck size={22} />
               </div>
               <h1 className="font-serif text-3xl font-bold">{t("Suppliers")}</h1>
@@ -557,7 +556,7 @@ export default function SupplierManagementPage() {
             {canCreateSuppliers && <button
               type="button"
               onClick={() => openModal()}
-              className="flex items-center gap-2 rounded-lg bg-[#362219] px-5 py-3 text-sm font-semibold text-white"
+              className="flex items-center gap-2 rounded-lg bg-[var(--color-brand-primary)] px-5 py-3 text-sm font-semibold text-white"
             >
               <Plus size={17} />
               {t("Add supplier")}
@@ -579,7 +578,7 @@ export default function SupplierManagementPage() {
                     setPage(1);
                     setSearch(searchInput.trim());
                   }}
-                  className="flex h-11 w-full max-w-sm items-center gap-2 rounded-lg border border-stone-200 px-3 focus-within:border-[#b86b42] focus-within:ring-4 focus-within:ring-[#b86b42]/10 sm:w-80"
+                  className="flex h-11 w-full max-w-sm items-center gap-2 rounded-lg border border-stone-200 px-3 focus-within:border-[var(--color-brand-accent)] focus-within:ring-4 focus-within:ring-[var(--color-brand-accent)]/10 sm:w-80"
                 >
                   <Search size={17} className="text-stone-400" />
                   <input
@@ -613,7 +612,7 @@ export default function SupplierManagementPage() {
                         }}
                         onChange={toggleSelectAllAvailable}
                         disabled={loading || selectableSuppliers.length === 0}
-                        className="size-4 accent-[#362219] disabled:cursor-not-allowed"
+                        className="size-4 accent-[var(--color-brand-primary)] disabled:cursor-not-allowed"
                       />
                       {t("Select all")}
                     </label>
@@ -630,16 +629,14 @@ export default function SupplierManagementPage() {
                 {error}
               </div>
             )}
-            {importSummary && (
-              <div className="m-4 flex flex-col gap-3 rounded-lg border border-green-200 bg-green-50 p-4 text-sm text-green-800 sm:flex-row sm:items-center sm:justify-between">
-                <p className="font-semibold">
-                  {t("Import finished")}: {t("Success")} {importSummary.success}, {t("Failed")} {importSummary.failed}
-                </p>
-                <button type="button" onClick={() => setImportDetailOpen(true)} className="self-start rounded-lg border border-green-300 px-3 py-2 text-xs font-bold text-green-800 hover:bg-green-100 sm:self-auto">
-                  {t("Detail")}
-                </button>
-              </div>
-            )}
+            <ImportResults
+              details={importSummary?.details ?? null}
+              columns={[
+                { label: "Phone", render: (item) => item.phone || "-" },
+                { label: "Email", render: (item) => item.email || "-" },
+                { label: "Address", render: (item) => item.address || "-" },
+              ]}
+            />
             <div className="overflow-x-auto">
               <table className="w-full min-w-170 text-left">
                 <thead className="bg-stone-50 text-xs uppercase tracking-wider text-stone-500">
@@ -682,13 +679,13 @@ export default function SupplierManagementPage() {
                               checked={selectedSupplierIDs.includes(supplier.supplier_id)}
                               onChange={() => toggleSelectSupplier(supplier)}
                               disabled={inUse}
-                              className="size-4 accent-[#362219] disabled:cursor-not-allowed"
+                              className="size-4 accent-[var(--color-brand-primary)] disabled:cursor-not-allowed"
                               title={inUse ? t("Supplier is used by purchases or prices") : t("Select supplier")}
                             />
                           </td>
                         )}
                         <td className="px-5 py-4">
-                          <Link to={`/supplier-management/${encodeURIComponent(supplier.supplier_id)}`} className="text-sm font-semibold text-[#92502f] hover:underline">{supplier.name}</Link>
+                          <Link to={`/supplier-management/${encodeURIComponent(supplier.supplier_id)}`} className="text-sm font-semibold text-[var(--color-brand-accent)] hover:underline">{supplier.name}</Link>
                           <p className="mt-1 text-xs text-stone-500">{supplier.supplier_id}</p>
                         </td>
                         <td className="px-5 py-4 text-sm">
@@ -703,7 +700,7 @@ export default function SupplierManagementPage() {
                         <td className="max-w-xs whitespace-pre-wrap break-words px-5 py-4 text-sm">{supplier.address || "-"}</td>
                         <td className="px-5 py-4 text-sm">
                           {supplier.link && isValidSupplierLink(supplier.link) ? (
-                            <a href={supplier.link.trim()} target="_blank" rel="noopener noreferrer" title={supplier.link} aria-label={`${t("Open link")}: ${supplier.name}`} className="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-stone-300 bg-white px-3 py-2 text-xs font-semibold text-stone-700 hover:border-stone-400 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b86b42]">
+                            <a href={supplier.link.trim()} target="_blank" rel="noopener noreferrer" title={supplier.link} aria-label={`${t("Open link")}: ${supplier.name}`} className="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-stone-300 bg-white px-3 py-2 text-xs font-semibold text-stone-700 hover:border-stone-400 hover:bg-stone-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-brand-accent)]">
                               <ExternalLink size={14} />
                               {t("Open link")}
                             </a>
@@ -770,7 +767,7 @@ export default function SupplierManagementPage() {
                       setPage(1);
                       setPageSize(Number(event.target.value));
                     }}
-                    className="rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-xs text-stone-700 outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10"
+                    className="rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-xs text-stone-700 outline-none focus:border-[var(--color-brand-accent)] focus:ring-4 focus:ring-[var(--color-brand-accent)]/10"
                   >
                     {PAGE_SIZE_OPTIONS.map((option) => (
                       <option key={option} value={option}>
@@ -825,7 +822,7 @@ export default function SupplierManagementPage() {
                       setForm((current) => ({ ...current, [field]: event.target.value }));
                       setFieldErrors((current) => ({ ...current, [field]: "" }));
                     }}
-                    className={`mt-2 w-full rounded-lg border px-3.5 py-3 text-sm outline-none ${fieldErrors[field] ? "border-red-400 focus:ring-4 focus:ring-red-100" : "border-stone-300 focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10"}`}
+                    className={`mt-2 w-full rounded-lg border px-3.5 py-3 text-sm outline-none ${fieldErrors[field] ? "border-red-400 focus:ring-4 focus:ring-red-100" : "border-stone-300 focus:border-[var(--color-brand-accent)] focus:ring-4 focus:ring-[var(--color-brand-accent)]/10"}`}
                     disabled={submitting}
                   />
                   {fieldErrors[field] && (
@@ -839,66 +836,11 @@ export default function SupplierManagementPage() {
               <button type="button" onClick={() => setModalOpen(false)} className="rounded-lg border border-stone-300 px-4 py-2.5 text-sm font-semibold hover:bg-stone-50">
                 {t("Cancel")}
               </button>
-              <button type="submit" disabled={submitting} className="rounded-lg bg-[#362219] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">
+              <button type="submit" disabled={submitting} className="rounded-lg bg-[var(--color-brand-primary)] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">
                 {submitting ? t("Saving...") : t("Save")}
               </button>
             </footer>
           </form>
-        </div>
-      )}
-
-      {importDetailOpen && importSummary && (
-        <div className="fixed inset-0 z-[85] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-          <section className="flex max-h-[85vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
-            <header className="flex items-start justify-between border-b border-stone-200 p-5">
-              <div>
-                <h2 className="text-lg font-bold">{t("Import detail")}</h2>
-                <p className="mt-1 text-sm text-stone-500">
-                  {t("Success")} {importSummary.success}, {t("Failed")} {importSummary.failed}
-                </p>
-              </div>
-              <button type="button" onClick={() => setImportDetailOpen(false)} className="grid size-9 place-items-center rounded-lg hover:bg-stone-100">
-                <X size={18} />
-              </button>
-            </header>
-            <div className="overflow-auto p-5">
-              <table className="w-full min-w-220 text-left">
-                <thead className="bg-stone-50 text-xs uppercase tracking-wider text-stone-500">
-                  <tr>
-                    <th className="px-4 py-3">{t("Row")}</th>
-                    <th className="px-4 py-3">{t("Name")}</th>
-                    <th className="px-4 py-3">{t("Phone")}</th>
-                    <th className="px-4 py-3">{t("Email")}</th>
-                    <th className="px-4 py-3">{t("Address")}</th>
-                    <th className="px-4 py-3">{t("Status")}</th>
-                    <th className="px-4 py-3">{t("Reason")}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-stone-100">
-                  {importSummary.details.map((detail, index) => (
-                    <tr key={`${detail.row}-${index}`}>
-                      <td className="px-4 py-3 text-sm font-semibold">{detail.row || "-"}</td>
-                      <td className="px-4 py-3 text-sm">{detail.name || "-"}</td>
-                      <td className="px-4 py-3 text-sm">{detail.phone || "-"}</td>
-                      <td className="px-4 py-3 text-sm">{detail.email || "-"}</td>
-                      <td className="px-4 py-3 text-sm">{detail.address || "-"}</td>
-                      <td className="px-4 py-3">
-                        <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${detail.status === "success" ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
-                          {detail.status === "success" ? t("Success") : t("Failed")}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-stone-600">{detail.reason}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <footer className="flex justify-end border-t border-stone-200 p-5">
-              <button type="button" onClick={() => setImportDetailOpen(false)} className="rounded-lg bg-[#362219] px-4 py-2.5 text-sm font-semibold text-white">
-                {t("Close")}
-              </button>
-            </footer>
-          </section>
         </div>
       )}
 

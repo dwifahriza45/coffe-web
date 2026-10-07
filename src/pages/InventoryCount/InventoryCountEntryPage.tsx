@@ -15,7 +15,8 @@ export default function InventoryCountEntryPage({ type }: { type: "OPENING" | "C
   const now = new Date();
   const date = params.get("date") || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
   const businessDayID = params.get("businessDayID") || "";
-  const key = `${type}:${businessDayID}:${date}`;
+  const department = params.get("department") || "";
+  const key = `${type}:${businessDayID}:${date}:${department}`;
 
   useEffect(() => {
     let current = true;
@@ -32,7 +33,7 @@ export default function InventoryCountEntryPage({ type }: { type: "OPENING" | "C
         }
         const counts = await getInventoryCounts({ start: 0, limit: 1, business_day_id: dayID, count_type: type, status: "", name: "" });
         const count = counts.data?.[0];
-        const query = new URLSearchParams({ businessDayID: dayID, date: count?.business_day_info?.business_date || date, focus: type.toLowerCase() });
+        const query = new URLSearchParams({ businessDayID: dayID, date: count?.business_day_info?.business_date || date, ...(department ? { department } : {}), focus: type.toLowerCase() });
         if (current) setResult({ key, path: count ? `/business-days/${dayID}/inventory-counts/${count.inventory_count_id}?${query}` : undefined });
       } catch {
         if (current) setResult({ key, error: true });
@@ -40,12 +41,12 @@ export default function InventoryCountEntryPage({ type }: { type: "OPENING" | "C
     }
     void resolve();
     return () => { current = false; };
-  }, [businessDayID, date, key, type]);
+  }, [businessDayID, date, key, type, department]);
 
   const resolved = result?.key === key ? result : null;
   if (resolved?.path) return <Navigate to={resolved.path} replace />;
   return (
-    <div className="flex min-h-screen bg-[#f8f5f0]">
+    <div className="flex min-h-screen bg-[var(--color-brand-cream)]">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <section className="min-w-0 flex-1">
         <Navbar onMenuClick={() => setSidebarOpen(true)} />

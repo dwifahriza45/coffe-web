@@ -52,14 +52,14 @@ export default function DashboardPage() {
     { icon: Users, label: t("New customers"), value: "24", change: "+5.1%" },
   ];
   return (
-    <div className="flex min-h-screen bg-[#f8f5f0]">
+    <div className="flex min-h-screen bg-[var(--color-brand-cream)]">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <section className="min-w-0 flex-1">
         <Navbar onMenuClick={() => setSidebarOpen(true)} />
         <main className="p-5 sm:p-8">
           <header className="flex justify-between">
             <div>
-              <p className="text-xs font-bold tracking-[.2em] text-[#a25e39]">
+              <p className="text-xs font-bold tracking-[.2em] text-[var(--color-brand-accent)]">
                 {formatCurrentDate(currentDate)}
               </p>
               <h1 className="mt-2 font-serif text-3xl font-bold">
@@ -69,7 +69,7 @@ export default function DashboardPage() {
                 {t("Here’s what’s happening at your coffee shop today.")}
               </p>
             </div>
-            <button className="hidden h-fit rounded-lg bg-[#362219] px-5 py-3 text-sm text-white sm:block">
+            <button className="hidden h-fit rounded-lg bg-[var(--color-brand-primary)] px-5 py-3 text-sm text-white sm:block">
               {t("+ New order")}
             </button>
           </header>
@@ -79,7 +79,7 @@ export default function DashboardPage() {
                 className="rounded-xl border border-stone-200 bg-white p-5"
                 key={label}
               >
-                <span className="float-right grid size-10 place-items-center rounded-full bg-[#f2e6dd] text-[#9d5935]">
+                <span className="float-right grid size-10 place-items-center rounded-full bg-[var(--color-brand-soft)] text-[var(--color-brand-accent)]">
                   <Icon size={18} />
                 </span>
                 <p className="text-xs text-stone-500">{label}</p>
@@ -103,7 +103,7 @@ export default function DashboardPage() {
                     key={index}
                   >
                     <span
-                      className="w-full max-w-9 rounded-t bg-[#b86d45]"
+                      className="w-full max-w-9 rounded-t bg-[var(--color-brand-accent)]"
                       style={{ height: `${height}%` }}
                     />
                     <small className="text-[9px]">
@@ -121,7 +121,7 @@ export default function DashboardPage() {
                   className="flex items-center gap-3 border-b border-stone-100 py-3 last:border-0"
                   key={order[0]}
                 >
-                  <span className="grid size-8 place-items-center rounded bg-[#f2e6dd] text-[#9d5935]">
+                  <span className="grid size-8 place-items-center rounded bg-[var(--color-brand-soft)] text-[var(--color-brand-accent)]">
                     <Coffee size={15} />
                   </span>
                   <span className="flex flex-1 flex-col">

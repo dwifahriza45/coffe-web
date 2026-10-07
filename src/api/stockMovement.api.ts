@@ -2,6 +2,9 @@ import api from "./client";
 import type { ApiResponse } from "../types/auth";
 
 export interface StockMovement {
+  po_id: string;
+  po_number: string;
+  supplier_id: string;
   stock_movement_id: string;
   business_day_id: string;
   business_date: string;

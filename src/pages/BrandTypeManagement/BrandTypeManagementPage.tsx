@@ -735,14 +735,14 @@ export default function BrandTypeManagementPage() {
   const columnCount = 5 + (canDelete ? 1 : 0) + (showActions ? 1 : 0);
 
   return (
-    <div className="flex min-h-screen bg-[#f8f5f0]">
+    <div className="flex min-h-screen bg-[var(--color-brand-cream)]">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <section className="min-w-0 flex-1">
         <Navbar onMenuClick={() => setSidebarOpen(true)} />
         <main className="p-5 sm:p-8">
           <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
             <div>
-              <div className="mb-3 flex size-11 items-center justify-center rounded-xl bg-[#f2e2d8] text-[#92502f]">
+              <div className="mb-3 flex size-11 items-center justify-center rounded-xl bg-[var(--color-brand-soft)] text-[var(--color-brand-accent)]">
                 <Tags size={22} />
               </div>
               <h1 className="font-serif text-3xl font-bold">
@@ -756,7 +756,7 @@ export default function BrandTypeManagementPage() {
               <button
                 type="button"
                 onClick={() => openModal()}
-                className="flex items-center gap-2 rounded-lg bg-[#362219] px-5 py-3 text-sm font-semibold text-white"
+                className="flex items-center gap-2 rounded-lg bg-[var(--color-brand-primary)] px-5 py-3 text-sm font-semibold text-white"
               >
                 <Plus size={17} />
                 {t("Add brand type")}
@@ -823,7 +823,7 @@ export default function BrandTypeManagementPage() {
                     setPage(1);
                     setSearch(searchInput.trim());
                   }}
-                  className="flex h-11 w-full max-w-sm items-center gap-2 rounded-lg border border-stone-200 px-3 focus-within:border-[#b86b42] focus-within:ring-4 focus-within:ring-[#b86b42]/10 sm:w-80"
+                  className="flex h-11 w-full max-w-sm items-center gap-2 rounded-lg border border-stone-200 px-3 focus-within:border-[var(--color-brand-accent)] focus-within:ring-4 focus-within:ring-[var(--color-brand-accent)]/10 sm:w-80"
                 >
                   <Search size={17} className="text-stone-400" />
                   <input
@@ -873,7 +873,7 @@ export default function BrandTypeManagementPage() {
                         }}
                         onChange={toggleSelectAll}
                         disabled={loading || selectableItems.length === 0}
-                        className="size-4 accent-[#362219] disabled:cursor-not-allowed"
+                        className="size-4 accent-[var(--color-brand-primary)] disabled:cursor-not-allowed"
                       />
                       {t("Select all")}
                     </label>
@@ -958,7 +958,7 @@ export default function BrandTypeManagementPage() {
                                 )}
                                 onChange={() => toggleSelectItem(item)}
                                 disabled={inUse}
-                                className="size-4 accent-[#362219] disabled:cursor-not-allowed"
+                                className="size-4 accent-[var(--color-brand-primary)] disabled:cursor-not-allowed"
                                 title={
                                   inUse
                                     ? t(
@@ -1068,7 +1068,7 @@ export default function BrandTypeManagementPage() {
                       setPage(1);
                       setPageSize(Number(event.target.value));
                     }}
-                    className="rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-xs text-stone-700 outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10"
+                    className="rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-xs text-stone-700 outline-none focus:border-[var(--color-brand-accent)] focus:ring-4 focus:ring-[var(--color-brand-accent)]/10"
                   >
                     {PAGE_SIZE_OPTIONS.map((option) => (
                       <option key={option} value={option}>
@@ -1232,7 +1232,7 @@ export default function BrandTypeManagementPage() {
                       name: event.target.value,
                     }))
                   }
-                  className="mt-2 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10"
+                  className="mt-2 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm outline-none focus:border-[var(--color-brand-accent)] focus:ring-4 focus:ring-[var(--color-brand-accent)]/10"
                   disabled={submitting}
                 />
                 {fieldErrors.name && (
@@ -1258,7 +1258,7 @@ export default function BrandTypeManagementPage() {
               <button
                 type="submit"
                 disabled={submitting}
-                className="rounded-lg bg-[#362219] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+                className="rounded-lg bg-[var(--color-brand-primary)] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
               >
                 {submitting ? t("Saving...") : t("Save")}
               </button>
@@ -1326,7 +1326,7 @@ export default function BrandTypeManagementPage() {
               <button
                 type="button"
                 onClick={() => setImportDetailOpen(false)}
-                className="rounded-lg bg-[#362219] px-4 py-2.5 text-sm font-semibold text-white"
+                className="rounded-lg bg-[var(--color-brand-primary)] px-4 py-2.5 text-sm font-semibold text-white"
               >
                 {t("Close")}
               </button>

@@ -34,7 +34,7 @@ export default function ConfirmDialog({
         <header className="flex items-start justify-between p-5">
           <div className="flex gap-3">
             <span
-              className={`grid size-10 shrink-0 place-items-center rounded-xl ${danger ? "bg-red-50 text-red-700" : "bg-[#f2e2d8] text-[#92502f]"}`}
+              className={`grid size-10 shrink-0 place-items-center rounded-xl ${danger ? "bg-red-50 text-red-700" : "bg-[var(--color-brand-soft)] text-[var(--color-brand-accent)]"}`}
             >
               {danger ? <AlertTriangle size={20} /> : <CheckCircle2 size={20} />}
             </span>
@@ -67,7 +67,7 @@ export default function ConfirmDialog({
             type="button"
             onClick={onConfirm}
             disabled={submitting}
-            className={`rounded-lg px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60 ${danger ? "bg-red-700" : "bg-[#362219]"}`}
+            className={`rounded-lg px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60 ${danger ? "bg-red-700" : "bg-[var(--color-brand-primary)]"}`}
           >
             {submitting ? "Saving..." : confirmText}
           </button>

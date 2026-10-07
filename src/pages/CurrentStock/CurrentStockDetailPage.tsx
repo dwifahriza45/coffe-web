@@ -64,7 +64,7 @@ export default function CurrentStockDetailPage() {
               limit: 10,
               business_day_id: "",
               count_type: "",
-              status: "SUBMITTED",
+              status: "",
               name: "",
             }),
             getStockMovements({
@@ -105,8 +105,8 @@ export default function CurrentStockDetailPage() {
         ]);
         if (!current) return;
         setIngredient(ingredientResponse.data ?? null);
-        setOpening(toNumber(openingItems.data?.[0]?.actual_quantity));
-        setClosing(closingItems.data?.[0] ? toNumber(closingItems.data[0].actual_quantity) : null);
+        setOpening(openingItems.data?.[0]?.section_status === "SUBMITTED" ? toNumber(openingItems.data[0].actual_quantity) : 0);
+        setClosing(closingItems.data?.[0]?.section_status === "SUBMITTED" ? toNumber(closingItems.data[0].actual_quantity) : null);
         setMovements(movementResponse.data ?? []);
       } catch (requestError) {
         if (!current) return;
@@ -145,10 +145,10 @@ export default function CurrentStockDetailPage() {
   const difference = summary.current - minimum;
   const currentSource = closing === null ? t("Calculated from Opening Stock") : t("Taken from Closing Stock");
   const dateQuery = `date=${encodeURIComponent(date)}`;
-  const summaryCardClass = "rounded-lg bg-white px-4 py-3 text-left transition hover:-translate-y-0.5 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-[#92502f]/30";
+  const summaryCardClass = "rounded-lg bg-white px-4 py-3 text-left transition hover:-translate-y-0.5 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-accent)]/30";
 
   return (
-    <div className="flex min-h-screen bg-[#f8f5f0]">
+    <div className="flex min-h-screen bg-[var(--color-brand-cream)]">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <section className="min-w-0 flex-1">
         <Navbar onMenuClick={() => setSidebarOpen(true)} />
@@ -166,7 +166,7 @@ export default function CurrentStockDetailPage() {
               <>
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div>
-                    <div className="mb-3 grid size-11 place-items-center rounded-xl bg-[#efe9df] text-[#8a5a3f]">
+                    <div className="mb-3 grid size-11 place-items-center rounded-xl bg-[var(--color-brand-soft)] text-[var(--color-brand-hover)]">
                       <Boxes size={22} />
                     </div>
                     <h1 className="font-serif text-3xl font-bold">{ingredient?.name ?? ingredientID}</h1>
@@ -223,7 +223,7 @@ export default function CurrentStockDetailPage() {
                   <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">{t("Opening Stock")}</p>
                   <p className="mt-2 text-xl font-bold text-stone-950">{formatQuantity(opening, unit)}</p>
                 </Link>
-                <Link to={`/stock-in?${dateQuery}`} className={summaryCardClass}>
+                <Link to={`/supplier-management?${dateQuery}`} className={summaryCardClass}>
                   <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">{t("Stock In")}</p>
                   <p className="mt-2 text-xl font-bold text-emerald-700">+{formatQuantity(summary.stockInTotal, unit)}</p>
                 </Link>
@@ -237,11 +237,11 @@ export default function CurrentStockDetailPage() {
                     {summary.adjustmentTotal >= 0 ? "+" : "-"}{formatQuantity(Math.abs(summary.adjustmentTotal), unit)}
                   </p>
                 </Link>
-                <div className="rounded-lg border border-[#92502f]/20 bg-[#fff8f3] px-4 py-3 shadow-sm">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-[#92502f]">{t("Current Stock")}</p>
-                  <div className="mt-1 flex items-end justify-between gap-3">
-                    <p className="text-xs font-semibold text-stone-500">{currentSource}</p>
-                    <p className="text-3xl font-bold leading-none text-[#362219]">{formatQuantity(summary.current, unit)}</p>
+                <div className="rounded-lg border border-[var(--color-brand-accent)]/20 bg-[var(--color-brand-cream)] px-4 py-3 shadow-sm">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-[var(--color-brand-accent)]">{t("Current Stock")}</p>
+                  <div className="mt-2">
+                    <p className="text-xl font-bold text-[var(--color-brand-primary)]">{formatQuantity(summary.current, unit)}</p>
+                    <p className="mt-1 text-xs font-semibold text-stone-500">{currentSource}</p>
                   </div>
                 </div>
               </div>
@@ -264,7 +264,7 @@ export default function CurrentStockDetailPage() {
                     <p className="font-semibold">{t("Stock In")}</p>
                     {summary.stockIn.map((item) => (
                       <div key={item.stock_movement_id} className="mt-2 flex max-w-xl justify-between gap-4 text-stone-600">
-                        <span>+ {item.reference_id}</span>
+                        <span>+ {item.po_number || item.reference_id}</span>
                         <span>{formatQuantity(toNumber(item.quantity), unit)}</span>
                       </div>
                     ))}

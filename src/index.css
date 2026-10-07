@@ -1,15 +1,45 @@
 @import "tailwindcss";
 
+@theme {
+  --color-brand-primary: #244510;
+  --color-brand-hover: #355c20;
+  --color-brand-accent: #416b2a;
+  --color-brand-cream: #fffbe5;
+  --color-brand-surface: #efedce;
+  --color-brand-soft: #e8f0d6;
+  --color-brand-sage: #d0e5b0;
+  --color-brand-scroll: #73965a;
+  --color-brand-scroll-hover: #a9c88a;
+
+  --color-stone-50: #f8faef;
+  --color-stone-100: #eef2e4;
+  --color-stone-200: #dce3cf;
+  --color-stone-300: #c3ceb2;
+  --color-stone-400: #8c9a7b;
+  --color-stone-500: #69785b;
+  --color-stone-600: #526146;
+  --color-stone-700: #3f4e34;
+  --color-stone-800: #2d3b25;
+  --color-stone-900: #1d2c17;
+  --color-stone-950: #111c0c;
+}
+
+html {
+  background: var(--color-brand-cream);
+  color: var(--color-stone-900);
+}
+
+
 .sidebar-scroll {
   color-scheme: dark;
   scrollbar-width: thin;
-  scrollbar-color: #614638 transparent;
+  scrollbar-color: var(--color-brand-scroll) transparent;
   scrollbar-gutter: stable;
 }
 
 .sidebar-scroll:hover,
 .sidebar-scroll:focus-within {
-  scrollbar-color: #95694f transparent;
+  scrollbar-color: var(--color-brand-scroll-hover) transparent;
 }
 
 /* Fallback for browsers without standard scrollbar styling. */
@@ -24,12 +54,12 @@
 
   .sidebar-scroll::-webkit-scrollbar-thumb {
     border-radius: 999px;
-    background: #614638;
+    background: var(--color-brand-scroll);
   }
 
   .sidebar-scroll:hover::-webkit-scrollbar-thumb,
   .sidebar-scroll:focus-within::-webkit-scrollbar-thumb {
-    background: #95694f;
+    background: var(--color-brand-scroll-hover);
   }
 
   .sidebar-scroll::-webkit-scrollbar-button {

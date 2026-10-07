@@ -162,7 +162,7 @@ export default function ProductDetailPage() {
   function submitRecipe(event: FormEvent) {
     event.preventDefault();
     setFieldErrors({});
-    if (!recipeForm.version) {
+    if (!recipeForm.version.trim()) {
       setFieldErrors({ version: t("version is required") });
       return;
     }
@@ -178,7 +178,7 @@ export default function ProductDetailPage() {
     setConfirm(null);
     setSubmitting(true);
     try {
-      const payload = { product_id: productID, version: Number(recipeForm.version), active: recipeForm.active };
+      const payload = { product_id: productID, version: recipeForm.version.trim(), active: recipeForm.active };
       if (editingRecipe) {
         await updateRecipe(editingRecipe.recipe_id, payload);
       } else {
@@ -305,7 +305,7 @@ export default function ProductDetailPage() {
   const selectedRecipe = productRecipes.find((recipe) => recipe.recipe_id === selectedRecipeID) ?? null;
 
   return (
-    <div className="flex min-h-screen bg-[#f8f5f0]">
+    <div className="flex min-h-screen bg-[var(--color-brand-cream)]">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <section className="min-w-0 flex-1">
         <Navbar onMenuClick={() => setSidebarOpen(true)} />
@@ -320,7 +320,7 @@ export default function ProductDetailPage() {
               <h1 className="font-serif text-3xl font-bold">{product?.name ?? t("Product Detail")}</h1>
               <p className="mt-2 text-sm text-stone-500">{product?.category_info?.name ?? t("No category")}</p>
             </div>
-            {canWriteRecipes && <button type="button" onClick={() => openRecipeModal()} className="flex items-center gap-2 rounded-lg bg-[#362219] px-5 py-3 text-sm font-semibold text-white">
+            {canWriteRecipes && <button type="button" onClick={() => openRecipeModal()} className="flex items-center gap-2 rounded-lg bg-[var(--color-brand-primary)] px-5 py-3 text-sm font-semibold text-white">
               <Plus size={17} />
               {t("Add recipe version")}
             </button>}
@@ -390,7 +390,7 @@ export default function ProductDetailPage() {
                   {canWriteRecipes && selectedRecipe && <button type="button" onClick={() => openRecipeModal(selectedRecipe)} className="grid size-9 place-items-center rounded-lg border text-stone-600 hover:bg-stone-50" title={t("Update recipe")}><Pencil size={16} /></button>}
                   {canWriteRecipes && selectedRecipe && <button type="button" onClick={() => requestToggleRecipeActive(selectedRecipe)} className="grid size-9 place-items-center rounded-lg border text-stone-600 hover:bg-stone-50" title={selectedRecipe.active ? t("Deactivate recipe") : t("Activate recipe")}><Power size={16} /></button>}
                   {canWriteRecipes && selectedRecipe && items.length === 0 && <button type="button" onClick={() => requestDeleteRecipe(selectedRecipe)} className="grid size-9 place-items-center rounded-lg border text-red-600 hover:bg-red-50" title={t("Delete recipe")}><Trash2 size={16} /></button>}
-                  {canWriteRecipes && <button type="button" onClick={() => openItemModal()} disabled={!selectedRecipeID} className="flex items-center gap-2 rounded-lg bg-[#362219] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
+                  {canWriteRecipes && <button type="button" onClick={() => openItemModal()} disabled={!selectedRecipeID} className="flex items-center gap-2 rounded-lg bg-[var(--color-brand-primary)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">
                     <ListPlus size={16} />
                     {t("Add item")}
                   </button>}
@@ -446,14 +446,15 @@ export default function ProductDetailPage() {
             <div className="space-y-4 p-5">
               <label className="block text-sm font-semibold text-stone-700">
                 {t("Version")}
-                <input inputMode="numeric" placeholder={t("Enter version")} value={formatNumber(recipeForm.version, 0)} onChange={(event) => setRecipeForm((current) => ({ ...current, version: normalizeNumberInput(event.target.value, false) }))} className="mt-2 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10" disabled={submitting} />
+                <input type="text" maxLength={100} placeholder={t("Example: Dine In or Takeaway")} value={recipeForm.version} onChange={(event) => setRecipeForm((current) => ({ ...current, version: event.target.value }))} className="mt-2 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm outline-none focus:border-[var(--color-brand-accent)] focus:ring-4 focus:ring-[var(--color-brand-accent)]/10" disabled={submitting} />
+                <p className="mt-2 text-xs text-stone-500">{t("Each version has its own ingredients. Add cups and packaging to Takeaway only.")}</p>
                 {fieldErrors.version && <p className="mt-1.5 text-xs font-medium text-red-600">{fieldErrors.version}</p>}
               </label>
               {actionError && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{actionError}</p>}
             </div>
             <footer className="flex justify-end gap-3 border-t border-stone-200 p-5">
               <button type="button" onClick={() => setRecipeModalOpen(false)} className="rounded-lg border border-stone-300 px-4 py-2.5 text-sm font-semibold hover:bg-stone-50">{t("Cancel")}</button>
-              <button type="submit" disabled={submitting} className="rounded-lg bg-[#362219] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">{submitting ? t("Saving...") : t("Save")}</button>
+              <button type="submit" disabled={submitting} className="rounded-lg bg-[var(--color-brand-primary)] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">{submitting ? t("Saving...") : t("Save")}</button>
             </footer>
           </form>
         </div>
@@ -469,7 +470,7 @@ export default function ProductDetailPage() {
             <div className="space-y-4 p-5">
               <label className="block text-sm font-semibold text-stone-700">
                 {t("Ingredient")}
-                <select value={itemForm.ingredient_id} onChange={(event) => setItemForm((current) => ({ ...current, ingredient_id: event.target.value }))} className="mt-2 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10" disabled={submitting}>
+                <select value={itemForm.ingredient_id} onChange={(event) => setItemForm((current) => ({ ...current, ingredient_id: event.target.value }))} className="mt-2 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm outline-none focus:border-[var(--color-brand-accent)] focus:ring-4 focus:ring-[var(--color-brand-accent)]/10" disabled={submitting}>
                   <option value="">{t("Select ingredient")}</option>
                   {ingredients.map((ingredient) => (
                     <option key={ingredient.ingredient_id} value={ingredient.ingredient_id} disabled={!ingredient.active}>{ingredient.name}{ingredient.active ? "" : ` - ${t("Inactive")}`}</option>
@@ -479,14 +480,14 @@ export default function ProductDetailPage() {
               </label>
               <label className="block text-sm font-semibold text-stone-700">
                 {t("Quantity")}
-                <input inputMode="decimal" placeholder="0" value={formatQuantity(itemForm.quantity)} onChange={(event) => setItemForm((current) => ({ ...current, quantity: normalizeNumberInput(event.target.value) }))} className="mt-2 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10" disabled={submitting} />
+                <input inputMode="decimal" placeholder="0" value={formatQuantity(itemForm.quantity)} onChange={(event) => setItemForm((current) => ({ ...current, quantity: normalizeNumberInput(event.target.value) }))} className="mt-2 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm outline-none focus:border-[var(--color-brand-accent)] focus:ring-4 focus:ring-[var(--color-brand-accent)]/10" disabled={submitting} />
                 {fieldErrors.quantity && <p className="mt-1.5 text-xs font-medium text-red-600">{fieldErrors.quantity}</p>}
               </label>
               {actionError && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{actionError}</p>}
             </div>
             <footer className="flex justify-end gap-3 border-t border-stone-200 p-5">
               <button type="button" onClick={() => setItemModalOpen(false)} className="rounded-lg border border-stone-300 px-4 py-2.5 text-sm font-semibold hover:bg-stone-50">{t("Cancel")}</button>
-              <button type="submit" disabled={submitting} className="rounded-lg bg-[#362219] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">{submitting ? t("Saving...") : t("Save")}</button>
+              <button type="submit" disabled={submitting} className="rounded-lg bg-[var(--color-brand-primary)] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">{submitting ? t("Saving...") : t("Save")}</button>
             </footer>
           </form>
         </div>

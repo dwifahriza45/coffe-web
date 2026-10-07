@@ -17,7 +17,22 @@ export function parseIngredientQuantity(value: string): { quantity: string; unit
 
 export function ingredientImportChanged(existing: Ingredient, payload: IngredientPayload): boolean {
   return (Object.keys(payload) as (keyof IngredientPayload)[]).some((key) => {
-    if (["package_qty", "content_qty", "minimum_stock"].includes(key)) return Number(existing[key]) !== Number(payload[key]);
+    if (["package_qty", "content_qty", "minimum_stock", "target_stock"].includes(key)) return Number(existing[key] ?? 0) !== Number(payload[key]);
     return (existing[key] ?? "") !== (payload[key] ?? "");
   });
+}
+
+export function parseIngredientTarget(value: unknown, minimum: string): string | undefined {
+  const text = String(value ?? "").trim();
+  if (!text) return undefined;
+  const target = text.replace(/,/g, "");
+  if (!/^\d+(?:\.\d+)?$/.test(target) || !Number.isFinite(Number(target)) || (Number(target) > 0 && Number(target) < Number(minimum))) {
+    throw new Error("Invalid target stock");
+  }
+  return target;
+}
+
+/** Content size and unit distinguish ingredients that share the same name. */
+export function ingredientImportKey(item: Pick<IngredientPayload, "name" | "content_qty" | "content_unit_id">): string {
+  return JSON.stringify([normalize(item.name), Number(item.content_qty), item.content_unit_id.trim()]);
 }

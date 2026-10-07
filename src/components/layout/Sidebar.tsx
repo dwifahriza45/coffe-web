@@ -1,3 +1,4 @@
+import { stockCountDepartments } from "../../utils/stockCountDepartment";
 import {
   LayoutDashboard,
   LockKeyhole,
@@ -5,6 +6,7 @@ import {
   Boxes,
   CalendarDays,
   ClipboardCheck,
+  ClipboardList,
   CupSoda,
   FolderTree,
   PackageOpen,
@@ -56,9 +58,6 @@ export default function Sidebar({
   const canReadInventoryCounts = userCan(user, "inventory_counts");
   const canReadOpeningCounts =
     userCan(user, "inventory_opening_counts");
-  const canReadStockReceipts = userCan(user, "stock_receipts");
-  const canReadStockAdjustments = userCan(user, "stock_adjustments");
-  const canReadStockMovements = userCan(user, "stock_movements");
   const canReadCurrentStock = userCan(user, "current_stock");
   const canReadReconciliations = userCan(user, "reconciliations");
   const canReadClosingCounts =
@@ -88,8 +87,6 @@ export default function Sidebar({
           ...(activeStockDate ? { date: activeStockDate } : {}),
         })}`
       : "";
-  const stockCountOpeningPath = `/stock-count/opening${stockOpnameContextQuery}`;
-  const stockCountClosingPath = `/stock-count/closing${stockOpnameContextQuery}`;
   if (canReadDashboard) {
     links.push({ label: t("Overview"), to: "/dashboard", icon: LayoutDashboard });
   }
@@ -125,10 +122,12 @@ export default function Sidebar({
       icon: Tags,
     });
   if (canReadSuppliers)
-    inventoryMasterLinks.push({ label: t("Suppliers"), to: "/supplier-management", icon: Truck });
+    inventoryOperationLinks.push({ label: t("Suppliers"), to: "/supplier-management", icon: Truck });
+  if (canReadSuppliers)
+    inventoryOperationLinks.push({ label: "Purchase Order", to: "/purchase-orders", icon: ClipboardList });
   if (canReadIngredients)
-    inventoryMasterLinks.push({
-      label: t("Ingredients"),
+    inventoryOperationLinks.unshift({
+      label: "Inventory",
       to: "/ingredient-management",
       icon: PackageOpen,
     });
@@ -144,42 +143,19 @@ export default function Sidebar({
       to: "/current-stock",
       icon: Boxes,
     });
-  if (canReadStockReceipts)
-    inventoryOperationLinks.push({
-      label: t("Purchasing"),
-      to: "/stock-in",
-      icon: Truck,
-    });
   if (canReadReconciliations)
     inventoryOperationLinks.push({
       label: t("Reconciliation"),
       to: "/reconciliation",
       icon: Scale,
     });
-  if (canReadOpeningCounts)
-    stockOpnameChildLinks.push({
-      label: t("Opening Stock"),
-      to: stockCountOpeningPath,
-      icon: ClipboardCheck,
-    });
-  if (canReadStockAdjustments)
-    stockOpnameChildLinks.push({
-      label: t("Stock Adjustments"),
-      to: `/stock-adjustments${stockOpnameContextQuery}`,
-      icon: ClipboardCheck,
-    });
-  if (canReadStockMovements)
-    stockOpnameChildLinks.push({
-      label: t("Stock Movements"),
-      to: `/stock-movements${stockOpnameContextQuery}`,
-      icon: PackageOpen,
-    });
-  if (canReadClosingCounts)
-    stockOpnameChildLinks.push({
-      label: t("Closing Stock"),
-      to: stockCountClosingPath,
-      icon: ClipboardCheck,
-    });
+  if (canReadInventoryCounts || canReadOpeningCounts || canReadClosingCounts) {
+    for (const department of stockCountDepartments) {
+      const query = new URLSearchParams(stockOpnameContextQuery.replace(/^\?/, ""));
+      query.set("department", department.key);
+      stockOpnameChildLinks.push({ label: department.label, to: `/stock-count?${query}`, icon: ClipboardCheck });
+    }
+  }
   if (canReadCategories)
     inventoryMenuLinks.push({
       label: t("Menu Items"),
@@ -234,6 +210,8 @@ export default function Sidebar({
   }
 
   function isStockChildActive(to: string, pathActive: boolean) {
+    const department = new URL(to, "http://local").searchParams.get("department");
+    if (department) return activeParams.get("department") === department && (location.pathname.startsWith("/stock-count") || location.pathname.includes("/inventory-counts"));
     const path = to.split("?")[0];
     const focus = path === "/stock-count/opening" ? "opening" : path === "/stock-count/closing" ? "closing" : null;
     return focus
@@ -259,11 +237,11 @@ export default function Sidebar({
         className={`fixed inset-0 z-40 bg-black/50 lg:hidden ${isOpen ? "" : "hidden"}`}
       />
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex h-screen w-72 max-w-[calc(100vw-2rem)] shrink-0 flex-col bg-[#211712] p-6 transition-transform duration-300 lg:sticky lg:top-0 lg:translate-x-0 ${isOpen ? "translate-x-0" : "-translate-x-full"}`}
+        className={`fixed inset-y-0 left-0 z-50 flex h-screen w-72 max-w-[calc(100vw-2rem)] shrink-0 flex-col bg-[var(--color-brand-primary)] p-6 transition-transform duration-300 lg:sticky lg:top-0 lg:translate-x-0 ${isOpen ? "translate-x-0" : "-translate-x-full"}`}
       >
         <Brand />
         {hasMenus && (
-          <div role="search" aria-label={t("Search sidebar menus")} className="mt-7 flex shrink-0 items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-stone-400 transition focus-within:border-[#b86b42] focus-within:ring-2 focus-within:ring-[#b86b42]/20">
+          <div role="search" aria-label={t("Search sidebar menus")} className="mt-7 flex shrink-0 items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-[var(--color-brand-sage)]/80 transition focus-within:border-[var(--color-brand-accent)] focus-within:ring-2 focus-within:ring-[var(--color-brand-accent)]/20">
             <Search size={16} className="shrink-0" aria-hidden="true" />
             <input
               ref={searchInputRef}
@@ -278,10 +256,10 @@ export default function Sidebar({
                   setMenuSearch("");
                 }
               }}
-              className="min-w-0 flex-1 bg-transparent text-sm text-stone-100 outline-none placeholder:text-stone-500"
+              className="min-w-0 flex-1 bg-transparent text-sm text-[var(--color-brand-cream)] outline-none placeholder:text-[var(--color-brand-sage)]/65"
             />
             {menuSearch && (
-              <button type="button" aria-label={t("Clear menu search")} onClick={() => { setMenuSearch(""); searchInputRef.current?.focus(); }} className="grid size-6 shrink-0 place-items-center rounded text-stone-400 transition hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-[#b86b42]">
+              <button type="button" aria-label={t("Clear menu search")} onClick={() => { setMenuSearch(""); searchInputRef.current?.focus(); }} className="grid size-6 shrink-0 place-items-center rounded text-[var(--color-brand-sage)]/80 transition hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-[var(--color-brand-accent)]">
                 <X size={14} />
               </button>
             )}
@@ -302,7 +280,7 @@ export default function Sidebar({
                 onClose();
               }}
               className={({ isActive }) =>
-                `flex items-center gap-3 rounded-lg p-3 text-sm ${isActive ? "bg-[#4b3023] text-white" : "text-stone-300 hover:bg-white/5"}`
+                `flex items-center gap-3 rounded-lg p-3 text-sm ${isActive ? "bg-[var(--color-brand-hover)] text-[var(--color-brand-sage)]" : "text-[var(--color-brand-cream)] hover:bg-white/5"}`
               }
             >
               <Icon size={18} />
@@ -314,12 +292,28 @@ export default function Sidebar({
               {showStockOpnameGroup && (
                 <div>
                   <div className="mb-3 flex items-center gap-3 px-3">
-                    <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-[var(--color-brand-sage)]/65">
                       {t("Inventory")}
                     </span>
                     <span className="h-px flex-1 bg-white/10" />
                   </div>
                   <div className="space-y-2">
+                    {filteredStandaloneInventoryOperationLinks.filter((link) => ["/ingredient-management", "/supplier-management", "/purchase-orders"].includes(link.to)).map(({ label, to, icon: Icon }) => (
+                      <NavLink
+                        key={label}
+                        to={to}
+                        onClick={() => {
+                          rememberScroll();
+                          onClose();
+                        }}
+                        className={({ isActive }) =>
+                          `flex items-center gap-3 rounded-lg p-3 text-sm ${isActive ? "bg-[var(--color-brand-hover)] text-[var(--color-brand-sage)]" : "text-[var(--color-brand-cream)] hover:bg-white/5"}`
+                        }
+                      >
+                        <Icon size={18} />
+                        {label}
+                      </NavLink>
+                    ))}
                     {stockOpnameLink && StockOpnameIcon && (
                       <NavLink
                         key={stockOpnameLink.label}
@@ -329,7 +323,7 @@ export default function Sidebar({
                           onClose();
                         }}
                         className={({ isActive }) =>
-                          `flex items-center gap-3 rounded-lg p-3 text-sm ${isActive ? "bg-[#4b3023] text-white" : "text-stone-300 hover:bg-white/5"}`
+                          `flex items-center gap-3 rounded-lg p-3 text-sm ${isActive ? "bg-[var(--color-brand-hover)] text-[var(--color-brand-sage)]" : "text-[var(--color-brand-cream)] hover:bg-white/5"}`
                         }
                       >
                         <StockOpnameIcon size={18} />
@@ -347,7 +341,7 @@ export default function Sidebar({
                               onClose();
                             }}
                             className={({ isActive }) =>
-                              `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm ${isStockChildActive(to, isActive) ? "bg-[#4b3023] text-white" : "text-stone-300 hover:bg-white/5"}`
+                              `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm ${isStockChildActive(to, isActive) ? "bg-[var(--color-brand-hover)] text-[var(--color-brand-sage)]" : "text-[var(--color-brand-cream)] hover:bg-white/5"}`
                             }
                           >
                             <Icon size={16} />
@@ -356,7 +350,7 @@ export default function Sidebar({
                         ))}
                       </div>
                     )}
-                    {filteredStandaloneInventoryOperationLinks.map(({ label, to, icon: Icon }) => (
+                    {filteredStandaloneInventoryOperationLinks.filter((link) => !["/ingredient-management", "/supplier-management", "/purchase-orders"].includes(link.to)).map(({ label, to, icon: Icon }) => (
                       <NavLink
                         key={label}
                         to={to}
@@ -365,7 +359,7 @@ export default function Sidebar({
                           onClose();
                         }}
                         className={({ isActive }) =>
-                          `flex items-center gap-3 rounded-lg p-3 text-sm ${isActive ? "bg-[#4b3023] text-white" : "text-stone-300 hover:bg-white/5"}`
+                          `flex items-center gap-3 rounded-lg p-3 text-sm ${isActive ? "bg-[var(--color-brand-hover)] text-[var(--color-brand-sage)]" : "text-[var(--color-brand-cream)] hover:bg-white/5"}`
                         }
                       >
                         <Icon size={18} />
@@ -378,7 +372,7 @@ export default function Sidebar({
               {filteredInventoryMenuLinks.length > 0 && (
                 <div className="pt-5">
                   <div className="mb-3 flex items-center gap-3 px-3">
-                    <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-[var(--color-brand-sage)]/65">
                       {t("Menu")}
                     </span>
                     <span className="h-px flex-1 bg-white/10" />
@@ -393,7 +387,7 @@ export default function Sidebar({
                           onClose();
                         }}
                         className={({ isActive }) =>
-                          `flex items-center gap-3 rounded-lg p-3 text-sm ${isActive ? "bg-[#4b3023] text-white" : "text-stone-300 hover:bg-white/5"}`
+                          `flex items-center gap-3 rounded-lg p-3 text-sm ${isActive ? "bg-[var(--color-brand-hover)] text-[var(--color-brand-sage)]" : "text-[var(--color-brand-cream)] hover:bg-white/5"}`
                         }
                       >
                         <Icon size={18} />
@@ -406,7 +400,7 @@ export default function Sidebar({
               {filteredInventoryMasterLinks.length > 0 && (
                 <div className="pt-5">
                   <div className="mb-3 flex items-center gap-3 px-3">
-                    <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-[var(--color-brand-sage)]/65">
                       {t("Master Data")}
                     </span>
                     <span className="h-px flex-1 bg-white/10" />
@@ -421,7 +415,7 @@ export default function Sidebar({
                           onClose();
                         }}
                         className={({ isActive }) =>
-                          `flex items-center gap-3 rounded-lg p-3 text-sm ${isActive ? "bg-[#4b3023] text-white" : "text-stone-300 hover:bg-white/5"}`
+                          `flex items-center gap-3 rounded-lg p-3 text-sm ${isActive ? "bg-[var(--color-brand-hover)] text-[var(--color-brand-sage)]" : "text-[var(--color-brand-cream)] hover:bg-white/5"}`
                         }
                       >
                         <Icon size={18} />
@@ -436,7 +430,7 @@ export default function Sidebar({
           {filteredHrisLinks.length > 0 && (
             <div className="pt-5">
               <div className="mb-3 flex items-center gap-3 px-3">
-                <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-stone-500">
+                <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-[var(--color-brand-sage)]/65">
                   HRIS
                 </span>
                 <span className="h-px flex-1 bg-white/10" />
@@ -451,7 +445,7 @@ export default function Sidebar({
                       onClose();
                     }}
                     className={({ isActive }) =>
-                      `flex items-center gap-3 rounded-lg p-3 text-sm ${isActive ? "bg-[#4b3023] text-white" : "text-stone-300 hover:bg-white/5"}`
+                      `flex items-center gap-3 rounded-lg p-3 text-sm ${isActive ? "bg-[var(--color-brand-hover)] text-[var(--color-brand-sage)]" : "text-[var(--color-brand-cream)] hover:bg-white/5"}`
                     }
                   >
                     <Icon size={18} />
@@ -463,9 +457,9 @@ export default function Sidebar({
           )}
           {hasMenus && resultCount === 0 && (
             <div role="status" className="rounded-xl border border-white/10 bg-white/5 px-3 py-6 text-center">
-              <Search size={22} className="mx-auto mb-3 text-stone-500" />
-              <p className="text-sm font-medium text-stone-300">{t("No menus found")}</p>
-              <p className="mt-1 text-xs text-stone-400">{t("Try another keyword.")}</p>
+              <Search size={22} className="mx-auto mb-3 text-[var(--color-brand-sage)]/65" />
+              <p className="text-sm font-medium text-[var(--color-brand-cream)]">{t("No menus found")}</p>
+              <p className="mt-1 text-xs text-[var(--color-brand-sage)]/80">{t("Try another keyword.")}</p>
             </div>
           )}
         </nav>
@@ -476,14 +470,14 @@ export default function Sidebar({
           stockOpnameChildLinks.length === 0 &&
           inventoryMenuLinks.length === 0 && (
           <div className="relative flex flex-1 items-center justify-center">
-            <span className="absolute h-36 w-36 rounded-full bg-[#b86b42]/20 blur-2xl" />
-            <span className="relative grid h-24 w-24 place-items-center rounded-3xl border border-white/10 bg-white/5 text-stone-500 backdrop-blur-md">
+            <span className="absolute h-36 w-36 rounded-full bg-[var(--color-brand-accent)]/20 blur-2xl" />
+            <span className="relative grid h-24 w-24 place-items-center rounded-3xl border border-white/10 bg-white/5 text-[var(--color-brand-sage)]/65 backdrop-blur-md">
               <LockKeyhole size={42} strokeWidth={1.6} />
             </span>
           </div>
         )}
-        <div className="mt-auto flex shrink-0 items-center gap-2 border-t border-white/15 pt-5 text-stone-300">
-          <span className="grid size-9 place-items-center rounded-full bg-[#b86b42] text-xs text-white">
+        <div className="mt-auto flex shrink-0 items-center gap-2 border-t border-white/15 pt-5 text-[var(--color-brand-cream)]">
+          <span className="grid size-9 place-items-center rounded-full bg-[var(--color-brand-accent)] text-xs text-white">
             {user?.fullname?.slice(0, 2).toUpperCase() || "KR"}
           </span>
           <span className="flex flex-1 flex-col">
@@ -510,7 +504,7 @@ export default function Sidebar({
           aria-labelledby="logout-title"
         >
           <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
-            <span className="grid size-12 place-items-center rounded-xl bg-orange-50 text-[#9d5935]">
+            <span className="grid size-12 place-items-center rounded-xl bg-[var(--color-brand-soft)] text-[var(--color-brand-accent)]">
               <LogOut size={22} />
             </span>
             <h2
@@ -519,7 +513,7 @@ export default function Sidebar({
             >
               {t("Confirm logout?")}
             </h2>
-            <p className="mt-2 text-sm leading-6 text-stone-500">
+            <p className="mt-2 text-sm leading-6 text-[var(--color-brand-sage)]/65">
               {t("You’ll need to sign in again to access the C.R.E.M.A dashboard.")}
             </p>
             <div className="mt-7 flex gap-3">

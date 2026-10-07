@@ -1,6 +1,9 @@
+import { getStockCountSections, type StockCountSection } from "../../api/inventoryCount.api";
+import StockCountDepartments from "../../components/common/StockCountDepartments";
+import { getStockCountDepartment } from "../../utils/stockCountDepartment";
 import { useAuth } from "../../app/AuthContext";
 import { userCan } from "../../app/roleAccess";
-import { Activity, ArrowLeft, ArrowRight, ClipboardCheck, PackagePlus, SlidersHorizontal } from "lucide-react";
+import { Activity, ArrowLeft, ArrowRight, ClipboardCheck, SlidersHorizontal } from "lucide-react";
 import { isAxiosError } from "axios";
 import { useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
@@ -38,6 +41,7 @@ export default function InventoryCountPage() {
   const queryDate = searchParams.get("date") ?? "";
   const focusStep = searchParams.get("focus") ?? "";
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sectionStates, setSectionStates] = useState<Record<string, StockCountSection[]>>({});
   const [items, setItems] = useState<InventoryCount[]>([]);
   const [businessDay, setBusinessDay] = useState<BusinessDay | null>(null);
   const [selectedDate, setSelectedDate] = useState(queryDate || today());
@@ -71,7 +75,14 @@ export default function InventoryCountPage() {
           count_type: "", status: "", name: "",
         });
         if (!current) return;
-        setItems(response.data ?? []);
+        const nextItems = response.data ?? [];
+        const states = await Promise.all(nextItems.map(async (count) => {
+          const response = await getStockCountSections(count.inventory_count_id);
+          return [count.inventory_count_id, response.data?.sections ?? []] as const;
+        }));
+        if (!current) return;
+        setSectionStates(Object.fromEntries(states));
+        setItems(nextItems);
       } catch (requestError) {
         if (!current) return;
         const response = isAxiosError<{ message?: string }>(requestError)
@@ -115,7 +126,8 @@ export default function InventoryCountPage() {
     };
   }, [businessDayID, selectedDate]);
 
-  const orderedItems = [...items].sort((first, second) => {
+  const department = getStockCountDepartment(searchParams.get("department"));
+  const orderedItems = items.map((item) => ({...item, status: department ? sectionStates[item.inventory_count_id]?.find((section) => section.department === department.key)?.status ?? item.status : item.status})).sort((first, second) => {
     const order = { OPENING: 0, CLOSING: 1 };
     return order[first.count_type] - order[second.count_type];
   });
@@ -127,12 +139,10 @@ export default function InventoryCountPage() {
   const scopedBusinessDayID = businessDayID || businessDay?.business_day_id || "";
   const scopedBusinessDate = businessDay?.business_date || selectedDate;
   const workflowQuery = new URLSearchParams({
+    ...(department ? { department: department.key } : {}),
     ...(scopedBusinessDayID ? { businessDayID: scopedBusinessDayID } : {}),
     date: scopedBusinessDate,
   });
-  const stockInPath = scopedBusinessDayID
-    ? `/stock-in?${workflowQuery}`
-    : `/stock-in?date=${encodeURIComponent(scopedBusinessDate)}`;
   const adjustmentPath = scopedBusinessDayID
     ? `/stock-adjustments?${workflowQuery}`
     : `/stock-adjustments?date=${encodeURIComponent(scopedBusinessDate)}`;
@@ -141,7 +151,7 @@ export default function InventoryCountPage() {
     : `/stock-movements?date=${encodeURIComponent(scopedBusinessDate)}`;
 
   function countPath(item: InventoryCount) {
-    const query = new URLSearchParams({ businessDayID: item.business_day_id, date: item.business_day_info?.business_date || scopedBusinessDate, focus: item.count_type.toLowerCase() });
+    const query = new URLSearchParams({ businessDayID: item.business_day_id, date: item.business_day_info?.business_date || scopedBusinessDate, ...(department ? { department: department.key } : {}), focus: item.count_type.toLowerCase() });
     return `/business-days/${item.business_day_id}/inventory-counts/${item.inventory_count_id}?${query}`;
   }
 
@@ -158,7 +168,7 @@ export default function InventoryCountPage() {
   const action = nextAction();
 
   return (
-    <div className="flex min-h-screen bg-[#f8f5f0]">
+    <div className="flex min-h-screen bg-[var(--color-brand-cream)]">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <section className="min-w-0 flex-1">
         <Navbar onMenuClick={() => setSidebarOpen(true)} />
@@ -170,10 +180,11 @@ export default function InventoryCountPage() {
                 {t("Business Days")}
               </Link>
             )}
-            <div className="mb-3 flex size-11 items-center justify-center rounded-xl bg-[#e8efe5] text-[#547144]">
+            <div className="mb-3 flex size-11 items-center justify-center rounded-xl bg-[var(--color-brand-soft)] text-[var(--color-brand-hover)]">
               <ClipboardCheck size={22} />
             </div>
-            <h1 className="font-serif text-3xl font-bold">{t("Stock Count")}</h1>
+            <h1 className="font-serif text-3xl font-bold">{t("Stock Count")}{department ? ` · ${department.label}` : ""}</h1>
+            <StockCountDepartments />
             <div className="mt-2 flex flex-wrap items-center gap-3">
               <p className="text-sm text-stone-500">{formatBusinessDate(businessDay?.business_date) || (businessDayID ? businessDayID : formatBusinessDate(selectedDate))}</p>
               {!businessDayID && (
@@ -187,7 +198,7 @@ export default function InventoryCountPage() {
                       setSelectedDate(nextDate);
                       setSearchParams((current) => { const next = new URLSearchParams(current); next.set("date", nextDate); next.delete("businessDayID"); return next; });
                     }}
-                    className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm font-normal text-stone-700 outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10"
+                    className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm font-normal text-stone-700 outline-none focus:border-[var(--color-brand-accent)] focus:ring-4 focus:ring-[var(--color-brand-accent)]/10"
                   />
                 </label>
               )}
@@ -214,12 +225,12 @@ export default function InventoryCountPage() {
                     {!canReadOpening ? t("Count ending stock.") : !canReadClosing ? t("Count beginning stock.") : openingSubmitted
                       ? closingSubmitted
                         ? t("Opening and Closing Stock have been submitted.")
-                        : t("Record Stock In or Adjustment when needed. If there is none, continue to Closing Stock.")
+                        : t("Record Adjustment when needed. If there is none, continue to Closing Stock.")
                       : t("Count physical stock before operational activities begin.")}
                   </p>
                 </div>
                 {action.path ? (
-                  <Link to={action.path} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#362219] px-5 py-3 text-sm font-semibold text-white">
+                  <Link to={action.path} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--color-brand-primary)] px-5 py-3 text-sm font-semibold text-white">
                     {action.label}
                     <ArrowRight size={17} />
                   </Link>
@@ -258,21 +269,9 @@ export default function InventoryCountPage() {
                   </div>
                 </div>
                 ))}
-                {userCan(user, "stock_receipts") && (
-                <Link to={stockInPath} className="flex gap-4 px-5 py-4 hover:bg-stone-50">
-                  <span className="grid size-8 shrink-0 place-items-center rounded-full bg-stone-100 text-xs font-bold text-stone-600">2</span>
-                  <div className="min-w-0 flex-1 sm:flex sm:items-center sm:justify-between sm:gap-5">
-                    <div>
-                      <p className="flex items-center gap-2 font-semibold text-stone-900"><PackagePlus size={16} /> {t("Stock In")}</p>
-                      <p className="mt-1 text-stone-500">{t("Use only when goods arrive.")}</p>
-                    </div>
-                    <p className="mt-2 shrink-0 font-semibold text-stone-700 sm:mt-0">{t("Optional")}</p>
-                  </div>
-                </Link>
-                )}
                 {userCan(user, "stock_adjustments") && (
                 <Link to={adjustmentPath} className="flex gap-4 px-5 py-4 hover:bg-stone-50">
-                  <span className="grid size-8 shrink-0 place-items-center rounded-full bg-stone-100 text-xs font-bold text-stone-600">3</span>
+                  <span className="grid size-8 shrink-0 place-items-center rounded-full bg-stone-100 text-xs font-bold text-stone-600">2</span>
                   <div className="min-w-0 flex-1 sm:flex sm:items-center sm:justify-between sm:gap-5">
                     <div>
                       <p className="flex items-center gap-2 font-semibold text-stone-900"><SlidersHorizontal size={16} /> {t("Adjustment")}</p>
@@ -284,7 +283,7 @@ export default function InventoryCountPage() {
                 )}
                 {userCan(user, "stock_movements") && (
                 <Link to={movementPath} className="flex gap-4 px-5 py-4 hover:bg-stone-50">
-                  <span className="grid size-8 shrink-0 place-items-center rounded-full bg-stone-100 text-xs font-bold text-stone-600">4</span>
+                  <span className="grid size-8 shrink-0 place-items-center rounded-full bg-stone-100 text-xs font-bold text-stone-600">3</span>
                   <div className="min-w-0 flex-1 sm:flex sm:items-center sm:justify-between sm:gap-5">
                     <div>
                       <p className="flex items-center gap-2 font-semibold text-stone-900"><Activity size={16} /> {t("Movement")}</p>
@@ -296,7 +295,7 @@ export default function InventoryCountPage() {
                 )}
                 {canReadClosing && (closingCount ? (
                 <Link to={countPath(closingCount)} className={`flex gap-4 px-5 py-4 transition hover:bg-stone-50 ${focusStep === "closing" ? "bg-amber-50/60 ring-1 ring-inset ring-amber-200" : ""}`}>
-                  <span className={`grid size-8 shrink-0 place-items-center rounded-full text-xs font-bold ${closingSubmitted ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>5</span>
+                  <span className={`grid size-8 shrink-0 place-items-center rounded-full text-xs font-bold ${closingSubmitted ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>4</span>
                   <div className="min-w-0 flex-1 sm:flex sm:items-center sm:justify-between sm:gap-5">
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
@@ -312,7 +311,7 @@ export default function InventoryCountPage() {
                 </Link>
                 ) : (
                 <div className={`flex gap-4 px-5 py-4 ${focusStep === "closing" ? "bg-amber-50/60 ring-1 ring-inset ring-amber-200" : ""}`}>
-                  <span className="grid size-8 shrink-0 place-items-center rounded-full bg-stone-100 text-xs font-bold text-stone-600">5</span>
+                  <span className="grid size-8 shrink-0 place-items-center rounded-full bg-stone-100 text-xs font-bold text-stone-600">4</span>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="font-semibold text-stone-900">{t("Closing Stock")}</p>

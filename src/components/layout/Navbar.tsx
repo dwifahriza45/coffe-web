@@ -65,10 +65,10 @@ export default function Navbar({ onMenuClick }: { onMenuClick: () => void }) {
             <button
               type="button"
               aria-label={t("Notifications")}
-              className="relative grid size-10 shrink-0 place-items-center rounded-xl border border-stone-200 bg-white text-stone-600 outline-none transition hover:border-[#d6a287] hover:text-[#9d5935] focus:ring-4 focus:ring-[#b86b42]/10"
+              className="relative grid size-10 shrink-0 place-items-center rounded-xl border border-stone-200 bg-white text-stone-600 outline-none transition hover:border-[var(--color-brand-sage)] hover:text-[var(--color-brand-accent)] focus:ring-4 focus:ring-[var(--color-brand-accent)]/10"
             >
               <Bell size={19} />
-              <span className="absolute right-2 top-2 size-1.5 rounded-full bg-[#c45f32] ring-2 ring-white" />
+              <span className="absolute right-2 top-2 size-1.5 rounded-full bg-[var(--color-brand-accent)] ring-2 ring-white" />
             </button>
             <div ref={accountMenuRef} className="relative">
               <button
@@ -76,9 +76,9 @@ export default function Navbar({ onMenuClick }: { onMenuClick: () => void }) {
                 onClick={() => setMenuOpen((value) => !value)}
                 aria-expanded={menuOpen}
                 aria-label={t("Open account menu")}
-                className="flex h-10 max-w-52 items-center gap-2 rounded-xl bg-white py-1 pl-1 pr-3 outline-none ring-1 ring-stone-200 transition hover:ring-[#d6a287] focus:ring-4 focus:ring-[#b86b42]/10"
+                className="flex h-10 max-w-52 items-center gap-2 rounded-xl bg-white py-1 pl-1 pr-3 outline-none ring-1 ring-stone-200 transition hover:ring-[var(--color-brand-sage)] focus:ring-4 focus:ring-[var(--color-brand-accent)]/10"
               >
-                <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-[#b86b42] text-xs font-bold text-white">
+                <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-[var(--color-brand-accent)] text-xs font-bold text-white">
                   {initials}
                 </span>
                 <span className="hidden min-w-0 truncate text-sm font-semibold text-stone-800 sm:block">
@@ -88,7 +88,7 @@ export default function Navbar({ onMenuClick }: { onMenuClick: () => void }) {
               {menuOpen && (
                 <div className="absolute right-0 top-[calc(100%+.75rem)] z-40 w-[min(16rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-stone-200 bg-white p-2 shadow-[0_18px_45px_rgba(54,34,25,.16)]">
                   <div className="flex items-center gap-3 border-b border-stone-100 px-2 py-3">
-                    <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#f2e2d8] text-xs font-bold text-[#92502f]">
+                    <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[var(--color-brand-soft)] text-xs font-bold text-[var(--color-brand-accent)]">
                       {initials}
                     </span>
                     <div className="min-w-0">
@@ -137,7 +137,7 @@ export default function Navbar({ onMenuClick }: { onMenuClick: () => void }) {
         >
           <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
             <div className="flex items-start justify-between">
-              <span className="grid size-14 place-items-center rounded-full bg-[#b86b42] text-lg font-bold text-white">
+              <span className="grid size-14 place-items-center rounded-full bg-[var(--color-brand-accent)] text-lg font-bold text-white">
                 {initials}
               </span>
               <button
@@ -175,7 +175,7 @@ export default function Navbar({ onMenuClick }: { onMenuClick: () => void }) {
           aria-labelledby="navbar-logout-title"
         >
           <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
-            <span className="grid size-12 place-items-center rounded-xl bg-orange-50 text-[#9d5935]">
+            <span className="grid size-12 place-items-center rounded-xl bg-orange-50 text-[var(--color-brand-accent)]">
               <LogOut size={22} />
             </span>
             <h2 id="navbar-logout-title" className="mt-5 text-xl font-bold">

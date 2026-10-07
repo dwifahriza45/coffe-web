@@ -40,7 +40,7 @@ export default function SupplierSelect({ value, onChange, disabled = false }: {
   const hasSavedValue = value && !suppliers.some((supplier) => supplier.name === value);
   return (
     <>
-      <select required aria-required="true" value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled || loading || error} className="mt-2 w-full rounded-lg border border-stone-300 bg-white px-3.5 py-3 text-sm font-normal outline-none focus:border-[#b86b42] focus:ring-4 focus:ring-[#b86b42]/10 disabled:bg-stone-100">
+      <select required aria-required="true" value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled || loading || error} className="mt-2 w-full rounded-lg border border-stone-300 bg-white px-3.5 py-3 text-sm font-normal outline-none focus:border-[var(--color-brand-accent)] focus:ring-4 focus:ring-[var(--color-brand-accent)]/10 disabled:bg-stone-100">
         <option value="">{loading ? "Loading suppliers..." : error ? "Could not load suppliers" : "Select supplier"}</option>
         {hasSavedValue && <option value={value} disabled>{value}{!loading && !error ? " (saved supplier)" : ""}</option>}
         {suppliers.map((supplier) => <option key={supplier.supplier_id} value={supplier.name}>{supplier.name}</option>)}

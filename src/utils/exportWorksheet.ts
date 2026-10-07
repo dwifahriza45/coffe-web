@@ -9,10 +9,10 @@ export function createExportWorksheet(
   const sheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
   sheet["!cols"] = columnWidths.map((wch) => ({ wch }));
   const border = {
-    top: { style: "thin", color: { rgb: "B8A99F" } },
-    right: { style: "thin", color: { rgb: "B8A99F" } },
-    bottom: { style: "thin", color: { rgb: "B8A99F" } },
-    left: { style: "thin", color: { rgb: "B8A99F" } },
+    top: { style: "thin", color: { rgb: "A9BC96" } },
+    right: { style: "thin", color: { rgb: "A9BC96" } },
+    bottom: { style: "thin", color: { rgb: "A9BC96" } },
+    left: { style: "thin", color: { rgb: "A9BC96" } },
   };
   for (let row = 0; row <= rows.length; row += 1) {
     for (let column = 0; column < headers.length; column += 1) {
@@ -23,7 +23,7 @@ export function createExportWorksheet(
         alignment: { horizontal: "center", vertical: "center" },
         ...(row === 0 ? {
           font: { bold: true, color: { rgb: "FFFFFF" } },
-          fill: { fgColor: { rgb: "362219" }, patternType: "solid" },
+          fill: { fgColor: { rgb: "244510" }, patternType: "solid" },
         } : {}),
       };
     }

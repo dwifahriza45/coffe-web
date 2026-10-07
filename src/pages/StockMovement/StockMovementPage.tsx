@@ -64,7 +64,7 @@ export default function StockMovementPage() {
   const pages = Math.max(1, Math.ceil(total / limit));
   const displayDate = businessDayID ? ((items[0]?.business_date ?? queryDate) || businessDayID) : todayOnly ? currentBusinessDate() : t("Inventory quantity changes");
   return (
-    <div className="flex min-h-screen bg-[#f8f5f0]">
+    <div className="flex min-h-screen bg-[var(--color-brand-cream)]">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <section className="min-w-0 flex-1">
         <Navbar onMenuClick={() => setSidebarOpen(true)} />
@@ -72,7 +72,7 @@ export default function StockMovementPage() {
           <Link to={businessDayID ? `/business-days/${businessDayID}/inventory-counts` : todayOnly ? "/stock-count" : "/business-days"} className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-stone-600"><ArrowLeft size={17} />{businessDayID || todayOnly ? t("Stock Count") : t("Business Days")}</Link>
           <header className="flex flex-wrap items-end justify-between gap-4">
             <div>
-              <div className="mb-3 grid size-11 place-items-center rounded-xl bg-[#efe9df] text-[#8a5a3f]"><ArrowRightLeft size={22} /></div>
+              <div className="mb-3 grid size-11 place-items-center rounded-xl bg-[var(--color-brand-soft)] text-[var(--color-brand-hover)]"><ArrowRightLeft size={22} /></div>
               <h1 className="font-serif text-3xl font-bold">{t("Stock Movement")}</h1>
               <p className="mt-2 text-sm text-stone-500">{displayDate}</p>
               <p className="mt-1 text-xs text-stone-500">{t("Stock movement history from submitted stock activity.")}</p>
@@ -100,7 +100,7 @@ export default function StockMovementPage() {
                       <td className="px-5 py-4 font-semibold">{item.ingredient_name}</td>
                       <td className="px-5 py-4"><span className="rounded-full bg-stone-100 px-2.5 py-1 text-xs font-semibold">{t(movementLabels[item.movement_type] ?? item.movement_type)}</span></td>
                       <td className={`whitespace-nowrap px-5 py-4 font-semibold ${outgoing ? "text-red-600" : "text-emerald-700"}`}>{outgoing ? "−" : "+"}{formatNumber(item.quantity, 3)} <span className="font-normal text-stone-500">{item.unit_code}</span></td>
-                      <td className="px-5 py-4">{item.reference_type === "STOCK_RECEIPT" ? <Link className="font-semibold text-[#92502f] underline" to={`/stock-in/${item.reference_id}?${new URLSearchParams({businessDayID: item.business_day_id, date: item.business_date})}`}>{item.reference_id}</Link> : item.reference_type === "STOCK_ADJUSTMENT" ? <Link className="font-semibold text-[#92502f] underline" to={`/stock-adjustments/${item.reference_id}?${new URLSearchParams({businessDayID: item.business_day_id, date: item.business_date})}`}>{item.reference_id}</Link> : item.reference_id}<p className="mt-1 text-xs text-stone-400">{item.stock_movement_id}</p></td>
+                      <td className="px-5 py-4">{item.po_id ? <Link className="font-semibold text-[var(--color-brand-accent)] underline" to={`/supplier-management/${encodeURIComponent(item.supplier_id)}`}>{item.po_number}</Link> : item.reference_type === "STOCK_ADJUSTMENT" ? <Link className="font-semibold text-[var(--color-brand-accent)] underline" to={`/stock-adjustments/${item.reference_id}?${new URLSearchParams({businessDayID: item.business_day_id, date: item.business_date})}`}>{item.reference_id}</Link> : item.reference_id}<p className="mt-1 text-xs text-stone-400">{item.stock_movement_id}</p></td>
                       <td className="px-5 py-4">{item.created_by_name}</td>
                       <td className="max-w-xs whitespace-pre-wrap break-words px-5 py-4 text-stone-500">{item.notes || "-"}</td>
                     </tr>;

@@ -95,6 +95,22 @@ export interface SupplierHistory {
   total: number;
 }
 
+export interface PurchaseOrder {
+  status: "PENDING" | "PARTIAL" | "RECEIVED";
+  transaction_id: string;
+  supplier_id: string;
+  supplier_name: string;
+  number: string;
+  date: string;
+  notes: string;
+  total: string;
+}
+
+export const getPurchaseOrders = async (supplierID: string, start = 0, limit = 10, status = "", date = "") =>
+  (await api.get<ApiResponse<{ orders: PurchaseOrder[]; total: number; status_counts: Record<PurchaseOrder["status"], number> }>>("/suppliers/purchase-orders", {
+    params: { supplier_id: supplierID, start, limit, status, date },
+  })).data;
+
 export const getSupplier = async (supplierID: string) =>
   (
     await api.get<ApiResponse<Supplier>>(
@@ -166,3 +182,13 @@ export const getAllSuppliers = async () => {
     if (!page.length || start >= (response.total ?? start)) return items;
   }
 };
+
+export interface POReceiving {
+  items: { item_id: string; name: string; ordered: string; received: string; remaining: string; packaging: string; unit_price: string; ordered_total: string; received_total: string }[];
+  receipts: { receipt_id: string; date: string; total: string; notes: string }[];
+}
+export const getPOReceiving = async (supplierID: string, detailID: string) =>
+  (await api.get<ApiResponse<POReceiving>>(`/suppliers/${encodeURIComponent(supplierID)}/shopping/${encodeURIComponent(detailID)}/receiving`)).data;
+export const receivePO = async (supplierID: string, detailID: string, payload: {
+  request_id: string; date: string; notes: string; items: { item_id: string; quantity: string }[];
+}) => (await api.post<ApiResponse<{ receipt_id: string }>>(`/suppliers/${encodeURIComponent(supplierID)}/shopping/${encodeURIComponent(detailID)}/receiving`, payload)).data;

@@ -18,6 +18,7 @@ export interface Ingredient {
   content_qty: string;
   content_unit_id: string;
   minimum_stock: string;
+  target_stock?: string;
   active: boolean;
 }
 
@@ -32,6 +33,7 @@ export interface IngredientPayload {
   content_qty: string;
   content_unit_id: string;
   minimum_stock: string;
+  target_stock?: string;
   active: boolean;
 }
 
@@ -71,6 +73,8 @@ export const deleteIngredient = async (ingredientID: string) =>
   (await api.delete<ApiResponse<null>>(`/ingredients/${ingredientID}`)).data;
 
 export interface IngredientPriceOption {
+  unit_price: string;
+  price_content_unit: string;
   in_use: boolean;
   supplier_name: string;
   purchase_no: string;
@@ -132,3 +136,8 @@ export const deleteIngredientPrice = async (
       `/ingredients/${encodeURIComponent(ingredientID)}/prices/${encodeURIComponent(priceID)}`,
     )
   ).data;
+
+export const getInventoryCategoryCounts = async (payload: { name: string; supplier_id: string }) => (await api.post<ApiResponse<{categories: {category_id: string; count: number}[]; total: number}>>("/ingredients/summary", payload)).data;
+
+export interface StockItemMetadata { ingredient_id: string; brand: string; subcategory: string; supplier: string; packaging: string; content_unit: string; unit_price: string | null }
+export const getStockItemMetadata = async () => (await api.get<ApiResponse<StockItemMetadata[]>>("/ingredients/stock-metadata")).data;
