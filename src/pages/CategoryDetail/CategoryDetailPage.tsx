@@ -1,4 +1,4 @@
-import { ArrowLeft, CupSoda, Pencil, Plus, Power, Search, Trash2, X } from "lucide-react";
+import { LayoutGrid, List, ArrowLeft, CupSoda, Pencil, Plus, Power, Search, Trash2, X } from "lucide-react";
 import { isAxiosError } from "axios";
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -17,7 +17,7 @@ import Navbar from "../../components/layout/Navbar";
 import Sidebar from "../../components/layout/Sidebar";
 import { useAuth } from "../../app/AuthContext";
 import { useLanguage } from "../../app/LanguageContext";
-import { getUserRoleNames } from "../../app/roleAccess";
+import { userCan } from "../../app/roleAccess";
 import { formatNumber, normalizeNumberInput } from "../../utils/numberFormat";
 
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50];
@@ -37,10 +37,10 @@ function formatPrice(value: string) {
 export default function CategoryDetailPage() {
   const { user } = useAuth();
   const { t } = useLanguage();
-  const roles = getUserRoleNames(user);
-  const canWriteProducts = roles.includes("admin");
+  const canWriteProducts = ["create", "update", "delete"].some((action) => userCan(user, "products", action as "create" | "update" | "delete"));
   const { categoryID = "" } = useParams();
   const navigate = useNavigate();
+  const [view, setView] = useState<"grid" | "table">("grid");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [category, setCategory] = useState<Category | null>(null);
   const [products, setProducts] = useState<Product[]>([]);
@@ -255,10 +255,13 @@ export default function CategoryDetailPage() {
               <h1 className="font-serif text-3xl font-bold">{category?.name ?? t("Category Detail")}</h1>
               <p className="mt-2 text-sm text-stone-500">{category?.description || t("Products in this category")}</p>
             </div>
-            {canWriteProducts && <button type="button" onClick={() => openModal()} className="flex items-center gap-2 rounded-lg bg-[var(--color-brand-primary)] px-5 py-3 text-sm font-semibold text-white">
+            <div className="flex flex-wrap items-center gap-3">
+              <div role="group" aria-label="Tampilan" className="inline-flex shrink-0 gap-1 rounded-full border border-[var(--color-brand-sage)] bg-[var(--color-brand-cream)] p-1">{(["grid", "table"] as const).map((mode) => { const Icon = mode === "grid" ? LayoutGrid : List; return <button key={mode} type="button" aria-pressed={view === mode} onClick={() => setView(mode)} className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ${view === mode ? "bg-[var(--color-brand-primary)] text-white" : "text-[var(--color-brand-primary)] hover:bg-[var(--color-brand-sage)]"}`}><Icon size={14} />{mode === "grid" ? "Grid" : "Table"}</button>; })}</div>
+            {userCan(user, "products", "create") && <button type="button" onClick={() => openModal()} className="flex items-center gap-2 rounded-lg bg-[var(--color-brand-primary)] px-5 py-3 text-sm font-semibold text-white">
               <Plus size={17} />
               {t("Add product")}
             </button>}
+            </div>
           </header>
 
           <section className="mt-7 overflow-hidden rounded-xl border border-stone-200 bg-white">
@@ -267,6 +270,7 @@ export default function CategoryDetailPage() {
                 <h2 className="font-semibold">{t("Products")}</h2>
                 <p className="text-xs text-stone-500">{total} {t("products found")}</p>
               </div>
+
               <form
                 onSubmit={(event) => {
                   event.preventDefault();
@@ -280,7 +284,7 @@ export default function CategoryDetailPage() {
               </form>
             </div>
             {error && <div className="m-4 rounded-lg bg-red-50 p-4 text-sm text-red-700">{error}</div>}
-            <div className="overflow-x-auto">
+            {view === "table" ? <div className="overflow-x-auto">
               <table className="w-full min-w-180 text-left">
                 <thead className="bg-stone-50 text-xs uppercase tracking-wider text-stone-500">
                   <tr>
@@ -318,9 +322,9 @@ export default function CategoryDetailPage() {
                           </td>
                           {canWriteProducts && <td className="px-5 py-4">
                             <div className="flex justify-end gap-1.5">
-                              {canWriteProducts && <button type="button" onClick={(event) => { event.stopPropagation(); openModal(product); }} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800" title={t("Update product")}><Pencil size={15} /></button>}
-                              {canWriteProducts && <button type="button" onClick={(event) => { event.stopPropagation(); requestToggleActive(product); }} disabled={product.active && inUse} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent" title={product.active && inUse ? t("Product is used by recipes") : product.active ? t("Deactivate product") : t("Activate product")}><Power size={15} /></button>}
-                              {canWriteProducts && <button type="button" onClick={(event) => { event.stopPropagation(); requestDelete(product); }} disabled={inUse} className="grid size-8 place-items-center rounded-lg text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent" title={inUse ? t("Product is used by recipes") : t("Delete product")}><Trash2 size={15} /></button>}
+                              {userCan(user, "products", "update") && <button type="button" onClick={(event) => { event.stopPropagation(); openModal(product); }} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800" title={t("Update product")}><Pencil size={15} /></button>}
+                              {userCan(user, "products", "update") && <button type="button" onClick={(event) => { event.stopPropagation(); requestToggleActive(product); }} disabled={product.active && inUse} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent" title={product.active && inUse ? t("Product is used by recipes") : product.active ? t("Deactivate product") : t("Activate product")}><Power size={15} /></button>}
+                              {userCan(user, "products", "delete") && <button type="button" onClick={(event) => { event.stopPropagation(); requestDelete(product); }} disabled={inUse} className="grid size-8 place-items-center rounded-lg text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent" title={inUse ? t("Product is used by recipes") : t("Delete product")}><Trash2 size={15} /></button>}
                             </div>
                           </td>}
                         </tr>
@@ -329,7 +333,13 @@ export default function CategoryDetailPage() {
                   )}
                 </tbody>
               </table>
-            </div>
+            </div> : loading ? <p className="p-14 text-center text-sm text-stone-500">{t("Loading...")}</p> : products.length === 0 ? <p className="p-14 text-center text-sm text-stone-500">{t("No products found")}</p> : <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 min-[1800px]:grid-cols-6">{products.map((product) => { const inUse = Boolean(productUsage[product.product_id]); return <article key={product.product_id} className="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-[var(--color-brand-sage)] bg-[var(--color-brand-surface)] transition hover:border-[var(--color-brand-primary)] hover:bg-[var(--color-brand-soft)]"><button type="button" onClick={() => navigate(`/category-management/${categoryID}/products/${product.product_id}`)} className="flex flex-1 flex-col p-5 text-left focus-visible:outline-2 focus-visible:outline-[var(--color-brand-primary)]"><div className="flex items-center justify-between gap-2"><span className="grid size-10 place-items-center rounded-full bg-[var(--color-brand-sage)] text-[var(--color-brand-primary)]"><CupSoda size={20} /></span><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${product.active ? "bg-green-50 text-green-700" : "bg-stone-100 text-stone-500"}`}>{product.active ? t("Active") : t("Inactive")}</span></div><h3 className="mt-4 break-words text-lg font-bold text-[var(--color-brand-primary)]">{product.name}</h3><p className="mt-2 line-clamp-2 text-sm text-stone-500">{product.description || "—"}</p><div className="mt-auto flex flex-wrap items-center justify-between gap-2 pt-4"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${inUse ? "bg-amber-50 text-amber-700" : "bg-stone-100 text-stone-500"}`}>{inUse ? t("Used") : t("Unused")}</span><span className="font-bold text-[var(--color-brand-primary)]">{formatPrice(product.price)}</span></div></button>{canWriteProducts && <div className="border-t border-stone-200 p-3">
+                            <div className="flex justify-end gap-1.5">
+                              {userCan(user, "products", "update") && <button type="button" onClick={(event) => { event.stopPropagation(); openModal(product); }} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800" title={t("Update product")}><Pencil size={15} /></button>}
+                              {userCan(user, "products", "update") && <button type="button" onClick={(event) => { event.stopPropagation(); requestToggleActive(product); }} disabled={product.active && inUse} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent" title={product.active && inUse ? t("Product is used by recipes") : product.active ? t("Deactivate product") : t("Activate product")}><Power size={15} /></button>}
+                              {userCan(user, "products", "delete") && <button type="button" onClick={(event) => { event.stopPropagation(); requestDelete(product); }} disabled={inUse} className="grid size-8 place-items-center rounded-lg text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent" title={inUse ? t("Product is used by recipes") : t("Delete product")}><Trash2 size={15} /></button>}
+                            </div>
+                          </div>}</article>; })}</div>}
             <footer className="flex items-center justify-between border-t border-stone-200 px-5 py-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                 <p className="text-xs text-stone-500">{t("Page")} {page} {t("of")} {totalPages}</p>

@@ -3,7 +3,7 @@ import { isAxiosError } from "axios";
 import { Download } from "lucide-react";
 import * as XLSX from "xlsx-js-style";
 import { getRecipeCost, type RecipeCost } from "../../api/recipe.api";
-import { formatNumber } from "../../utils/numberFormat";
+import { formatNumber, formatNumberInput, normalizeNumberInput } from "../../utils/numberFormat";
 import { createExportWorksheet } from "../../utils/exportWorksheet";
 
 const money = (value: string | null, digits = 2) =>
@@ -16,13 +16,19 @@ export default function RecipeCostPanel({
   version,
   isBase,
   refreshKey,
+  onSaveYield,
 }: {
   recipeID: string;
   name: string;
   version: string;
   isBase: boolean;
   refreshKey: number;
+  onSaveYield?: (quantity: string, unit: string) => Promise<void>;
 }) {
+  const [yieldValue, setYieldValue] = useState("");
+  const [yieldUnit, setYieldUnit] = useState("ml");
+  const [savingYield, setSavingYield] = useState(false);
+  const [yieldError, setYieldError] = useState("");
   const [cost, setCost] = useState<RecipeCost | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -33,7 +39,7 @@ export default function RecipeCostPanel({
     setCost(null);
     getRecipeCost(recipeID)
       .then((response) => {
-        if (current) setCost(response.data ?? null);
+        if (current) { setCost(response.data ?? null); setYieldValue(response.data?.yield_quantity ? String(Math.round(Number(response.data.yield_quantity))) : ""); setYieldUnit(response.data?.yield_unit || "ml"); setYieldError(""); }
       })
       .catch((requestError) => {
         if (current)
@@ -67,6 +73,7 @@ export default function RecipeCostPanel({
       number(item.cost),
       item.issue ?? "",
     ]);
+    rows.push(["TOTAL HPP", "", "", null, "", null, null, "", null, cost.complete ? number(cost.total_cost) : "HPP belum lengkap", ""]);
     const book = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(
       book,
@@ -85,7 +92,7 @@ export default function RecipeCostPanel({
           "Catatan",
         ],
         rows,
-        [26, 20, 30, 16, 12, 22, 16, 18, 24, 22, 50],
+        [26, 20, 48, 16, 12, 22, 16, 18, 24, 22, 50],
       ),
       "Rincian HPP",
     );
@@ -101,8 +108,9 @@ export default function RecipeCostPanel({
             isBase ? "Total HPP per racikan (Rp)" : "HPP per porsi (Rp)",
             number(cost.total_cost),
           ],
-          ["Jumlah sebelum susut", number(cost.initial_quantity)],
-          ["Waste / susut", number(cost.waste_quantity)],
+          ["Total qty awal (otomatis)", number(cost.initial_quantity)],
+          ["Selisih qty awal / akhir", number(cost.waste_quantity)],
+          ["Satuan qty awal", cost.initial_unit],
           ["Hasil akhir", number(cost.yield_quantity)],
           ["Satuan hasil akhir", cost.yield_unit],
           [
@@ -119,6 +127,29 @@ export default function RecipeCostPanel({
       ),
       "Ringkasan",
     );
+    for (const sheetName of book.SheetNames) {
+      const sheet = book.Sheets[sheetName];
+      for (const [address, cell] of Object.entries(sheet)) {
+        if (address.startsWith("!")) continue;
+        if (cell.t === "n") {
+          const { r, c } = XLSX.utils.decode_cell(address);
+          const currency = sheetName === "Rincian HPP" ? [5, 8, 9].includes(c) : String(sheet[XLSX.utils.encode_cell({ r, c: 0 })]?.v ?? "").includes("(Rp)");
+          const decimals = (String(Number(Number(cell.v).toFixed(3))).split(".")[1] ?? "").length;
+          cell.z = currency || decimals === 0 ? "#,##0" : `#,##0.${"0".repeat(decimals)}`;
+          cell.s = { ...cell.s, alignment: { horizontal: "right", vertical: "center" } };
+        } else {
+          cell.s = { ...cell.s, alignment: { ...cell.s?.alignment, wrapText: true } };
+        }
+      }
+    }
+    const detail = book.Sheets["Rincian HPP"];
+    const totalRow = rows.length;
+    detail["!merges"] = [...(detail["!merges"] ?? []), { s: { r: totalRow, c: 0 }, e: { r: totalRow, c: 8 } }];
+    for (let column = 0; column < 11; column++) {
+      const cell = detail[XLSX.utils.encode_cell({ r: totalRow, c: column })];
+      if (!cell) continue;
+      cell.s = { ...cell.s, font: { bold: true, color: { rgb: "244510" } }, fill: { patternType: "solid", fgColor: { rgb: "E7EED9" } } };
+    }
     XLSX.writeFile(book, `hpp-${recipeID}.xlsx`);
   }
   return (
@@ -176,25 +207,31 @@ export default function RecipeCostPanel({
             {isBase && (
               <div className="mx-4 mb-4 grid grid-cols-3 gap-3 rounded-xl border border-stone-200 p-3 text-sm">
                 <div>
-                  <p className="text-xs text-stone-500">Sebelum susut</p>
+                  <p className="text-xs text-stone-500">Total qty awal</p>
                   <p className="mt-1 font-semibold">
-                    {quantity(cost.initial_quantity, cost.yield_unit)}
+                    {quantity(cost.initial_quantity, cost.initial_unit)}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-stone-500">Waste / susut</p>
+                  <p className="text-xs text-stone-500">{cost.initial_mixed ? "Selisih qty" : "Waste / susut"}</p>
                   <p className="mt-1 font-semibold">
-                    {quantity(cost.waste_quantity, cost.yield_unit)}
+                    {quantity(cost.waste_quantity, cost.initial_unit)}
                   </p>
                 </div>
                 <div>
                   <p className="text-xs text-stone-500">Hasil akhir</p>
-                  <p className="mt-1 font-semibold">
-                    {quantity(cost.yield_quantity, cost.yield_unit)}
-                  </p>
+                  {onSaveYield ? <form className="mt-2 space-y-2" onSubmit={async (event) => {
+                    event.preventDefault(); if (savingYield) return;
+                    if (!(Math.round(Number(yieldValue)) > 0)) { setYieldError("Isi hasil akhir lebih dari 0."); return; }
+                    setSavingYield(true); setYieldError("");
+                    try { await onSaveYield(String(Math.round(Number(yieldValue))), yieldUnit); }
+                    catch (err) { setYieldError(isAxiosError<{message?:string}>(err) ? err.response?.data?.message || "Gagal menyimpan hasil akhir" : "Gagal menyimpan hasil akhir"); }
+                    finally { setSavingYield(false); }
+                  }}><div className="flex flex-wrap gap-2"><input aria-label="Jumlah hasil akhir base" required inputMode="decimal" value={formatNumberInput(yieldValue)} onBlur={() => { if (yieldValue) setYieldValue(String(Math.round(Number(yieldValue)))); }} onChange={(e) => setYieldValue(normalizeNumberInput(e.target.value))} disabled={savingYield} className="h-10 min-w-0 flex-1 rounded-lg border border-stone-300 px-3" /><select aria-label="Satuan hasil akhir base" value={yieldUnit} onChange={(e) => setYieldUnit(e.target.value)} disabled={savingYield || Boolean(cost.yield_unit)} className="h-10 rounded-lg border border-stone-300 px-2"><option value="ml">ml</option><option value="gr">gr</option></select></div><button disabled={savingYield || !yieldValue || (Number(yieldValue) === Number(cost.yield_quantity) && yieldUnit === cost.yield_unit)} className="rounded-lg bg-[var(--color-brand-primary)] px-3 py-2 text-xs font-semibold text-white disabled:opacity-40">{savingYield ? "Menyimpan…" : "Simpan hasil akhir"}</button>{yieldError && <p role="alert" className="text-xs text-red-700">{yieldError}</p>}<p className="text-xs text-stone-500">Input hasil racikan yang kamu ukur. HPP diperbarui setelah disimpan.</p></form> : <p className="mt-1 font-semibold">{quantity(cost.yield_quantity, cost.yield_unit)}</p>}
                 </div>
               </div>
             )}
+            {isBase && cost.initial_mixed && <p className="mx-4 mb-4 text-xs text-stone-500">Qty awal mengikuti jumlah komposisi GR + ML. Selisih qty ini adalah acuan racikan; hasil akhir diukur terpisah dan dipakai sebagai pembagi HPP.</p>}
             {cost.issues.length > 0 && (
               <div className="mx-4 mb-4 rounded-lg bg-amber-50 p-3 text-xs text-amber-900">
                 <ul className="list-disc space-y-1 pl-4">
@@ -212,6 +249,7 @@ export default function RecipeCostPanel({
                     <th className="px-4 py-3 text-right">Qty resep</th>
                     <th className="px-4 py-3 text-right">Harga acuan</th>
                     <th className="px-4 py-3 text-right">Isi acuan</th>
+                    <th className="px-4 py-3 text-right">HPP / satuan</th>
                     <th className="px-4 py-3 text-right">HPP item</th>
                   </tr>
                 </thead>
@@ -243,6 +281,7 @@ export default function RecipeCostPanel({
                           item.purchase_unit ?? "",
                         )}
                       </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-right">{money(item.unit_cost)} / {item.unit}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-right font-semibold">
                         {money(item.cost)}
                       </td>
@@ -253,9 +292,7 @@ export default function RecipeCostPanel({
             </div>
             <p className="border-t border-stone-200 p-4 text-xs leading-relaxed text-stone-500">
               HPP mencakup item dan komponen yang dimasukkan ke resep. Tenaga
-              kerja, listrik, dan biaya operasional belum termasuk. Waste
-              memakai jumlah sebelum susut dan hasil akhir yang dicatat, tanpa
-              menjumlahkan gram dan ml.
+              kerja, listrik, dan biaya operasional belum termasuk. Qty awal dihitung otomatis dari komposisi. HPP base dibagi hasil akhir yang diukur.
             </p>
           </>
         )

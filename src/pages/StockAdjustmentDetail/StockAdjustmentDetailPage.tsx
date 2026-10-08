@@ -1,3 +1,5 @@
+import { userCanStockDepartment } from "../../app/roleAccess";
+import { stockCountDepartments, matchesStockCountDepartment } from "../../utils/stockCountDepartment";
 import { isOpeningStockSubmitted } from "../../api/inventoryCount.api";
 import { isAxiosError } from "axios";
 import { ArrowLeft, Pencil, Plus, SlidersHorizontal, Trash2, X } from "lucide-react";
@@ -33,8 +35,20 @@ function formatDate(value?: string) {
   return value ? new Date(`${value}T00:00:00`).toLocaleDateString("id-ID", { day: "2-digit", month: "long", year: "numeric" }) : "-";
 }
 
+async function loadAllIngredients() {
+  const data: Ingredient[] = [];
+  for (let start = 0; ; start += 100) {
+    const response = await getIngredients({ start, limit: 100, name: "" });
+    const batch = response.data ?? [];
+    data.push(...batch);
+    if (batch.length < 100 || data.length >= (response.total ?? Infinity)) break;
+  }
+  return { data };
+}
+
 export default function StockAdjustmentDetailPage() {
   const { user } = useAuth();
+  const allowedDepartments = stockCountDepartments.filter((d) => userCanStockDepartment(user, d.key));
   const roles = getUserRoleNames(user);
   const requiresOpening = roles.some((role) => ["admin", "leader"].includes(role));
   const todayOnly = roles.includes("inventory") && !roles.some((role) => ["admin", "leader"].includes(role));
@@ -42,13 +56,13 @@ export default function StockAdjustmentDetailPage() {
   const [searchParams] = useSearchParams();
   const businessDayID = todayOnly ? "" : searchParams.get("businessDayID") ?? "";
   const scopedDate = todayOnly ? currentBusinessDate() : searchParams.get("date") ?? "";
-  const contextQuery = businessDayID ? `?${new URLSearchParams({ businessDayID, date: scopedDate })}` : "";
+  const contextQuery = businessDayID ? `?${new URLSearchParams({ businessDayID, date: scopedDate, ...(searchParams.get("department") ? { department: searchParams.get("department")! } : {}) })}` : "";
   const loadedAdjustmentID = useRef("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [adjustment, setAdjustment] = useState<StockAdjustment | null>(null);
   const [items, setItems] = useState<StockAdjustmentItem[]>([]);
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
-  const [draft, setDraft] = useState<StockAdjustmentPayload>({ reason: "", notes: "" });
+  const [draft, setDraft] = useState<StockAdjustmentPayload>({ department: "", reason: "", notes: "" });
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
@@ -79,16 +93,16 @@ export default function StockAdjustmentDetailPage() {
         const [adjustmentResponse, itemResponse, ingredientResponse] = await Promise.all([
           getStockAdjustment(adjustmentID),
           getStockAdjustmentItems({ start: 0, limit: 100, adjustment_id: adjustmentID, ingredient_id: "", name: "" }),
-          getIngredients({ start: 0, limit: 100, name: "" }),
+          loadAllIngredients(),
         ]);
         if (!current) return;
-        const submitted = requiresOpening ? await isOpeningStockSubmitted(adjustmentResponse.data?.business_day_id ?? "") : false;
+        const submitted = requiresOpening ? await isOpeningStockSubmitted(adjustmentResponse.data?.business_day_id ?? "", adjustmentResponse.data?.department || undefined) : false;
         if (!current) return;
         setOpeningSubmitted(submitted);
         setAdjustment(adjustmentResponse.data ?? null);
         if (adjustmentResponse.data && loadedAdjustmentID.current !== adjustmentID) {
           loadedAdjustmentID.current = adjustmentID;
-          setDraft({ reason: adjustmentResponse.data.reason, notes: adjustmentResponse.data.notes });
+          setDraft({ department: adjustmentResponse.data.department, reason: adjustmentResponse.data.reason, notes: adjustmentResponse.data.notes });
         }
         setItems(itemResponse.data ?? []);
         setIngredients((ingredientResponse.data ?? []).filter((ingredient) => ingredient.active));
@@ -132,6 +146,7 @@ export default function StockAdjustmentDetailPage() {
 
   function openItemModal(item?: StockAdjustmentItem) {
     if (!canWrite) return;
+    if (!adjustment?.department) { setError("Pilih bagian dan simpan draft terlebih dahulu."); return; }
     setEditingItem(item ?? null);
     setForm(item ? {
       adjustment_id: item.adjustment_id,
@@ -215,7 +230,7 @@ export default function StockAdjustmentDetailPage() {
               <span className="rounded-full bg-stone-100 px-2.5 py-1 text-stone-600">Submitted by {adjustment?.submitted_by_info?.fullname || adjustment?.submitted_by || "-"}</span>
               <span className="rounded-full bg-stone-100 px-2.5 py-1 text-stone-600">Submitted at {adjustment?.submitted_at ? new Date(adjustment.submitted_at).toLocaleString("id-ID") : "-"}</span>
             </div>
-            <label className="mt-5 block text-sm font-semibold text-stone-700">Reason *<textarea value={draft.reason} onChange={(event) => { setDraft((current) => ({ ...current, reason: event.target.value })); setReasonError(""); }} disabled={!canWrite} className="mt-2 min-h-20 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm font-normal outline-none focus:border-[var(--color-brand-accent)] disabled:bg-stone-100" />{reasonError && <span role="alert" className="mt-2 block text-xs text-red-600">{reasonError}</span>}</label>
+            <label className="mt-5 block text-sm font-semibold">Bagian *<select required disabled={!canWrite} value={draft.department} onChange={(e) => setDraft({ ...draft, department: e.target.value })} className="mt-2 block w-full rounded-lg border border-stone-300 p-3"><option value="">Pilih bagian</option>{allowedDepartments.map((d) => <option key={d.key} value={d.key}>{d.key === "waiters" ? "Waiter" : d.label}</option>)}</select><p className="mt-2 text-xs text-stone-500">Simpan draft setelah memilih bagian. Semua Item harus sesuai bagian tersebut.</p></label><label className="mt-5 block text-sm font-semibold text-stone-700">Reason *<textarea value={draft.reason} onChange={(event) => { setDraft((current) => ({ ...current, reason: event.target.value })); setReasonError(""); }} disabled={!canWrite} className="mt-2 min-h-20 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm font-normal outline-none focus:border-[var(--color-brand-accent)] disabled:bg-stone-100" />{reasonError && <span role="alert" className="mt-2 block text-xs text-red-600">{reasonError}</span>}</label>
             <label className="mt-5 block text-sm font-semibold text-stone-700">Notes<textarea value={draft.notes} onChange={(event) => setDraft((current) => ({ ...current, notes: event.target.value }))} disabled={!canWrite} className="mt-2 min-h-20 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm font-normal outline-none focus:border-[var(--color-brand-accent)] disabled:bg-stone-100" /></label>
             <div className="mt-4 flex flex-wrap items-center gap-2"><button type="button" onClick={() => void saveAdjustment()} disabled={!canWrite} className="rounded-lg border border-stone-300 px-4 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40">Save Draft</button><button type="button" onClick={requestSubmitAdjustment} disabled={!canWrite} className="rounded-lg bg-[var(--color-brand-primary)] px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40">Submit</button></div>
             {notice && <p role="status" className="mt-3 text-sm text-emerald-700">{notice}</p>}
@@ -229,7 +244,7 @@ export default function StockAdjustmentDetailPage() {
           </section>
         </main>
       </section>
-      {modalOpen && <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"><form onSubmit={submitItem} className="w-full max-w-md rounded-2xl bg-white shadow-2xl"><header className="flex items-start justify-between border-b border-stone-200 p-5"><h2 className="text-lg font-bold">{editingItem ? "Update item" : "Add item"}</h2><button type="button" onClick={() => setModalOpen(false)} className="grid size-9 place-items-center rounded-lg hover:bg-stone-100"><X size={18} /></button></header><div className="space-y-4 p-5"><label className="block text-sm font-semibold text-stone-700">Ingredient<select value={form.ingredient_id} onChange={(event) => setForm((current) => ({ ...current, ingredient_id: event.target.value }))} required className="mt-2 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm outline-none focus:border-[var(--color-brand-accent)]"><option value="">Select ingredient</option>{ingredients.map((ingredient) => <option key={ingredient.ingredient_id} value={ingredient.ingredient_id}>{ingredient.name}</option>)}</select></label><label className="block text-sm font-semibold text-stone-700">Adjustment Type<select value={form.adjustment_type} onChange={(event) => setForm((current) => ({ ...current, adjustment_type: event.target.value as StockAdjustmentItemPayload["adjustment_type"] }))} required className="mt-2 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm outline-none focus:border-[var(--color-brand-accent)]"><option value="IN">Tambah Stok</option><option value="OUT">Kurangi Stok</option></select></label><label className="block text-sm font-semibold text-stone-700">Quantity ({ingredients.find((ingredient) => ingredient.ingredient_id === form.ingredient_id)?.base_unit_info?.code || "base unit"})<input inputMode="decimal" value={formatNumber(form.quantity, 3)} onChange={(event) => setForm((current) => ({ ...current, quantity: normalizeNumberInput(event.target.value) }))} required className="mt-2 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm outline-none focus:border-[var(--color-brand-accent)]" /></label><label className="block text-sm font-semibold text-stone-700">Reason<textarea value={form.reason} onChange={(event) => setForm((current) => ({ ...current, reason: event.target.value }))} className="mt-2 min-h-20 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm outline-none focus:border-[var(--color-brand-accent)]" /></label></div><footer className="flex justify-end gap-3 border-t border-stone-200 p-5"><button type="button" onClick={() => setModalOpen(false)} className="rounded-lg border border-stone-300 px-4 py-2.5 text-sm font-semibold hover:bg-stone-50">Cancel</button><button type="submit" disabled={submitting || !canWrite} className="rounded-lg bg-[var(--color-brand-primary)] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">{submitting ? "Saving..." : "Save"}</button></footer></form></div>}
+      {modalOpen && <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"><form onSubmit={submitItem} className="w-full max-w-md rounded-2xl bg-white shadow-2xl"><header className="flex items-start justify-between border-b border-stone-200 p-5"><h2 className="text-lg font-bold">{editingItem ? "Update item" : "Add item"}</h2><button type="button" onClick={() => setModalOpen(false)} className="grid size-9 place-items-center rounded-lg hover:bg-stone-100"><X size={18} /></button></header><div className="space-y-4 p-5"><label className="block text-sm font-semibold text-stone-700">Item<select value={form.ingredient_id} onChange={(event) => setForm((current) => ({ ...current, ingredient_id: event.target.value }))} required className="mt-2 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm outline-none focus:border-[var(--color-brand-accent)]"><option value="">Pilih Item</option>{ingredients.filter((item) => Boolean(adjustment?.department) && matchesStockCountDepartment(item.category_ingredient_name, adjustment!.department)).map((ingredient) => <option key={ingredient.ingredient_id} value={ingredient.ingredient_id}>{ingredient.name}</option>)}</select></label><label className="block text-sm font-semibold text-stone-700">Adjustment Type<select value={form.adjustment_type} onChange={(event) => setForm((current) => ({ ...current, adjustment_type: event.target.value as StockAdjustmentItemPayload["adjustment_type"] }))} required className="mt-2 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm outline-none focus:border-[var(--color-brand-accent)]"><option value="IN">Tambah Stok</option><option value="OUT">Kurangi Stok</option></select></label><label className="block text-sm font-semibold text-stone-700">Quantity ({ingredients.find((ingredient) => ingredient.ingredient_id === form.ingredient_id)?.base_unit_info?.code || "base unit"})<input inputMode="decimal" value={formatNumber(form.quantity, 3)} onChange={(event) => setForm((current) => ({ ...current, quantity: normalizeNumberInput(event.target.value) }))} required className="mt-2 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm outline-none focus:border-[var(--color-brand-accent)]" /></label><label className="block text-sm font-semibold text-stone-700">Reason<textarea value={form.reason} onChange={(event) => setForm((current) => ({ ...current, reason: event.target.value }))} className="mt-2 min-h-20 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm outline-none focus:border-[var(--color-brand-accent)]" /></label></div><footer className="flex justify-end gap-3 border-t border-stone-200 p-5"><button type="button" onClick={() => setModalOpen(false)} className="rounded-lg border border-stone-300 px-4 py-2.5 text-sm font-semibold hover:bg-stone-50">Cancel</button><button type="submit" disabled={submitting || !canWrite} className="rounded-lg bg-[var(--color-brand-primary)] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">{submitting ? "Saving..." : "Save"}</button></footer></form></div>}
       <ConfirmDialog open={Boolean(confirm)} title={confirm?.title ?? ""} message={confirm?.message ?? ""} confirmText={confirm?.confirmText ?? "Confirm"} tone={confirm?.tone} submitting={submitting} onCancel={() => setConfirm(null)} onConfirm={() => void confirm?.onConfirm()} />
     </div>
   );

@@ -1,3 +1,5 @@
+import { userCanStockDepartment } from "../../app/roleAccess";
+import { getStockCountDepartment, stockCountDepartments } from "../../utils/stockCountDepartment";
 import { ArrowLeft, ArrowRightLeft, Search } from "lucide-react";
 import { isAxiosError } from "axios";
 import { useEffect, useState } from "react";
@@ -13,6 +15,7 @@ import { formatNumber } from "../../utils/numberFormat";
 
 const movementLabels: Record<string, string> = {
   STOCK_IN: "Stock In",
+  STOCK_OUT: "Stock Out",
   ORDER_USAGE: "Order Usage",
   WASTE: "Waste",
   ADJUSTMENT_IN: "Koreksi Stok (+)",
@@ -25,6 +28,7 @@ function formatDateTime(value: string) {
 
 export default function StockMovementPage() {
   const { user } = useAuth();
+  const allowedDepartments = stockCountDepartments.filter((d) => userCanStockDepartment(user, d.key));
   const { t } = useLanguage();
   const roles = getUserRoleNames(user);
   const todayOnly = roles.includes("inventory") && !roles.some((role) => ["admin", "leader"].includes(role));
@@ -32,12 +36,15 @@ export default function StockMovementPage() {
   const queryBusinessDayID = params.get("businessDayID") ?? "";
   const queryDate = params.get("date") ?? "";
   const businessDayID = queryBusinessDayID;
+  const [department, setDepartment] = useState<string>(getStockCountDepartment(params.get("department"))?.key || (params.get("ingredientID") ? "" : allowedDepartments[0]?.key || ""));
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [date, setDate] = useState(queryDate);
   const scopedDate = businessDayID ? "" : todayOnly ? currentBusinessDate() : date;
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
-  const [type, setType] = useState("");
+  const queryType = params.get("movementType") ?? "";
+  const [type, setType] = useState(queryType in movementLabels ? queryType : "");
+  useEffect(() => { setType(queryType in movementLabels ? queryType : ""); setPage(1); }, [queryType]);
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
   const [items, setItems] = useState<StockMovement[]>([]);
@@ -54,12 +61,12 @@ export default function StockMovementPage() {
   useEffect(() => {
     let current = true;
     setLoading(true); setError("");
-    getStockMovements({ start: (page - 1) * limit, limit, business_day_id: businessDayID, business_date: scopedDate, movement_type: type, name: search, ingredient_id: params.get("ingredientID") ?? "" })
+    getStockMovements({ start: (page - 1) * limit, limit, business_day_id: businessDayID, business_date: scopedDate, movement_type: type, name: search, department, ingredient_id: params.get("ingredientID") ?? "" })
       .then((response) => { if (current) { setItems(response.data ?? []); setTotal(response.total ?? 0); } })
       .catch((error) => { if (current) { setItems([]); setTotal(0); setError(isAxiosError<{message?: string}>(error) ? error.response?.data.message || t("Could not load stock movements.") : t("Could not load stock movements.")); } })
       .finally(() => { if (current) setLoading(false); });
     return () => { current = false; };
-  }, [businessDayID, scopedDate, page, limit, type, search, refresh, params]);
+  }, [businessDayID, scopedDate, page, limit, type, search, refresh, params, department]);
 
   const pages = Math.max(1, Math.ceil(total / limit));
   const displayDate = businessDayID ? ((items[0]?.business_date ?? queryDate) || businessDayID) : todayOnly ? currentBusinessDate() : t("Inventory quantity changes");
@@ -69,7 +76,7 @@ export default function StockMovementPage() {
       <section className="min-w-0 flex-1">
         <Navbar onMenuClick={() => setSidebarOpen(true)} />
         <main className="p-5 sm:p-8">
-          <Link to={businessDayID ? `/business-days/${businessDayID}/inventory-counts` : todayOnly ? "/stock-count" : "/business-days"} className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-stone-600"><ArrowLeft size={17} />{businessDayID || todayOnly ? t("Stock Count") : t("Business Days")}</Link>
+          <Link to={businessDayID ? `/business-days/${businessDayID}/inventory-counts${department ? `?department=${department}` : ""}` : todayOnly ? "/stock-count" : "/business-days"} className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-stone-600"><ArrowLeft size={17} />{businessDayID || todayOnly ? t("Stock Count") : t("Business Days")}</Link>
           <header className="flex flex-wrap items-end justify-between gap-4">
             <div>
               <div className="mb-3 grid size-11 place-items-center rounded-xl bg-[var(--color-brand-soft)] text-[var(--color-brand-hover)]"><ArrowRightLeft size={22} /></div>
@@ -79,6 +86,7 @@ export default function StockMovementPage() {
             </div>
             <button type="button" onClick={() => setRefresh((value) => value + 1)} disabled={loading} className="rounded-lg border border-stone-300 bg-white px-4 py-2 text-sm font-semibold disabled:opacity-40">{t("Refresh")}</button>
           </header>
+          <div className="mt-6 flex flex-wrap gap-2" aria-label="Bagian Stock Movement">{[{ key: "", label: "Semua bagian" }, ...allowedDepartments].map((d) => <button key={d.key} type="button" onClick={() => { setDepartment(d.key); setPage(1); }} className={`rounded-lg px-5 py-3 text-sm font-semibold ${department === d.key ? "bg-[var(--color-brand-primary)] text-white" : "border border-stone-200 bg-white"}`}>{d.label}</button>)}</div>
           <section className="mt-7 overflow-hidden rounded-xl border border-stone-200 bg-white">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-200 p-4">
               <p className="text-sm text-stone-500">{total} {t("movements")}</p>
@@ -91,16 +99,16 @@ export default function StockMovementPage() {
             {error && <div role="alert" className="m-4 rounded-lg bg-red-50 p-4 text-sm text-red-700">{error}</div>}
             <div className="overflow-x-auto">
               <table className="w-full min-w-[1000px] text-left text-sm">
-                <thead className="bg-stone-50 text-xs uppercase text-stone-500"><tr>{["Date / Time", "Ingredient", "Movement", "Quantity", "Reference", "Submitted by", "Notes"].map((label) => <th key={label} className="px-5 py-3">{t(label)}</th>)}</tr></thead>
+                <thead className="bg-stone-50 text-xs uppercase text-stone-500"><tr>{["Date / Time", "Item", "Bagian", "Movement", "Quantity", "Reference", "Submitted by", "Notes"].map((label) => <th key={label} className="px-5 py-3">{t(label)}</th>)}</tr></thead>
                 <tbody className="divide-y divide-stone-100">
-                  {loading ? <tr><td colSpan={7} className="p-12 text-center text-stone-500">{t("Loading movements...")}</td></tr> : items.length === 0 ? <tr><td colSpan={7} className="p-12 text-center text-stone-500">{t("No stock movement history found.")}</td></tr> : items.map((item) => {
+                  {loading ? <tr><td colSpan={8} className="p-12 text-center text-stone-500">{t("Loading movements...")}</td></tr> : items.length === 0 ? <tr><td colSpan={8} className="p-12 text-center text-stone-500">{t("No stock movement history found.")}</td></tr> : items.map((item) => {
                     const outgoing = ["ORDER_USAGE", "WASTE", "ADJUSTMENT_OUT"].includes(item.movement_type);
                     return <tr key={item.stock_movement_id}>
                       <td className="px-5 py-4"><p>{item.business_date}</p><p className="mt-1 text-xs text-stone-500">{formatDateTime(item.created_at)}</p></td>
-                      <td className="px-5 py-4 font-semibold">{item.ingredient_name}</td>
+                      <td className="px-5 py-4 font-semibold">{item.ingredient_name}</td><td className="px-5 py-4">{getStockCountDepartment(item.department)?.label || "—"}</td>
                       <td className="px-5 py-4"><span className="rounded-full bg-stone-100 px-2.5 py-1 text-xs font-semibold">{t(movementLabels[item.movement_type] ?? item.movement_type)}</span></td>
                       <td className={`whitespace-nowrap px-5 py-4 font-semibold ${outgoing ? "text-red-600" : "text-emerald-700"}`}>{outgoing ? "−" : "+"}{formatNumber(item.quantity, 3)} <span className="font-normal text-stone-500">{item.unit_code}</span></td>
-                      <td className="px-5 py-4">{item.po_id ? <Link className="font-semibold text-[var(--color-brand-accent)] underline" to={`/supplier-management/${encodeURIComponent(item.supplier_id)}`}>{item.po_number}</Link> : item.reference_type === "STOCK_ADJUSTMENT" ? <Link className="font-semibold text-[var(--color-brand-accent)] underline" to={`/stock-adjustments/${item.reference_id}?${new URLSearchParams({businessDayID: item.business_day_id, date: item.business_date})}`}>{item.reference_id}</Link> : item.reference_id}<p className="mt-1 text-xs text-stone-400">{item.stock_movement_id}</p></td>
+                      <td className="px-5 py-4">{item.po_id ? <Link className="font-semibold text-[var(--color-brand-accent)] underline" to={`/supplier-management/${encodeURIComponent(item.supplier_id)}`}>{item.po_number}</Link> : item.reference_type === "STOCK_ADJUSTMENT" ? <Link className="font-semibold text-[var(--color-brand-accent)] underline" to={`/stock-adjustments/${item.reference_id}?${new URLSearchParams({businessDayID: item.business_day_id, date: item.business_date, department: item.department})}`}>{item.reference_id}</Link> : item.reference_type === "WASTE" ? "Waste" : item.reference_id}<p className="mt-1 text-xs text-stone-400">{item.stock_movement_id}</p></td>
                       <td className="px-5 py-4">{item.created_by_name}</td>
                       <td className="max-w-xs whitespace-pre-wrap break-words px-5 py-4 text-stone-500">{item.notes || "-"}</td>
                     </tr>;

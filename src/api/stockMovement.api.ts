@@ -2,6 +2,7 @@ import api from "./client";
 import type { ApiResponse } from "../types/auth";
 
 export interface StockMovement {
+ department: string;
   po_id: string;
   po_number: string;
   supplier_id: string;
@@ -24,5 +25,7 @@ export interface StockMovement {
 
 export const getStockMovements = async (payload: {
   start: number; limit: number; business_day_id: string; business_date: string;
-  movement_type: string; name: string; ingredient_id?: string;
+  movement_type: string; name: string; ingredient_id?: string; department?: string;
 }) => (await api.post<ApiResponse<StockMovement[]>>("/stock-movements/list", payload)).data;
+
+export const recordClosingWaste = async (payload: { inventory_count_id: string; ingredient_id: string; department: string; quantity: string; reason: string; request_id: string }) => (await api.post<ApiResponse<{stock_movement_id: string}>>("/stock-movements/waste", payload)).data;

@@ -7,6 +7,7 @@ export interface StockAdjustmentUserInfo {
 }
 
 export interface StockAdjustment {
+ department: string;
   has_items: boolean;
   status: "DRAFT" | "SUBMITTED";
   submitted_by?: string;
@@ -29,11 +30,13 @@ export interface StockAdjustment {
 }
 
 export interface StockAdjustmentPayload {
+ department: string;
   reason: string;
   notes: string;
 }
 
 export const getStockAdjustments = async (payload: {
+  department?: string;
   start: number;
   limit: number;
   name: string;

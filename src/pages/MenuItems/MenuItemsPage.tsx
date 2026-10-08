@@ -1,4 +1,4 @@
-import { CupSoda, Search } from "lucide-react";
+import { CupSoda, Search, LayoutGrid, List, ArrowRight } from "lucide-react";
 import { isAxiosError } from "axios";
 import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
@@ -13,6 +13,7 @@ const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50];
 export default function MenuItemsPage() {
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const [view, setView] = useState<"grid" | "table">("grid");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -84,6 +85,9 @@ export default function MenuItemsPage() {
                 <h2 className="font-semibold">{t("All menu items")}</h2>
                 <p className="text-xs text-stone-500">{total} {t("menu items found")}</p>
               </div>
+              <div role="group" aria-label="Tampilan Menu Item" className="inline-flex shrink-0 gap-1 rounded-full border border-[var(--color-brand-sage)] bg-[var(--color-brand-cream)] p-1">
+                {(["grid", "table"] as const).map((mode) => { const Icon = mode === "grid" ? LayoutGrid : List; return <button key={mode} type="button" aria-pressed={view === mode} onClick={() => setView(mode)} className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition ${view === mode ? "bg-[var(--color-brand-primary)] text-[var(--color-brand-cream)]" : "text-[var(--color-brand-primary)] hover:bg-[var(--color-brand-sage)]"}`}><Icon size={14} />{mode === "grid" ? "Grid" : "Table"}</button>; })}
+              </div>
               <form
                 onSubmit={(event: FormEvent) => {
                   event.preventDefault();
@@ -97,7 +101,7 @@ export default function MenuItemsPage() {
               </form>
             </div>
             {error && <div className="m-4 rounded-lg bg-red-50 p-4 text-sm text-red-700">{error}</div>}
-            <div className="overflow-x-auto">
+            {view === "table" ? <div className="overflow-x-auto">
               <table className="w-full min-w-180 text-left">
                 <thead className="bg-stone-50 text-xs uppercase tracking-wider text-stone-500">
                   <tr>
@@ -132,7 +136,15 @@ export default function MenuItemsPage() {
                   )}
                 </tbody>
               </table>
-            </div>
+            </div> : loading ? <p className="p-14 text-center text-sm text-stone-500">{t("Loading menu items...")}</p> : products.length === 0 ? <p className="p-14 text-center text-sm text-stone-500">{t("No menu items found")}</p> : <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 min-[1800px]:grid-cols-6">
+              {products.map((product) => <button key={product.product_id} type="button" onClick={() => navigate(`/menu-items/${product.product_id}`)} className="group flex min-w-0 flex-col rounded-2xl border border-[var(--color-brand-sage)] bg-[var(--color-brand-surface)] p-5 text-left transition hover:border-[var(--color-brand-primary)] hover:bg-[var(--color-brand-soft)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-brand-primary)]">
+                <div className="flex items-center justify-between gap-2"><span className="grid size-10 shrink-0 place-items-center rounded-full bg-[var(--color-brand-sage)] text-[var(--color-brand-primary)]"><CupSoda size={20} /></span><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${product.active ? "bg-green-50 text-green-700" : "bg-stone-100 text-stone-500"}`}>{product.active ? t("Active") : t("Inactive")}</span></div>
+                <p className="mt-4 text-xs font-semibold text-stone-500">{product.category_info?.name || "—"}</p>
+                <h3 className="mt-1 break-words text-lg font-bold text-[var(--color-brand-primary)]">{product.name}</h3>
+                {product.description && <p className="mt-2 line-clamp-2 text-sm text-stone-500">{product.description}</p>}
+                <div className="mt-auto flex items-center justify-between gap-2 pt-5"><span className="text-lg font-bold text-[var(--color-brand-primary)]">Rp {formatNumber(product.price, 0)}</span><ArrowRight size={17} className="shrink-0 text-[var(--color-brand-primary)] transition-transform group-hover:translate-x-1" /></div>
+              </button>)}
+            </div>}
             <footer className="flex items-center justify-between border-t border-stone-200 px-5 py-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                 <p className="text-xs text-stone-500">{t("Page")} {page} {t("of")} {totalPages}</p>

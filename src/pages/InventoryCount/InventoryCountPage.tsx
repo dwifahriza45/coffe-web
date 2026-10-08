@@ -1,3 +1,4 @@
+import { exportStockCountReport } from "../../utils/stockCountReport";
 import { getStockCountSections, type StockCountSection } from "../../api/inventoryCount.api";
 import StockCountDepartments from "../../components/common/StockCountDepartments";
 import { getStockCountDepartment } from "../../utils/stockCountDepartment";
@@ -45,6 +46,7 @@ export default function InventoryCountPage() {
   const [items, setItems] = useState<InventoryCount[]>([]);
   const [businessDay, setBusinessDay] = useState<BusinessDay | null>(null);
   const [selectedDate, setSelectedDate] = useState(queryDate || today());
+  const [exporting, setExporting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -184,6 +186,12 @@ export default function InventoryCountPage() {
               <ClipboardCheck size={22} />
             </div>
             <h1 className="font-serif text-3xl font-bold">{t("Stock Count")}{department ? ` · ${department.label}` : ""}</h1>
+            <button type="button" disabled={loading || exporting || !items.length} onClick={async () => {
+ setExporting(true); setError("");
+ try { await exportStockCountReport({ counts: items.filter((item) => item.count_type === "OPENING" ? canReadOpening : canReadClosing), dayID: scopedBusinessDayID || items[0]?.business_day_id || "", date: scopedBusinessDate, department: department?.key }); }
+ catch (err) { setError(isAxiosError<{message?:string}>(err) ? err.response?.data?.message || "Gagal export laporan stock opname" : "Gagal export laporan stock opname"); }
+ finally { setExporting(false); }
+ }} className="mt-4 rounded-lg bg-[var(--color-brand-primary)] px-5 py-3 text-sm font-semibold text-white disabled:opacity-40">{exporting ? "Menyiapkan laporan…" : "Export Laporan Excel"}</button>
             <StockCountDepartments />
             <div className="mt-2 flex flex-wrap items-center gap-3">
               <p className="text-sm text-stone-500">{formatBusinessDate(businessDay?.business_date) || (businessDayID ? businessDayID : formatBusinessDate(selectedDate))}</p>
@@ -205,7 +213,7 @@ export default function InventoryCountPage() {
             </div>
           </header>
 
-          <section className="mt-7 max-w-7xl overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
+          <section className="mt-7 w-full overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
             {error && <div className="m-5 rounded-lg bg-red-50 p-4 text-sm text-red-700">{error}</div>}
             {loading ? (
               <div className="p-6 text-sm text-stone-500">{t("Loading stock counts...")}</div>

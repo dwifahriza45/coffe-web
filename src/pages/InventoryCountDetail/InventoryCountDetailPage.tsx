@@ -1,3 +1,4 @@
+import { recordClosingWaste } from "../../api/stockMovement.api";
 import { copyPreviousStockCountSection, getStockCountSections, submitStockCountSection, saveStockCountSectionDraft, type StockCountSection, type StockCountBalance } from "../../api/inventoryCount.api";
 import { stockRecap } from "../../utils/stockRecap";
 import { inventorySectionLabel } from "../../utils/stockDisplay";
@@ -109,6 +110,7 @@ export default function InventoryCountDetailPage() {
   );
   const [itemForm, setItemForm] = useState(emptyItemForm);
   const [submitting, setSubmitting] = useState(false);
+  const [waste, setWaste] = useState<{ ingredientID: string; name: string; department: string; unit: string; quantity: string; reason: string; requestID: string } | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [confirm, setConfirm] = useState<{
     title: string;
@@ -535,7 +537,7 @@ export default function InventoryCountDetailPage() {
               <div><h2 className="font-semibold">Rekap SO</h2><p className="mt-1 text-xs text-stone-500">{visibleItems.length} item · {count?.count_type === "OPENING" ? "Stok Awal" : "Stok Akhir"}</p></div>
               <button type="button" onClick={() => openItemModal()} disabled={!canCreateItem || loading || submitting} className="flex items-center gap-2 rounded-lg bg-brand-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"><Plus size={16} />{t("Add item")}</button>
             </div>
-            <p className="px-4 py-3 text-xs leading-relaxed text-stone-500">Barista/Kitchen: pemakaian dari mutasi tercatat; selisih membandingkan stok fisik dengan stok sistem. Waiters: pemakaian dihitung dari stok awal + masuk + penyesuaian − stok akhir fisik, termasuk waste jika ada. Hasil negatif perlu diperiksa. Rekap draft masih sementara.</p>
+            <p className="px-4 py-3 text-xs leading-relaxed text-stone-500">Barista/Kitchen: pemakaian dari Stock Movement tercatat; selisih membandingkan stok fisik dengan stok sistem. Waiters: pemakaian dihitung dari stok awal + masuk + penyesuaian − stok akhir fisik, termasuk waste jika ada. Hasil negatif perlu diperiksa. Rekap draft masih sementara.</p>
             <div className="overflow-x-auto px-3 pb-3">
               <table className="w-full min-w-[1750px] border-separate border-spacing-y-2 text-left text-sm">
                 <thead className="text-xs uppercase tracking-wider text-stone-500"><tr>{["Item", "Opening Stock", "Stock In", "Adjustments", "Pemakaian", "Closing Stock", "Variance", "Stock value", "Action"].map((label) => <th key={label} className="px-4 py-3">{t(label)}</th>)}</tr></thead>
@@ -550,7 +552,7 @@ export default function InventoryCountDetailPage() {
                           <p>Berat kemasan kosong: {row.item.container_weight ? `${formatNumber(row.item.container_weight,3)} g` : "—"}</p>
                           <p>Harga satuan: {row.item.valuation_unit_price ? `Rp ${formatNumber(row.item.valuation_unit_price,6)} / ${row.unit}` : "—"}</p>
                           <p>Stok sistem: {quantityLabel(row.expected,row.unit)}</p>
-                          <p>Mutasi keluar tercatat: {formatNumber(row.balance?.stock_out || "0",3)} {row.unit}</p>
+                          <p>Stock Movement keluar tercatat: {formatNumber(row.balance?.stock_out || "0",3)} {row.unit}</p>
                           <p>Catatan: {row.item.notes || "—"}</p>
                         </div>
                       </details>
@@ -558,11 +560,12 @@ export default function InventoryCountDetailPage() {
                     <td className="whitespace-nowrap px-4 py-4">{quantityLabel(count?.count_type === "OPENING" ? row.physical : row.balance?.opening == null ? null : numericValue(row.balance.opening),row.unit)}</td>
                     <td className="whitespace-nowrap px-4 py-4 text-emerald-700">{count?.count_type === "OPENING" ? "—" : `+${formatNumber(row.balance?.stock_in || "0",3)} ${row.unit}`}</td>
                     <td className="whitespace-nowrap px-4 py-4">{count?.count_type === "OPENING" ? "—" : quantityLabel(numericValue(row.balance?.adjustment),row.unit)}</td>
-                    <td className="whitespace-nowrap px-4 py-4"><p className={row.invalid ? "font-semibold text-amber-800" : "font-semibold"}>{row.invalid ? "Perlu diperiksa" : quantityLabel(row.consumption,row.unit)}</p><p className="mt-1 text-xs text-stone-500">{row.waiters ? "Dari hitung fisik" : "Dari mutasi tercatat"}</p></td>
+                    <td className="whitespace-nowrap px-4 py-4"><p className={row.invalid ? "font-semibold text-amber-800" : "font-semibold"}>{row.invalid ? "Perlu diperiksa" : quantityLabel(row.consumption,row.unit)}</p><p className="mt-1 text-xs text-stone-500">{row.waiters ? "Dari hitung fisik" : "Dari Stock Movement tercatat"}</p></td>
                     <td className="whitespace-nowrap px-4 py-4 font-semibold">{count?.count_type === "CLOSING" ? quantityLabel(row.physical,row.unit) : "—"}</td>
                     <td className="whitespace-nowrap px-4 py-4"><p className={row.variance ? "font-semibold text-amber-800" : "font-semibold text-emerald-700"}>{quantityLabel(row.variance,row.unit)}</p>{row.waiters && <p className="mt-1 text-xs text-stone-500">Pemakaian dari fisik</p>}</td>
                     <td className="whitespace-nowrap px-4 py-4 font-semibold">{row.item.stock_value ? `Rp ${formatNumber(row.item.stock_value,2)}` : "—"}</td>
                     <td className="rounded-r-2xl px-4 py-4"><div className="flex gap-2">
+                      {count?.count_type === "CLOSING" && userCan(user, "stock_adjustments", "create") && <button type="button" disabled={!editable || loading || submitting} onClick={() => { setError(""); setWaste({ ingredientID: row.item.ingredient_id, name: row.ingredient?.name || row.item.ingredient_id, department: row.item.department || department?.key || "", unit: row.unit, quantity: row.variance != null && row.variance < 0 ? String(-row.variance) : "", reason: "", requestID: crypto.randomUUID() }); }} className="rounded-lg border border-amber-300 px-3 py-2 text-xs font-semibold text-amber-800 disabled:opacity-30">Catat Waste</button>}
                       <button type="button" onClick={() => openItemModal(row.item)} disabled={!canMutateDraft || loading || submitting} className="rounded-lg p-2 text-brand-primary disabled:opacity-30" title={t("Update item")}><Pencil size={16} /></button>
                       <button type="button" onClick={() => requestDelete(row.item)} disabled={!canDeleteItem || loading || submitting} className="rounded-lg p-2 text-red-600 disabled:opacity-30" title={t("Delete item")}><Trash2 size={16} /></button>
                     </div></td>
@@ -847,7 +850,21 @@ export default function InventoryCountDetailPage() {
         </div>
       )}
 
-      <ConfirmDialog
+      {waste && <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4"><form className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl" onSubmit={async (event) => {
+ event.preventDefault(); if (submitting) return;
+ setSubmitting(true); setError("");
+ try { await recordClosingWaste({ inventory_count_id: inventoryCountID, ingredient_id: waste.ingredientID, department: waste.department, quantity: waste.quantity, reason: waste.reason, request_id: waste.requestID }); setWaste(null); setNotice("Waste tercatat di Stock Movement. Pemakaian dan selisih sudah diperbarui."); setRefreshKey((value) => value+1); }
+ catch (err) { setError(isAxiosError<{message?:string}>(err) ? err.response?.data?.message || "Gagal mencatat Waste" : "Gagal mencatat Waste"); }
+ finally { setSubmitting(false); }
+ }}>
+ <h2 className="text-lg font-bold">Catat Waste · {waste.name}</h2>
+ <p className="mt-2 text-sm text-stone-500">{getStockCountDepartment(waste.department)?.label} · {count?.business_day_info?.business_date}. Catat hanya jumlah yang memang terbuang. Data langsung disubmit dan tidak dapat diedit.</p>
+ <label className="mt-4 block text-sm font-semibold">Jumlah terbuang ({waste.unit})<input required inputMode="decimal" value={formatNumberInput(waste.quantity)} onChange={(e) => setWaste({ ...waste, quantity: normalizeNumberInput(e.target.value) })} className="mt-2 block w-full rounded-lg border p-3" /></label>
+ <label className="mt-4 block text-sm font-semibold">Alasan Waste<textarea required maxLength={1000} value={waste.reason} onChange={(e) => setWaste({ ...waste, reason: e.target.value })} placeholder="Contoh: tumpah, rusak, atau kedaluwarsa" className="mt-2 block w-full rounded-lg border p-3" /></label>
+ {error && <p role="alert" className="mt-3 text-sm text-red-700">{error}</p>}
+ <div className="mt-5 flex justify-end gap-3"><button type="button" disabled={submitting} onClick={() => setWaste(null)} className="rounded-lg border px-4 py-2">Batal</button><button disabled={submitting || !waste.reason.trim() || !(Number(waste.quantity)>0)} className="rounded-lg bg-brand-primary px-4 py-2 font-semibold text-white disabled:opacity-40">{submitting ? "Menyimpan…" : "Submit Waste"}</button></div>
+ </form></div>}
+ <ConfirmDialog
         open={Boolean(confirm)}
         title={confirm?.title ?? ""}
         message={confirm?.message ?? ""}

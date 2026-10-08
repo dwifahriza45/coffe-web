@@ -43,6 +43,8 @@ type ConfirmRequest = {
 };
 
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50];
+const STOCK_CHILD_KEYS = ["inventory_opening_counts", "stock_adjustments", "stock_movements", "inventory_closing_counts"];
+const STOCK_ACCESS = [{key: "stock_department_barista", label: "Barista"}, {key: "stock_department_kitchen", label: "Kitchen"}, {key: "stock_department_waiters", label: "Waiters"}];
 const PERMISSION_MENUS = [
   { key: "dashboard", label: "Dashboard" },
   { key: "users", label: "Users" },
@@ -223,8 +225,13 @@ export default function RoleManagementPage() {
   function normalizeRolePermissions(
     permissions: RolePermission[],
   ): RolePermission[] {
-    return applyPermissionDependencies(PERMISSION_MENUS.map((menu) => {
-      const existing = permissions.find((item) => item.menu_key === menu.key);
+    return applyPermissionDependencies([...PERMISSION_MENUS, ...STOCK_ACCESS].map((menu) => {
+      const existing = menu.key === "inventory_counts" ? {
+        can_read: permissions.some((p) => ["inventory_counts", ...STOCK_CHILD_KEYS].includes(p.menu_key) && (p.can_read || p.can_create || p.can_update || p.can_delete)),
+        can_create: permissions.some((p) => ["inventory_counts", ...STOCK_CHILD_KEYS.filter((key) => key !== "stock_movements")].includes(p.menu_key) && p.can_create),
+        can_update: permissions.some((p) => ["inventory_counts", ...STOCK_CHILD_KEYS.filter((key) => key !== "stock_movements")].includes(p.menu_key) && p.can_update),
+        can_delete: permissions.some((p) => ["inventory_counts", ...STOCK_CHILD_KEYS.filter((key) => key !== "stock_movements")].includes(p.menu_key) && p.can_delete),
+      } : permissions.find((item) => item.menu_key === menu.key);
       return {
         menu_key: menu.key,
         can_read: existing?.can_read ?? false,
@@ -302,6 +309,8 @@ export default function RoleManagementPage() {
   function applyPermissionDependencies(
     permissions: RolePermission[],
   ): RolePermission[] {
+    const parent = permissions.find((p) => p.menu_key === "inventory_counts");
+    permissions = permissions.map((p) => STOCK_CHILD_KEYS.includes(p.menu_key) && parent ? { ...parent, menu_key: p.menu_key, ...(p.menu_key === "stock_movements" ? {can_create:false,can_update:false,can_delete:false} : {}) } : p);
     const requiredReadMenus = new Set<string>();
     permissions.forEach((permission) => {
       if (permission.can_read && ["inventory_opening_counts", "inventory_closing_counts"].includes(permission.menu_key)) {
@@ -760,6 +769,12 @@ export default function RoleManagementPage() {
                   </p>
                 )}
               </label>
+              <section className="rounded-xl border border-stone-200 p-4">
+                <h3 className="text-sm font-bold">Akses bagian stok</h3>
+                <p className="mt-1 text-xs text-stone-500">Pilih bagian yang boleh diakses role ini. Bisa lebih dari satu. Permission menu di bawah menentukan tindakan yang diizinkan.</p>
+                <div className="mt-3 flex flex-wrap gap-6">{STOCK_ACCESS.map((part) => <label key={part.key} className="flex items-center gap-2 text-sm font-semibold"><input type="checkbox" disabled={submitting} checked={Boolean(rolePermissions.find((p) => p.menu_key === part.key)?.can_read)} onChange={() => togglePermission(part.key, "can_read")} className="size-4 accent-[var(--color-brand-primary)]" />{part.label}</label>)}</div>
+                <p className="mt-2 text-xs text-stone-500">Tanpa pilihan, role tidak dapat mengakses bagian stok. Admin memiliki akses semua bagian.</p>
+              </section>
               <section>
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <div>
@@ -771,7 +786,7 @@ export default function RoleManagementPage() {
                     </p>
                   </div>
                 </div>
-                <p className="mb-3 text-xs text-stone-500">{t("Opening and Closing Stock: Create adds items, Update edits items and notes or submits the count, Delete removes draft items.")}</p>
+                <p className="mb-3 text-xs text-stone-500">Stock Opname mencakup Stock Awal, Penyesuaian, Stock Movement, dan Stock Akhir. Create menambah item, Update mengubah atau submit, Delete menghapus draft. Stock Movement hanya dibaca. Bagian mengikuti pilihan akses bagian stok.</p>
                 <div className="overflow-x-auto rounded-xl border border-stone-200">
                   <table className="w-full min-w-[720px] text-left">
                     <thead className="bg-stone-50 text-xs uppercase tracking-wider text-stone-500">
@@ -786,7 +801,7 @@ export default function RoleManagementPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-stone-100">
-                      {PERMISSION_MENUS.map((menu) => {
+                      {PERMISSION_MENUS.filter((menu) => !STOCK_CHILD_KEYS.includes(menu.key)).map((menu) => {
                         const permission = rolePermissions.find(
                           (item) => item.menu_key === menu.key,
                         );

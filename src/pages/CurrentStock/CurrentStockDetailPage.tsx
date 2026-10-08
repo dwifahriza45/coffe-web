@@ -109,7 +109,7 @@ export default function CurrentStockDetailPage() {
   }, [movements, opening, snapshot]);
   const low = summary.current !== null && summary.current < minimum;
   const difference = summary.current === null || (historical && snapshot?.minimum_stock == null) ? null : summary.current - minimum;
-  const currentSource = snapshot?.current_quantity == null ? "Belum ada stock count valid pada tanggal ini" : closing === null ? `Dihitung dari stock count ${snapshot?.snapshot_date || ""} dan mutasi setelahnya` : t("Taken from Closing Stock");
+  const currentSource = snapshot?.current_quantity == null ? "Belum ada stock count valid pada tanggal ini" : closing === null ? `Dihitung dari stock count ${snapshot?.snapshot_date || ""} dan Stock Movement setelahnya` : t("Taken from Closing Stock");
   const dateQuery = `date=${encodeURIComponent(date)}`;
   const summaryCardClass = "rounded-lg bg-white px-4 py-3 text-left transition hover:-translate-y-0.5 hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-brand-accent)]/30";
 
@@ -181,7 +181,7 @@ export default function CurrentStockDetailPage() {
             </div>
             <p className="mt-3 text-sm text-stone-500">
               {closing === null
-                ? "Stok dihitung dari stock count terakhir yang disubmit sampai tanggal pilihan, ditambah mutasi setelahnya."
+                ? "Stok dihitung dari stock count terakhir yang disubmit sampai tanggal pilihan, ditambah Stock Movement setelahnya."
                 : t("Current Stock is taken from submitted Closing Stock.")}
             </p>
             <div className="mt-5 rounded-xl border border-stone-200 bg-stone-50 p-4">
@@ -190,18 +190,18 @@ export default function CurrentStockDetailPage() {
                   <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">{t("Opening Stock")}</p>
                   <p className="mt-2 text-xl font-bold text-stone-950">{formatQuantity(opening, unit)}</p>
                 </Link>
-                <Link to={`/supplier-management?${dateQuery}`} className={summaryCardClass}>
+                <Link to={`/stock-movements?${dateQuery}&ingredientID=${encodeURIComponent(ingredientID)}&movementType=STOCK_IN`} className={summaryCardClass}>
                   <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">{t("Stock In")}</p>
-                  <p className="mt-2 text-xl font-bold text-emerald-700">+{formatQuantity(summary.stockInTotal, unit)}</p>
+                  <p className="mt-2 text-xl font-bold text-emerald-700">{summary.stockInTotal > 0 ? "+" : ""}{formatQuantity(summary.stockInTotal, unit)}</p>
                 </Link>
-                <Link to={`/stock-movements?${dateQuery}&ingredientID=${encodeURIComponent(ingredientID)}`} className={summaryCardClass}>
+                <Link to={`/stock-movements?${dateQuery}&ingredientID=${encodeURIComponent(ingredientID)}&movementType=STOCK_OUT`} className={summaryCardClass}>
                   <p className="text-xs font-semibold uppercase tracking-wider text-red-700">{t("Stock Out")}</p>
-                  <p className="mt-2 text-xl font-bold text-red-700">-{formatQuantity(summary.stockOutTotal, unit)}</p>
+                  <p className="mt-2 text-xl font-bold text-red-700">{summary.stockOutTotal > 0 ? "-" : ""}{formatQuantity(summary.stockOutTotal, unit)}</p>
                 </Link>
                 <Link to={`/stock-adjustments?${dateQuery}`} className={summaryCardClass}>
                   <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">{t("Adjustments")}</p>
                   <p className={`mt-2 text-xl font-bold ${summary.adjustmentTotal < 0 ? "text-red-700" : "text-emerald-700"}`}>
-                    {summary.adjustmentTotal >= 0 ? "+" : "-"}{formatQuantity(Math.abs(summary.adjustmentTotal), unit)}
+                    {formatQuantity(summary.adjustmentTotal, unit)}
                   </p>
                 </Link>
                 <div className="rounded-lg border border-[var(--color-brand-accent)]/20 bg-[var(--color-brand-cream)] px-4 py-3 shadow-sm">

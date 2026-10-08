@@ -10,6 +10,7 @@ export interface Recipe {
   version: string;
   active: boolean;
   is_base?: boolean;
+  serving_quantity?: string;
   yield_quantity?: string;
   initial_quantity?: string;
   yield_unit?: string;
@@ -22,6 +23,7 @@ export interface RecipePayload {
   version: string;
   active: boolean;
   is_base?: boolean;
+  serving_quantity?: string;
   yield_quantity?: string;
   initial_quantity?: string;
   yield_unit?: string;
@@ -89,6 +91,8 @@ export interface RecipeCost {
  unit_cost: string | null;
  yield_quantity: string;
  yield_unit: string;
+ initial_unit: string;
+ initial_mixed: boolean;
  initial_quantity: string;
  waste_quantity: string | null;
  issues: string[];

@@ -105,7 +105,7 @@ export const setIngredientPriceActive = async (
 export type IngredientPricePayload = Pick<
   IngredientPriceOption,
   "price" | "effective_date" | "notes" | "active"
->;
+> & { price_basis?: "package" | "unit" };
 export const createIngredientPrice = async (
   ingredientID: string,
   payload: IngredientPricePayload,

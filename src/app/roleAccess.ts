@@ -22,6 +22,11 @@ export const userCan = (
   const permission = user?.permissions?.find(
     (item) => item.menu_key === menuKey,
   );
+  const parent = ["inventory_opening_counts", "inventory_closing_counts", "stock_adjustments", "stock_movements"].includes(menuKey) ? user?.permissions?.find((p) => p.menu_key === "inventory_counts") : undefined;
+  if (parent && (menuKey !== "stock_movements" || action === "read")) {
+    const allowed = action === "read" ? parent.can_read || parent.can_create || parent.can_update || parent.can_delete : action === "create" ? parent.can_create : action === "update" ? parent.can_update : parent.can_delete;
+    if (allowed) return true;
+  }
   if (!permission) return false;
   switch (action) {
     case "create":
@@ -43,3 +48,5 @@ export const userCan = (
 export const getHomeRoute = (user: AuthenticatedUser | null) => {
   return user ? "/home" : "/login";
 };
+
+export const userCanStockDepartment = (user: AuthenticatedUser | null, department: string) => userCan(user, `stock_department_${department}`);

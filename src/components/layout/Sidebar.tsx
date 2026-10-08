@@ -25,7 +25,7 @@ import { logout as logoutRequest } from "../../api/auth.api";
 import { useAuth } from "../../app/AuthContext";
 import { invalidateSession } from "../../app/authSession";
 import { useLanguage } from "../../app/LanguageContext";
-import { userCan } from "../../app/roleAccess";
+import { userCanStockDepartment, userCan } from "../../app/roleAccess";
 import Brand from "./Brand";
 
 type SidebarLink = {
@@ -150,7 +150,7 @@ export default function Sidebar({
       icon: Scale,
     });
   if (canReadInventoryCounts || canReadOpeningCounts || canReadClosingCounts) {
-    for (const department of stockCountDepartments) {
+    for (const department of stockCountDepartments.filter((part) => userCanStockDepartment(user, part.key))) {
       const query = new URLSearchParams(stockOpnameContextQuery.replace(/^\?/, ""));
       query.set("department", department.key);
       stockOpnameChildLinks.push({ label: department.label, to: `/stock-count?${query}`, icon: ClipboardCheck });
@@ -158,13 +158,13 @@ export default function Sidebar({
   }
   if (canReadCategories)
     inventoryMenuLinks.push({
-      label: t("Menu Items"),
+      label: "HPP",
       to: "/category-management",
       icon: FolderTree,
     });
   if (canReadProducts && !canReadCategories)
     inventoryMenuLinks.push({
-      label: t("Menu Items"),
+      label: "HPP",
       to: "/menu-items",
       icon: CupSoda,
     });
@@ -182,7 +182,7 @@ export default function Sidebar({
       (link) => link.to.split("?")[0] !== "/stock-count",
     );
   const filteredStockOpnameChildLinks = stockOpnameChildLinks.filter((link) => matchesMenu(link.label, `${t("Inventory")} ${t("Stock Count")}`));
-  const filteredInventoryMenuLinks = inventoryMenuLinks.filter((link) => matchesMenu(link.label, t("Menu")));
+  const filteredInventoryMenuLinks = inventoryMenuLinks.filter((link) => matchesMenu(link.label, t("Costing")));
   const showStockOpnameGroup =
     filteredInventoryOperationLinks.length > 0 ||
     filteredStockOpnameChildLinks.length > 0;
@@ -373,7 +373,7 @@ export default function Sidebar({
                 <div className="pt-5">
                   <div className="mb-3 flex items-center gap-3 px-3">
                     <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-[var(--color-brand-sage)]/65">
-                      {t("Menu")}
+                      {t("Costing")}
                     </span>
                     <span className="h-px flex-1 bg-white/10" />
                   </div>

@@ -165,7 +165,7 @@ export default function IngredientDetailPage() {
               onSubmit={(event) => {
                 event.preventDefault();
                 if (
-                  !/^[0-9]{1,16}(\.[0-9]{1,2})?$/.test(editor.data.price) ||
+                  !(editor.data.price_basis === "unit" ? /^[0-9]{1,16}(\.[0-9]{1,6})?$/ : /^[0-9]{1,16}(\.[0-9]{1,2})?$/).test(editor.data.price) ||
                   !editor.data.effective_date
                 ) {
                   setError(t("Enter a valid price and date"));
@@ -191,8 +191,18 @@ export default function IngredientDetailPage() {
                 )}
               </h2>
               <fieldset disabled={saving} className="grid gap-4 sm:grid-cols-2">
+                <label className="text-sm sm:col-span-2">
+                  Dasar harga
+                  <select value={editor.data.price_basis || "package"}
+                    onChange={(event) => setEditor({ ...editor, data: { ...editor.data, price: "", price_basis: event.target.value as "package" | "unit" } })}
+                    className="mt-1 block w-full rounded-lg border border-stone-300 p-2">
+                    <option value="package">Harga per kemasan</option>
+                    <option value="unit">Harga per satuan isi ({prices.find((p) => p.price_option_id === editor.id)?.price_content_unit || activePrice?.price_content_unit || "satuan isi item"})</option>
+                  </select>
+                  <p className="mt-2 text-xs text-stone-500">Untuk Ice Rp1 per GR, pilih harga per satuan isi lalu masukkan 1. Harga kemasan dihitung dari jumlah isi item.</p>
+                </label>
                 <label className="text-sm">
-                  {t("Price")} (Rp)
+                  {editor.data.price_basis === "unit" ? "Harga satuan" : "Harga kemasan"} (Rp)
                   <input
                     autoFocus
                     required
@@ -282,6 +292,7 @@ export default function IngredientDetailPage() {
             <p className="mt-2 text-2xl font-bold text-[var(--color-brand-primary)]">
               {activePrice ? `Rp ${formatNumber(activePrice.price, 2)}` : "—"}
             </p>
+            {activePrice && <p className="mt-2 font-semibold">Rp {formatNumber(activePrice.unit_price, 6)} / {activePrice.price_content_unit}</p>}
             <p className="mt-2 text-xs text-stone-500">
               {t(
                 "Price per packaging unit. Used as the default for new supplier shopping records.",
@@ -339,7 +350,7 @@ export default function IngredientDetailPage() {
                       Rp {formatNumber(price.price, 2)}
                     </td>
                     <td className="whitespace-nowrap px-5 py-4 font-semibold">
-                      Rp {formatNumber(price.unit_price, 2)}
+                      Rp {formatNumber(price.unit_price, 6)}
                       {price.price_content_unit && (
                         <span className="ml-1 text-xs font-normal text-stone-500">/ {price.price_content_unit}</span>
                       )}
