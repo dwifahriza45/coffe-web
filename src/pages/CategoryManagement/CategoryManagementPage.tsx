@@ -1,7 +1,6 @@
-import { LayoutGrid, List, FolderTree, Pencil, Plus, Power, Search, Trash2, X } from "lucide-react";
+import { FolderTree, Pencil, Plus, Power, Search, Trash2, X } from "lucide-react";
 import { isAxiosError } from "axios";
 import { useEffect, useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
 import {
   createCategory,
   deleteCategory,
@@ -29,8 +28,6 @@ export default function CategoryManagementPage() {
   const { user } = useAuth();
   const { t } = useLanguage();
   const canWriteMenuCategories = ["create", "update", "delete"].some((action) => userCan(user, "categories", action as "create" | "update" | "delete"));
-  const navigate = useNavigate();
-  const [view, setView] = useState<"grid" | "table">("grid");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoryUsage, setCategoryUsage] = useState<Record<string, boolean>>({});
@@ -223,11 +220,10 @@ export default function CategoryManagementPage() {
               <div className="mb-3 flex size-11 items-center justify-center rounded-xl bg-[var(--color-brand-soft)] text-[var(--color-brand-hover)]">
                 <FolderTree size={22} />
               </div>
-              <h1 className="font-serif text-3xl font-bold">{"HPP"}</h1>
-              <p className="mt-2 text-sm text-stone-500">{"Kelola resep, base racikan, dan hitung HPP menu berdasarkan kategori."}</p>
+              <h1 className="font-serif text-3xl font-bold">{"Kategori Menu"}</h1>
+              <p className="mt-2 text-sm text-stone-500">{"Kelola kategori untuk mengelompokkan menu."}</p>
             </div>
             <div className="flex flex-wrap items-center gap-3">
-              <div role="group" aria-label="Tampilan" className="inline-flex shrink-0 gap-1 rounded-full border border-[var(--color-brand-sage)] bg-[var(--color-brand-cream)] p-1">{(["grid", "table"] as const).map((mode) => { const Icon = mode === "grid" ? LayoutGrid : List; return <button key={mode} type="button" aria-pressed={view === mode} onClick={() => setView(mode)} className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ${view === mode ? "bg-[var(--color-brand-primary)] text-white" : "text-[var(--color-brand-primary)] hover:bg-[var(--color-brand-sage)]"}`}><Icon size={14} />{mode === "grid" ? "Grid" : "Table"}</button>; })}</div>
             {userCan(user, "categories", "create") && <button type="button" onClick={() => openModal()} className="flex items-center gap-2 rounded-lg bg-[var(--color-brand-primary)] px-5 py-3 text-sm font-semibold text-white">
               <Plus size={17} />
               {t("Add category")}
@@ -255,7 +251,7 @@ export default function CategoryManagementPage() {
               </form>
             </div>
             {error && <div className="m-4 rounded-lg bg-red-50 p-4 text-sm text-red-700">{error}</div>}
-            {view === "table" ? <div className="overflow-x-auto">
+            <div className="overflow-x-auto">
               <table className="w-full min-w-170 text-left">
                 <thead className="bg-stone-50 text-xs uppercase tracking-wider text-stone-500">
                   <tr>
@@ -275,9 +271,9 @@ export default function CategoryManagementPage() {
                     categories.map((category) => {
                       const inUse = Boolean(categoryUsage[category.category_id]);
                       return (
-                      <tr key={category.category_id} onClick={() => navigate(`/category-management/${category.category_id}`)} className="group cursor-pointer hover:bg-stone-50/70">
+                      <tr key={category.category_id} className="hover:bg-stone-50/70">
                         <td className="px-5 py-4">
-                          <p className="inline-flex text-sm font-semibold transition-colors group-hover:text-[var(--color-brand-accent)] group-hover:underline group-hover:underline-offset-4">{category.name}</p>
+                          <p className="text-sm font-semibold">{category.name}</p>
                         </td>
                         <td className="px-5 py-4 text-sm text-stone-600">{category.description || "-"}</td>
                         <td className="px-5 py-4">
@@ -304,13 +300,7 @@ export default function CategoryManagementPage() {
                   )}
                 </tbody>
               </table>
-            </div> : loading ? <p className="p-14 text-center text-sm text-stone-500">{t("Loading...")}</p> : categories.length === 0 ? <p className="p-14 text-center text-sm text-stone-500">{t("No categorys found")}</p> : <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 min-[1800px]:grid-cols-6">{categories.map((category) => { const inUse = Boolean(categoryUsage[category.category_id]); return <article key={category.category_id} className="flex min-w-0 flex-col overflow-hidden rounded-2xl border border-[var(--color-brand-sage)] bg-[var(--color-brand-surface)] transition hover:border-[var(--color-brand-primary)] hover:bg-[var(--color-brand-soft)]"><button type="button" onClick={() => navigate(`/category-management/${category.category_id}`)} className="flex flex-1 flex-col p-5 text-left focus-visible:outline-2 focus-visible:outline-[var(--color-brand-primary)]"><div className="flex items-center justify-between gap-2"><span className="grid size-10 place-items-center rounded-full bg-[var(--color-brand-sage)] text-[var(--color-brand-primary)]"><FolderTree size={20} /></span><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${category.active ? "bg-green-50 text-green-700" : "bg-stone-100 text-stone-500"}`}>{category.active ? t("Active") : t("Inactive")}</span></div><h3 className="mt-4 break-words text-lg font-bold text-[var(--color-brand-primary)]">{category.name}</h3><p className="mt-2 line-clamp-2 text-sm text-stone-500">{category.description || "—"}</p><div className="mt-auto flex flex-wrap items-center justify-between gap-2 pt-4"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${inUse ? "bg-amber-50 text-amber-700" : "bg-stone-100 text-stone-500"}`}>{inUse ? t("Used") : t("Unused")}</span><span className="font-bold text-[var(--color-brand-primary)]"></span></div></button>{canWriteMenuCategories && <div className="border-t border-stone-200 p-3">
-                          <div className="flex justify-end gap-1.5">
-                            {userCan(user, "categories", "update") && <button type="button" onClick={(event) => { event.stopPropagation(); openModal(category); }} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800" title={t("Update category")}><Pencil size={15} /></button>}
-                            {userCan(user, "categories", "update") && <button type="button" onClick={(event) => { event.stopPropagation(); requestToggleActive(category); }} disabled={category.active && inUse} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent" title={category.active && inUse ? t("Category is used by products") : category.active ? t("Deactivate category") : t("Activate category")}><Power size={15} /></button>}
-                            {userCan(user, "categories", "delete") && <button type="button" onClick={(event) => { event.stopPropagation(); requestDelete(category); }} disabled={inUse} className="grid size-8 place-items-center rounded-lg text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent" title={inUse ? t("Category is used by products") : t("Delete category")}><Trash2 size={15} /></button>}
-                          </div>
-                        </div>}</article>; })}</div>}
+            </div>
             <footer className="flex items-center justify-between border-t border-stone-200 px-5 py-4">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                 <p className="text-xs text-stone-500">{t("Page")} {page} {t("of")} {totalPages}</p>

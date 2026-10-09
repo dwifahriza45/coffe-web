@@ -1,11 +1,15 @@
-import { Bell, LogOut, Menu, UserRound, X } from "lucide-react";
+import { Link, useLocation } from "react-router-dom";
+import { userCan } from "../../app/roleAccess";
+import { Bell, LogOut, Menu, UserRound, X, ShoppingBag, LayoutDashboard } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { logout as logoutRequest } from "../../api/auth.api";
 import { useAuth } from "../../app/AuthContext";
 import { invalidateSession } from "../../app/authSession";
 import { useLanguage } from "../../app/LanguageContext";
 
-export default function Navbar({ onMenuClick }: { onMenuClick: () => void }) {
+export default function Navbar({ onMenuClick, orderMode = false }: { onMenuClick?: () => void; orderMode?: boolean }) {
+  const location=useLocation();
+  const inOrder=orderMode||(location.pathname === "/order" || location.pathname.startsWith("/order/"));
   const { user, setUser } = useAuth();
   const { t } = useLanguage();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -52,16 +56,17 @@ export default function Navbar({ onMenuClick }: { onMenuClick: () => void }) {
     <>
       <header className="relative z-30 h-19 border-b border-stone-200 bg-white px-4 sm:px-6 lg:px-8">
         <div className="flex h-full min-w-0 items-center justify-between gap-3">
-          <button
+          {!inOrder&&<button
             type="button"
             aria-label={t("Open navigation")}
             className="grid size-10 shrink-0 place-items-center rounded-xl border border-stone-200 bg-white lg:hidden"
             onClick={onMenuClick}
           >
             <Menu size={20} />
-          </button>
-          <div className="hidden lg:block" />
+          </button>}
+          {inOrder?<Link to="/order" className="flex items-center gap-2 text-lg font-bold text-[var(--color-brand-primary)]"><ShoppingBag size={21}/>Order</Link>:<div className="hidden lg:block" />}
           <div className="flex shrink-0 items-center gap-3">
+            {(inOrder||userCan(user,"orders"))&&<Link to={inOrder?"/home":"/order"} title={inOrder?"Ke Admin":"Ke Order"} aria-label={inOrder?"Ke halaman Admin":"Ke halaman Order"} className="grid size-10 shrink-0 place-items-center rounded-xl border border-stone-200 bg-white text-[var(--color-brand-primary)] outline-none transition hover:border-[var(--color-brand-sage)] hover:bg-[var(--color-brand-soft)] focus:ring-4 focus:ring-[var(--color-brand-accent)]/10">{inOrder?<LayoutDashboard size={19}/>:<ShoppingBag size={19}/>}</Link>}
             <button
               type="button"
               aria-label={t("Notifications")}

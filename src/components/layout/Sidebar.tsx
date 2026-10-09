@@ -70,6 +70,7 @@ export default function Sidebar({
   const canReadProducts = userCan(user, "products");
   const links: SidebarLink[] = [];
   const hrisLinks: SidebarLink[] = [];
+  const operationalMenuLinks: SidebarLink[] = [];
   const inventoryMasterLinks: SidebarLink[] = [];
   const inventoryOperationLinks: SidebarLink[] = [];
   const stockOpnameChildLinks: SidebarLink[] = [];
@@ -137,6 +138,7 @@ export default function Sidebar({
       to: `/stock-count${stockOpnameContextQuery}`,
       icon: ClipboardCheck,
     });
+  if (userCan(user, "menu_items")) operationalMenuLinks.push({ label: "Resep Item", to: "/operational-menu", icon: CupSoda });
   if (canReadCurrentStock)
     inventoryOperationLinks.push({
       label: t("Current Stock"),
@@ -149,6 +151,7 @@ export default function Sidebar({
       to: "/reconciliation",
       icon: Scale,
     });
+  if (userCan(user, "orders")) inventoryOperationLinks.push({ label: "Riwayat Pesanan", to: "/order-history", icon: ClipboardList });
   if (canReadInventoryCounts || canReadOpeningCounts || canReadClosingCounts) {
     for (const department of stockCountDepartments.filter((part) => userCanStockDepartment(user, part.key))) {
       const query = new URLSearchParams(stockOpnameContextQuery.replace(/^\?/, ""));
@@ -156,18 +159,9 @@ export default function Sidebar({
       stockOpnameChildLinks.push({ label: department.label, to: `/stock-count?${query}`, icon: ClipboardCheck });
     }
   }
-  if (canReadCategories)
-    inventoryMenuLinks.push({
-      label: "HPP",
-      to: "/category-management",
-      icon: FolderTree,
-    });
-  if (canReadProducts && !canReadCategories)
-    inventoryMenuLinks.push({
-      label: "HPP",
-      to: "/menu-items",
-      icon: CupSoda,
-    });
+  if (canReadCategories) inventoryMasterLinks.push({label: "Kategori Menu", to: "/category-management", icon: FolderTree});
+  if (canReadProducts) inventoryMenuLinks.push({label: "HPP", to: "/menu-items", icon: CupSoda});
+  if (userCan(user, "selling_price_hpp")) inventoryMenuLinks.push({label: "HPP Harga Penjualan", to: "/selling-price-hpp", icon: Scale});
   const searchTerms = menuSearch.trim().toLowerCase().split(/\s+/).filter(Boolean);
   function matchesMenu(label: string, group: string) {
     const text = `${group} ${label}`.toLowerCase();
@@ -175,6 +169,7 @@ export default function Sidebar({
   }
   const filteredLinks = links.filter((link) => matchesMenu(link.label, ""));
   const filteredHrisLinks = hrisLinks.filter((link) => matchesMenu(link.label, "HRIS"));
+  const filteredOperationalMenuLinks = operationalMenuLinks.filter((link) => matchesMenu(link.label, "MENU"));
   const filteredInventoryMasterLinks = inventoryMasterLinks.filter((link) => matchesMenu(link.label, t("Master Data")));
   const filteredInventoryOperationLinks = inventoryOperationLinks.filter((link) => matchesMenu(link.label, t("Inventory")));
   const filteredStandaloneInventoryOperationLinks =
@@ -189,8 +184,8 @@ export default function Sidebar({
   const stockOpnameLink = filteredInventoryOperationLinks.find(
     (link) => link.to.split("?")[0] === "/stock-count",
   );
-  const hasMenus = [links, hrisLinks, inventoryMasterLinks, inventoryOperationLinks, stockOpnameChildLinks, inventoryMenuLinks].some((group) => group.length > 0);
-  const resultCount = [filteredLinks, filteredHrisLinks, filteredInventoryMasterLinks, filteredInventoryOperationLinks, filteredStockOpnameChildLinks, filteredInventoryMenuLinks].reduce((total, group) => total + group.length, 0);
+  const hasMenus = [links, hrisLinks, operationalMenuLinks, inventoryMasterLinks, inventoryOperationLinks, stockOpnameChildLinks, inventoryMenuLinks].some((group) => group.length > 0);
+  const resultCount = [filteredLinks, filteredHrisLinks, filteredOperationalMenuLinks, filteredInventoryMasterLinks, filteredInventoryOperationLinks, filteredStockOpnameChildLinks, filteredInventoryMenuLinks].reduce((total, group) => total + group.length, 0);
   const StockOpnameIcon = stockOpnameLink?.icon;
 
   useLayoutEffect(() => {
@@ -287,7 +282,7 @@ export default function Sidebar({
               {label}
             </NavLink>
           ))}
-          {(filteredInventoryMasterLinks.length > 0 || showStockOpnameGroup || filteredInventoryMenuLinks.length > 0) && (
+          {(filteredOperationalMenuLinks.length > 0 || filteredInventoryMasterLinks.length > 0 || showStockOpnameGroup || filteredInventoryMenuLinks.length > 0) && (
             <div className="pt-5">
               {showStockOpnameGroup && (
                 <div>
@@ -397,6 +392,21 @@ export default function Sidebar({
                   </div>
                 </div>
               )}
+              {filteredOperationalMenuLinks.length > 0 && (
+                <div className="pt-5">
+                  <div className="mb-3 flex items-center gap-3 px-3">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-[var(--color-brand-sage)]/65">MENU</span>
+                    <span className="h-px flex-1 bg-white/10" />
+                  </div>
+                  <div className="space-y-2">
+                    {filteredOperationalMenuLinks.map(({label,to,icon:Icon})=>(
+                      <NavLink key={to} to={to} onClick={()=>{rememberScroll();onClose()}} className={({isActive})=>`flex items-center gap-3 rounded-lg p-3 text-sm ${isActive?"bg-[var(--color-brand-hover)] text-[var(--color-brand-sage)]":"text-[var(--color-brand-cream)] hover:bg-white/5"}`}>
+                        <Icon size={18}/>{label}
+                      </NavLink>
+                    ))}
+                  </div>
+                </div>
+              )}
               {filteredInventoryMasterLinks.length > 0 && (
                 <div className="pt-5">
                   <div className="mb-3 flex items-center gap-3 px-3">
@@ -465,6 +475,7 @@ export default function Sidebar({
         </nav>
         {links.length === 0 &&
           hrisLinks.length === 0 &&
+          operationalMenuLinks.length === 0 &&
           inventoryMasterLinks.length === 0 &&
           inventoryOperationLinks.length === 0 &&
           stockOpnameChildLinks.length === 0 &&

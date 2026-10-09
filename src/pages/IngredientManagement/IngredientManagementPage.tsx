@@ -1,3 +1,4 @@
+import { currentBusinessDate } from "../../utils/businessDate";
 import InventoryCategoryFilters from "../../components/common/InventoryCategoryFilters";
 import ImportResults, { type ImportResultRow } from "../../components/common/ImportResults";
 import { addWorkbookDropdowns, downloadWorkbookFile } from "../../utils/workbookDropdown";
@@ -20,8 +21,11 @@ import { isAxiosError } from "axios";
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import {
   createIngredient,
+  importIngredientPrice,
   deleteIngredient,
   getIngredients,
+  getActiveIngredientPrices,
+  type ActiveIngredientPrice,
   getInventoryCategoryCounts,
   updateIngredient,
   type Ingredient,
@@ -60,6 +64,7 @@ export default function IngredientManagementPage() {
   const canDeleteIngredients = userCan(user, "ingredients", "delete");
   const showActions = canUpdateIngredients || canDeleteIngredients;
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [activePrices, setActivePrices] = useState<Record<string, ActiveIngredientPrice>>({});
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [categoryIngredients, setCategoryIngredients] = useState<
     CategoryIngredient[]
@@ -131,6 +136,9 @@ export default function IngredientManagementPage() {
         });
         if (!current) return;
         const nextIngredients = response.data ?? [];
+        const priceResponse = await getActiveIngredientPrices(nextIngredients.map((item) => item.ingredient_id));
+        if (!current) return;
+        setActivePrices(Object.fromEntries((priceResponse.data || []).map((item) => [item.ingredient_id, item])));
         setIngredients(nextIngredients);
         setTotal(response.total ?? 0);
       } catch (requestError) {
@@ -139,6 +147,7 @@ export default function IngredientManagementPage() {
           ? requestError.response?.data
           : undefined;
         setIngredients([]);
+        setActivePrices({});
         setError(response?.message || t("Could not load ingredients."));
       } finally {
         if (current) setLoading(false);
@@ -455,6 +464,12 @@ export default function IngredientManagementPage() {
         exportTotal = response.total ?? items.length;
       } while (items.length < exportTotal);
 
+      const priceMap: Record<string, ActiveIngredientPrice> = {};
+      for (let start = 0; start < items.length; start += 100) {
+        const response = await getActiveIngredientPrices(items.slice(start, start + 100).map((item) => item.ingredient_id));
+        for (const price of response.data || []) priceMap[price.ingredient_id] = price;
+      }
+
       async function allOptions<T>(load: (start: number) => Promise<{ data?: T[] | null; total?: number }>) {
         const options: T[] = [];
         for (;;) {
@@ -470,10 +485,12 @@ export default function IngredientManagementPage() {
         allOptions((start) => getUnits({ start, limit: 100, name: "" })),
       ]);
       const subs = subResponse.data ?? [];
-      const labels = ["Ingredient", "Ingredient Category", "Ingredient subcategory", "Brand / Type", "Supplier", "Package quantity", "Packaging unit", "Content quantity", "Content unit", "Min stock", "Target stock"];
+      const labels = ["Ingredient", "Harga aktif (Rp)", "Harga satuan (Rp)", "Ingredient Category", "Ingredient subcategory", "Brand / Type", "Supplier", "Package quantity", "Packaging unit", "Content quantity", "Content unit", "Min stock", "Target stock"];
       const headers = labels.map((label) => t(label).toUpperCase());
       const rows = items.map((item) => [
         item.name,
+        priceMap[item.ingredient_id] ? Number(priceMap[item.ingredient_id].price) : null,
+        priceMap[item.ingredient_id] ? Number(priceMap[item.ingredient_id].unit_price) : null,
         categories.find((category) => category.category_ingredient_id === item.category_ingredient_id)?.name ?? item.category_ingredient_name ?? item.category_ingredient_id,
         subs.find((subcategory) => subcategory.subcategory_ingredient_id === item.subcategory_ingredient_id)?.name ?? item.subcategory_ingredient_id,
         brands.find((brand) => brand.brand_type_id === item.brand_type_id)?.name ?? item.brand_type_id,
@@ -485,18 +502,29 @@ export default function IngredientManagementPage() {
         Number(item.minimum_stock),
         Number(item.target_stock || 0),
       ]);
-      const sheet = createExportWorksheet(headers, rows, [30, 25, 25, 25, 30, 18, 22, 18, 18, 16, 16]);
+      const sheet = createExportWorksheet(headers, rows, [30, 22, 24, 25, 25, 25, 30, 18, 22, 18, 18, 16, 16]);
+      for (let index = 0; index < items.length; index++) {
+        const price = priceMap[items[index].ingredient_id];
+        for (const col of [1, 2]) {
+          const cell = sheet[XLSX.utils.encode_cell({r: index + 1, c: col})];
+          if (cell?.t === "n") { cell.z = "#,##0"; cell.s = {...cell.s, alignment: {horizontal: "right", vertical: "center"}}; }
+          if (col === 2 && cell?.t === "n" && price) {
+            const unit = price.price_content_unit.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+            cell.z = unit ? `#,##0" / ${unit}"` : "#,##0";
+          }
+        }
+      }
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, sheet, t("Ingredients"));
       const activeCategories = categories.filter((item) => item.active);
       const activeSubs = subs.filter((item) => item.active && activeCategories.some((category) => category.category_ingredient_id === item.category_ingredient_id));
       const bytes = addWorkbookDropdowns(workbook, [
-        { column: "B", name: "IngredientCategories", options: activeCategories.map((item) => item.name) },
-        { column: "C", name: "IngredientSubcategories", options: activeSubs.map((item) => item.name) },
-        { column: "D", name: "IngredientBrands", options: brands.filter((item) => item.active && activeCategories.some((category) => category.category_ingredient_id === item.category_ingredient_id) && (!item.subcategory_ingredient_id || activeSubs.some((sub) => sub.subcategory_ingredient_id === item.subcategory_ingredient_id))).map((item) => item.name) },
-        { column: "E", name: "IngredientSuppliers", options: supplierItems.filter((item) => item.active).map((item) => item.name) },
-        { column: "G", name: "IngredientPackagings", options: packagingItems.filter((item) => item.active).map((item) => item.name) },
-        { column: "I", name: "IngredientUnits", options: units.filter((item) => item.active).map((item) => item.code) },
+        { column: "D", name: "IngredientCategories", options: activeCategories.map((item) => item.name) },
+        { column: "E", name: "IngredientSubcategories", options: activeSubs.map((item) => item.name) },
+        { column: "F", name: "IngredientBrands", options: brands.filter((item) => item.active && activeCategories.some((category) => category.category_ingredient_id === item.category_ingredient_id) && (!item.subcategory_ingredient_id || activeSubs.some((sub) => sub.subcategory_ingredient_id === item.subcategory_ingredient_id))).map((item) => item.name) },
+        { column: "G", name: "IngredientSuppliers", options: supplierItems.filter((item) => item.active).map((item) => item.name) },
+        { column: "I", name: "IngredientPackagings", options: packagingItems.filter((item) => item.active).map((item) => item.name) },
+        { column: "K", name: "IngredientUnits", options: units.filter((item) => item.active).map((item) => item.code) },
       ]);
       downloadWorkbookFile(bytes, "bahan.xlsx");
     } catch (requestError) {
@@ -532,6 +560,7 @@ export default function IngredientManagementPage() {
         }[label] ?? [])].includes(cell),
       ));
       const findColumn = (label: string, aliases: string[]) => header.findIndex((cell) => [label.toLowerCase(), t(label).toLowerCase(), ...aliases].includes(cell));
+      const activePriceColumn = findColumn("Harga aktif (Rp)", ["harga aktif", "active price (rp)", "active price"]);
       const targetStockColumn = findColumn("Target stock", ["target stok", "target stock", "stok target"]);
       const packageQtyColumn = findColumn("Package quantity", ["jumlah kemasan"]);
       const contentQtyColumn = findColumn("Content quantity", ["jumlah isi"]);
@@ -570,6 +599,14 @@ export default function IngredientManagementPage() {
         const [name, categoryName, subcategoryName, brandName, supplierName, packageValue, contentValue, stockValue] = cells;
         const entry = { row: index + 2, name };
         try {
+          let importedPrice:string|null=null;
+          if(activePriceColumn>=0&&String(row[activePriceColumn]??"").trim()!==""){
+            const raw=row[activePriceColumn];
+            const value=typeof raw==="number"?raw:Number(String(raw).replace(/Rp\s*/gi,"").replace(/\s/g,"").replace(/\.(?=\d{3}(?:\D|$))/g,"").replace(",","."));
+            if(!Number.isFinite(value)||value<0||Math.abs(value*100-Math.round(value*100))>0.00001)throw new Error("Harga aktif harus angka positif, maksimal 2 desimal.");
+            if(!canUpdateIngredients)throw new Error("Permission Update Inventory diperlukan untuk import harga.");
+            importedPrice=value.toFixed(2);
+          }
           if (!name) throw new Error("Name is required");
           const category = resolveImportOption(categories.filter((item) => item.active), categoryName, (item) => item.name);
           const categorySubs = subs.filter((item) => item.active && item.category_ingredient_id === category.category_ingredient_id);
@@ -600,18 +637,22 @@ export default function IngredientManagementPage() {
             content_qty: content.quantity, content_unit_id: unit.unit_id,
             minimum_stock: stock, ...(target === undefined ? {} : { target_stock: target }), active: existing?.active ?? true,
           };
-          if (existing && !ingredientImportChanged(existing, payload)) {
-            details.push({ ...entry, status: "skipped", reason: t("No changes") });
-            continue;
+          const dataChanged=!existing||ingredientImportChanged(existing,payload);
+          let ingredientID=existing?.ingredient_id||"";
+          if(existing&&dataChanged){
+            if(!canUpdateIngredients)throw new Error("You do not have permission to update ingredients");
+            await updateIngredient(existing.ingredient_id,payload);
+          }else if(!existing){
+            if(!canCreateIngredients)throw new Error("You do not have permission to create ingredients");
+            const created=await createIngredient(payload);ingredientID=created.data?.ingredient_id||"";
+            if(!ingredientID)throw new Error("ID bahan baru tidak diterima");
           }
-          if (existing) {
-            if (!canUpdateIngredients) throw new Error("You do not have permission to update ingredients");
-            await updateIngredient(existing.ingredient_id, payload);
-          } else {
-            if (!canCreateIngredients) throw new Error("You do not have permission to create ingredients");
-            await createIngredient(payload);
+          let priceChanged=false;
+          if(importedPrice!==null){
+            try{const result=await importIngredientPrice(ingredientID,importedPrice,currentBusinessDate());priceChanged=!!result.data?.changed;}
+            catch(error){throw new Error(`${dataChanged?"Data bahan sudah tersimpan; ":""}gagal menyimpan harga. ${isAxiosError<{message?:string}>(error)?error.response?.data?.message||"Coba import ulang.":"Coba import ulang."}`)}
           }
-          details.push({ ...entry, status: "success", reason: t(existing ? "Ingredient updated successfully" : "Imported successfully") });
+          details.push({...entry,status:dataChanged||priceChanged?"success":"skipped",reason:priceChanged?"Harga import aktif; harga sebelumnya nonaktif":dataChanged?t(existing?"Ingredient updated successfully":"Imported successfully"):t("No changes")});
         } catch (requestError) {
           const message = isAxiosError<{ message?: string }>(requestError)
             ? requestError.response?.data?.message
@@ -631,7 +672,7 @@ export default function IngredientManagementPage() {
   }
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const columnCount = showActions ? 14 : 13;
+  const columnCount = showActions ? 16 : 15;
 
   return (
     <div className="flex min-h-screen bg-[var(--color-brand-cream)]">
@@ -730,6 +771,8 @@ export default function IngredientManagementPage() {
               headers={<>
 
                     <th className="px-5 py-3">{t("Item")}</th>
+                    <th className="px-5 py-3 text-right">Harga aktif</th>
+                    <th className="px-5 py-3 text-right">Harga satuan</th>
                     <th className="px-5 py-3">{t("Ingredient Category")}</th>
                     <th className="px-5 py-3">{t("Ingredient subcategory")}</th>
                     <th className="px-5 py-3">{t("Brand / Type")}</th>
@@ -778,6 +821,8 @@ export default function IngredientManagementPage() {
                               {ingredient.name}
                             </Link>
                           </td>
+                          <td className="whitespace-nowrap px-5 py-4 text-right text-sm font-semibold">{activePrices[ingredient.ingredient_id] ? `Rp ${formatNumber(activePrices[ingredient.ingredient_id].price, 0)}` : "—"}</td>
+                          <td className="whitespace-nowrap px-5 py-4 text-right text-sm">{activePrices[ingredient.ingredient_id] ? `Rp ${formatNumber(activePrices[ingredient.ingredient_id].unit_price, 0)} / ${activePrices[ingredient.ingredient_id].price_content_unit}` : "—"}</td>
                           <td className="px-5 py-4 text-sm">
                             {categoryIngredients.find(
                               (item) =>

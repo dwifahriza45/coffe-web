@@ -141,3 +141,8 @@ export const getInventoryCategoryCounts = async (payload: { name: string; suppli
 
 export interface StockItemMetadata { ingredient_id: string; brand: string; subcategory: string; supplier: string; packaging: string; content_unit: string; unit_price: string | null }
 export const getStockItemMetadata = async () => (await api.get<ApiResponse<StockItemMetadata[]>>("/ingredients/stock-metadata")).data;
+
+export interface ActiveIngredientPrice { ingredient_id: string; price: string; unit_price: string; price_content_unit: string }
+export const getActiveIngredientPrices = async (ingredientIDs: string[]) => (await api.post<ApiResponse<ActiveIngredientPrice[]>>("/ingredients/active-prices", {ingredient_ids: ingredientIDs})).data;
+
+export const importIngredientPrice = async (id:string,price:string,effective_date:string) => (await api.post<ApiResponse<{changed:boolean}>>(`/ingredients/${encodeURIComponent(id)}/prices/import`,{price,effective_date,notes:"Import inventory",active:true,price_basis:"package"})).data;

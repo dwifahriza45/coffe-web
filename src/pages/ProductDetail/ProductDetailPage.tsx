@@ -1,7 +1,7 @@
 import { ArrowLeft, BookOpen, ListPlus, Pencil, Plus, Power, Trash2, X } from "lucide-react";
 import { isAxiosError } from "axios";
 import { useEffect, useState, type FormEvent } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { getProduct, type Product } from "../../api/product.api";
 import {
   createRecipeItem,
@@ -45,7 +45,8 @@ export default function ProductDetailPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [product, setProduct] = useState<Product | null>(null);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
-  const [selectedRecipeID, setSelectedRecipeID] = useState("");
+  const [recipeParams]=useSearchParams();
+  const [selectedRecipeID, setSelectedRecipeID] = useState(()=>recipeParams.get("recipe")||"");
   const [items, setItems] = useState<RecipeItem[]>([]);
   const [baseRecipes, setBaseRecipes] = useState<Recipe[]>([]);
   const [ingredients, setIngredients] = useState<RecipeIngredient[]>([]);
@@ -104,7 +105,7 @@ export default function ProductDetailPage() {
         setBaseRecipes(allRecipes.filter(recipe => recipe.is_base && recipe.active));
         setSelectedRecipeID((currentID) => {
           const currentRecipe = nextRecipes.find((recipe) => recipe.recipe_id === currentID);
-          if (currentRecipe?.active) return currentID;
+          if (currentRecipe) return currentID;
           return nextRecipes.find((recipe) => recipe.active && !recipe.is_base)?.recipe_id
             ?? nextRecipes.find((recipe) => !recipe.is_base)?.recipe_id
             ?? nextRecipes.find((recipe) => recipe.active)?.recipe_id
@@ -339,7 +340,7 @@ export default function ProductDetailPage() {
   const backCategoryID = product?.category_id ?? categoryID;
   const hasCategoryContext = Boolean(categoryID);
   const backPath = hasCategoryContext && backCategoryID ? `/category-management/${backCategoryID}` : "/menu-items";
-  const backLabel = hasCategoryContext ? product?.category_info?.name ?? t("Menu Categories") : t("Menu Items");
+  const backLabel = hasCategoryContext ? product?.category_info?.name ?? t("Menu Categories") : "HPP";
   const productRecipes = recipes.filter((recipe) => recipe.product_id === currentProductID);
   const activeRecipes = productRecipes.filter((recipe) => recipe.active);
   const inactiveRecipes = productRecipes.filter((recipe) => !recipe.active);

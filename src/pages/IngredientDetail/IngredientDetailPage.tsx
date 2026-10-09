@@ -290,9 +290,9 @@ export default function IngredientDetailPage() {
           <div className="mt-6 rounded-xl border border-stone-200 bg-white p-5">
             <p className="text-sm text-stone-500">{t("Active price")}</p>
             <p className="mt-2 text-2xl font-bold text-[var(--color-brand-primary)]">
-              {activePrice ? `Rp ${formatNumber(activePrice.price, 2)}` : "—"}
+              {activePrice ? `Rp ${formatNumber(activePrice.price, 0)}` : "—"}
             </p>
-            {activePrice && <p className="mt-2 font-semibold">Rp {formatNumber(activePrice.unit_price, 6)} / {activePrice.price_content_unit}</p>}
+            {activePrice && <p className="mt-2 font-semibold">Rp {formatNumber(activePrice.unit_price, 0)} / {activePrice.price_content_unit}</p>}
             <p className="mt-2 text-xs text-stone-500">
               {t(
                 "Price per packaging unit. Used as the default for new supplier shopping records.",
@@ -347,10 +347,10 @@ export default function IngredientDetailPage() {
                     className="hover:bg-stone-50/70"
                   >
                     <td className="whitespace-nowrap px-5 py-4 font-semibold">
-                      Rp {formatNumber(price.price, 2)}
+                      Rp {formatNumber(price.price, 0)}
                     </td>
                     <td className="whitespace-nowrap px-5 py-4 font-semibold">
-                      Rp {formatNumber(price.unit_price, 6)}
+                      Rp {formatNumber(price.unit_price, 0)}
                       {price.price_content_unit && (
                         <span className="ml-1 text-xs font-normal text-stone-500">/ {price.price_content_unit}</span>
                       )}

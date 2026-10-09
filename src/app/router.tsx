@@ -1,3 +1,7 @@
+import OrderHistoryPage from "../pages/Order/OrderHistoryPage";
+import OrderPage from "../pages/Order/OrderPage";
+import SellingPriceHPPPage from "../pages/SellingPriceHPP/SellingPriceHPPPage";
+import OperationalMenuPage from "../pages/OperationalMenu/OperationalMenuPage";
 import IngredientDetailPage from "../pages/IngredientDetail/IngredientDetailPage";
 import IngredientSubcategoriesPage from "../pages/IngredientSubcategories/IngredientSubcategoriesPage";
 import CategoryIngredientManagementPage from "../pages/CategoryIngredientManagement/CategoryIngredientManagementPage";
@@ -163,7 +167,13 @@ export default function AppRouter() {
         />
         <Route path="/supplier-management/:supplierID" element={<RequireAuth><RequirePermission menuKey="suppliers"><SupplierDetailPage /></RequirePermission></RequireAuth>} />
         <Route path="/supplier-management" element={<RequireAuth><RequirePermission menuKey="suppliers"><SupplierManagementPage /></RequirePermission></RequireAuth>} />
+        <Route path="/order-history" element={<RequireAuth><RequirePermission menuKey="orders"><OrderHistoryPage /></RequirePermission></RequireAuth>} />
+        <Route path="/order" element={<RequireAuth><RequirePermission menuKey="orders"><OrderPage /></RequirePermission></RequireAuth>} />
         <Route path="/purchase-orders" element={<RequireAuth><RequirePermission menuKey="suppliers"><PurchaseOrderPage /></RequirePermission></RequireAuth>} />
+        <Route path="/selling-price-hpp" element={<RequireAuth><RequirePermission menuKey="selling_price_hpp"><SellingPriceHPPPage /></RequirePermission></RequireAuth>} />
+        <Route path="/operational-menu" element={<RequireAuth><RequirePermission menuKey="menu_items"><OperationalMenuPage /></RequirePermission></RequireAuth>} />
+        <Route path="/operational-menu/products/:productID" element={<RequireAuth><RequirePermission menuKey="menu_items"><OperationalMenuPage /></RequirePermission></RequireAuth>} />
+        <Route path="/operational-menu/recipes/:recipeID" element={<RequireAuth><RequirePermission menuKey="menu_items"><OperationalMenuPage /></RequirePermission></RequireAuth>} />
         <Route path="/stock-adjustments" element={<RequireAuth><RequirePermission menuKey="stock_adjustments"><StockAdjustmentPage /></RequirePermission></RequireAuth>} />
         <Route path="/stock-adjustments/:adjustmentID" element={<RequireAuth><RequirePermission menuKey="stock_adjustments"><StockAdjustmentDetailPage /></RequirePermission></RequireAuth>} />
         <Route path="/stock-movements" element={<RequireAuth><RequirePermission menuKey="stock_movements"><StockMovementPage /></RequirePermission></RequireAuth>} />
@@ -234,7 +244,7 @@ export default function AppRouter() {
           path="/menu-items"
           element={
             <RequireAuth>
-              <RequirePermission menuKey="categories">
+              <RequirePermission menuKey="products">
                 <MenuItemsPage />
               </RequirePermission>
             </RequireAuth>

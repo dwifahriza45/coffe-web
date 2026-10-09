@@ -18,7 +18,6 @@ export default function StockCountDepartments({ statuses = {} }: { statuses?: Re
   return <div className="my-5">
     <div className="flex items-center justify-between gap-3">
       <p className="text-sm font-semibold text-stone-700">{t("Stock count section")}</p>
-      <button type="button" onClick={() => select("")} aria-pressed={!active} className="text-xs font-semibold text-[var(--color-brand-accent)] underline">{allowedDepartments.length === 3 ? t("All sections") : "Semua bagian yang diizinkan"}</button>
     </div>
     <div className="mt-3 grid gap-3 sm:grid-cols-3">
       {allowedDepartments.map((department) => <button key={department.key} type="button" aria-pressed={active === department.key} onClick={() => select(department.key)} className={`rounded-xl border p-4 text-left transition ${active === department.key ? "border-[var(--color-brand-primary)] bg-[var(--color-brand-soft)]" : "border-stone-200 bg-white hover:bg-stone-50"}`}>
