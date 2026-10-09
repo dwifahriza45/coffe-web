@@ -1,13 +1,15 @@
+import ConfirmDialog from "../../components/common/ConfirmDialog";
+import CreateMenuModal from "./CreateMenuModal";
 import { getCategories, type Category } from "../../api/category.api";
 import { getRecipes, getRecipeCost, type Recipe } from "../../api/recipe.api";
 import { exportAllRecipeHpp } from "../../utils/recipeHppReport";
 import { useAuth } from "../../app/AuthContext";
 import { userCan } from "../../app/roleAccess";
-import { CupSoda, Search, Download, ChevronDown } from "lucide-react";
+import { CupSoda, Search, Download, ChevronDown, Plus, Trash2 } from "lucide-react";
 import { isAxiosError } from "axios";
 import { Fragment, useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
-import { getProducts, type Product } from "../../api/product.api";
+import { getProducts, deleteProduct, type Product } from "../../api/product.api";
 import Navbar from "../../components/layout/Navbar";
 import Sidebar from "../../components/layout/Sidebar";
 import { useLanguage } from "../../app/LanguageContext";
@@ -18,6 +20,11 @@ const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50];
 export default function MenuItemsPage() {
   const { t } = useLanguage();
   const { user } = useAuth();
+  const [createOpen,setCreateOpen]=useState(false);
+  const [unusedProducts,setUnusedProducts]=useState<Set<string>>(()=>new Set());
+  const [deleteTarget,setDeleteTarget]=useState<Product|null>(null);
+  const [deleting,setDeleting]=useState(false);
+  const [createdMessage,setCreatedMessage]=useState("");
   const [exporting, setExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState("");
   async function handleExportHpp() {
@@ -31,6 +38,7 @@ export default function MenuItemsPage() {
   const [hpp,setHpp]=useState<Record<string,{versions:{recipe:Recipe;value:string|null;note:string}[];note:string}>>({});
   const [expanded,setExpanded]=useState<Set<string>>(()=>new Set());
   const canReadRecipes=userCan(user,"recipes");
+  const canDeleteProducts=userCan(user,"products","delete");
   const [products, setProducts] = useState<Product[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
   const [categoryID,setCategoryID]=useState("");
@@ -59,7 +67,7 @@ export default function MenuItemsPage() {
   useEffect(() => {
     let current = true;
     async function loadProducts() {
-      setLoading(true);setHpp({});setExpanded(new Set());
+      setLoading(true);setUnusedProducts(new Set());setHpp({});setExpanded(new Set());
       setError("");
       try {
         const response = await getProducts({
@@ -74,6 +82,7 @@ export default function MenuItemsPage() {
         setProducts(nextProducts);
         setTotal(response.total ?? 0);
         if(canReadRecipes){
+          const unused=new Set<string>();
           const prices:Record<string,{versions:{recipe:Recipe;value:string|null;note:string}[];note:string}>={};
           let index=0;
           await Promise.all(Array.from({length:Math.min(4,nextProducts.length)},async()=>{
@@ -83,6 +92,7 @@ export default function MenuItemsPage() {
                 const recipes:Recipe[]=[];
                 for(let start=0;current;start+=100){const result=await getRecipes({start,limit:100,name:"",product_id:product.product_id});const rows=result.data||[];recipes.push(...rows);if(rows.length<100)break;}
                 if(!current)return;
+                if(recipes.length===0)unused.add(product.product_id);
                 const menuRecipes=recipes.filter(r=>!r.is_base);
                 const versions:{recipe:Recipe;value:string|null;note:string}[]=[];
                 for(const recipe of menuRecipes){
@@ -94,7 +104,7 @@ export default function MenuItemsPage() {
               }catch{prices[product.product_id]={versions:[],note:"Gagal memuat versi resep"};}
             }
           }));
-          if(current)setHpp(prices);
+          if(current){setHpp(prices);setUnusedProducts(unused);}
         }
 
       } catch (requestError) {
@@ -115,6 +125,13 @@ export default function MenuItemsPage() {
     };
   }, [page, pageSize, search, refreshKey, canReadRecipes, categoryID]);
 
+  async function confirmDelete(){
+    if(!deleteTarget||deleting||!userCan(user,"products","delete"))return;
+    setDeleting(true);setError("");
+    try{await deleteProduct(deleteTarget.product_id);setDeleteTarget(null);setCreatedMessage("Menu berhasil dihapus.");if(products.length===1&&page>1)setPage(value=>value-1);setRefreshKey(value=>value+1)}
+    catch(requestError){setDeleteTarget(null);setError(isAxiosError<{message?:string}>(requestError)?requestError.response?.data?.message||"Gagal menghapus menu.":"Gagal menghapus menu.")}
+    finally{setDeleting(false)}
+  }
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   return (
@@ -131,9 +148,10 @@ export default function MenuItemsPage() {
               <h1 className="font-serif text-3xl font-bold">HPP</h1>
               <p className="mt-2 text-sm text-stone-500">Buka menu untuk membandingkan HPP tiap versi resep. Base racikan tersedia di detail.</p>
             </div>
-            <div className="flex flex-wrap gap-3">{userCan(user,"recipes")&&<button type="button" disabled={exporting} onClick={()=>void handleExportHpp()} className="inline-flex items-center gap-2 rounded-lg border bg-white px-4 py-2 text-sm font-semibold disabled:opacity-50"><Download size={17}/>{exporting?`Export HPP ${exportProgress||"…"}`:"Export Semua HPP"}</button>}<button type="button" disabled={loading} onClick={() => setRefreshKey(value => value + 1)} className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">Perbarui menu</button></div>
+            <div className="flex flex-wrap gap-3">{userCan(user,"products","create")&&<button type="button" disabled={loadingCategories||!!categoryError} onClick={()=>{setCreatedMessage("");setCreateOpen(true)}} className="inline-flex items-center gap-2 rounded-lg bg-[var(--color-brand-primary)] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"><Plus size={17}/>Tambah menu</button>}{userCan(user,"recipes")&&<button type="button" disabled={exporting} onClick={()=>void handleExportHpp()} className="inline-flex items-center gap-2 rounded-lg border bg-white px-4 py-2 text-sm font-semibold disabled:opacity-50"><Download size={17}/>{exporting?`Export HPP ${exportProgress||"…"}`:"Export Semua HPP"}</button>}<button type="button" disabled={loading} onClick={() => setRefreshKey(value => value + 1)} className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">Perbarui menu</button></div>
           </header>
 
+          {createdMessage&&<p role="status" className="mt-5 rounded-xl bg-green-50 p-4 text-sm text-green-800">{createdMessage}</p>}
           <section className="mt-7 overflow-hidden rounded-xl border border-stone-200 bg-white">
             <div className="flex flex-col gap-4 border-b border-stone-200 p-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -171,13 +189,14 @@ export default function MenuItemsPage() {
                     <th className="px-5 py-3">{t("Category")}</th>
                     <th className="px-5 py-3">HPP satu porsi</th>
                     <th className="px-5 py-3">{t("Status")}</th>
+                    {canDeleteProducts&&<th className="w-20 px-5 py-3 text-right">Aksi</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-100">
                   {loading ? (
-                    <tr><td colSpan={4} className="px-5 py-14 text-center text-sm text-stone-500">{t("Loading menu items...")}</td></tr>
+                    <tr><td colSpan={canDeleteProducts?5:4} className="px-5 py-14 text-center text-sm text-stone-500">{t("Loading menu items...")}</td></tr>
                   ) : products.length === 0 ? (
-                    <tr><td colSpan={4} className="px-5 py-14 text-center text-sm text-stone-500">{t("No menu items found")}</td></tr>
+                    <tr><td colSpan={canDeleteProducts?5:4} className="px-5 py-14 text-center text-sm text-stone-500">{t("No menu items found")}</td></tr>
                   ) : (
                     products.map(product=>{
                       const data=hpp[product.product_id];const open=expanded.has(product.product_id);
@@ -192,8 +211,9 @@ export default function MenuItemsPage() {
                           <td className="px-5 py-4 text-sm">{product.category_info?.name||"—"}</td>
                           <td className="px-5 py-4 text-sm text-stone-500">{data?.versions.length?"Lihat per versi":"—"}</td>
                           <td className="px-5 py-4"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${product.active?"bg-green-50 text-green-700":"bg-stone-100 text-stone-500"}`}>{product.active?t("Active"):t("Inactive")}</span></td>
+                          {canDeleteProducts&&<td className="px-5 py-4 text-right"><button type="button" disabled={loading||deleting||!unusedProducts.has(product.product_id)} onClick={()=>setDeleteTarget(product)} aria-label={`Hapus menu ${product.name}`} title={unusedProducts.has(product.product_id)?"Hapus menu":"Hanya menu tanpa resep yang dapat dihapus"} className="inline-flex rounded-lg p-2 align-middle text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent"><Trash2 size={17}/></button></td>}
                         </tr>
-                        {open&&<tr><td colSpan={4} className="p-0"><div id={`versions-${product.product_id}`} className="border-l-4 border-[var(--color-brand-sage)] bg-stone-50/60 px-5 py-3">
+                        {open&&<tr><td colSpan={canDeleteProducts?5:4} className="p-0"><div id={`versions-${product.product_id}`} className="border-l-4 border-[var(--color-brand-sage)] bg-stone-50/60 px-5 py-3">
                           {data?.versions.length?<table className="w-full text-left text-sm"><thead className="text-xs text-stone-500"><tr><th scope="col" className="px-3 pb-2">Versi resep</th><th scope="col" className="px-3 pb-2">HPP satu porsi</th><th scope="col" className="px-3 pb-2">Status resep</th><th scope="col" className="px-3 pb-2 text-right">Detail</th></tr></thead><tbody>{data.versions.map(({recipe,value,note})=><tr key={recipe.recipe_id} className="border-t border-stone-200"><td className="px-3 py-3 font-semibold"><Link to={`/menu-items/${encodeURIComponent(product.product_id)}?recipe=${encodeURIComponent(recipe.recipe_id)}`} className="text-[var(--color-brand-primary)] hover:underline">{recipe.version}</Link></td><td className="px-3 py-3"><p className="font-semibold">{value!==null?`Rp ${formatNumber(value,2)}`:"—"}</p>{note&&<p className="mt-1 text-xs text-stone-500">{note}</p>}</td><td className="px-3 py-3"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${recipe.active?"bg-green-50 text-green-700":"bg-stone-100 text-stone-500"}`}>{recipe.active?t("Active"):t("Inactive")}</span></td><td className="px-3 py-3 text-right"><Link to={`/menu-items/${encodeURIComponent(product.product_id)}?recipe=${encodeURIComponent(recipe.recipe_id)}`} className="font-semibold text-[var(--color-brand-primary)] hover:underline">Detail</Link></td></tr>)}</tbody></table>:<div className="flex items-center justify-between gap-3 py-2 text-sm text-stone-500"><span>{data?.note||"Akses resep diperlukan"}</span><Link to={`/menu-items/${encodeURIComponent(product.product_id)}`} className="font-semibold text-[var(--color-brand-primary)] hover:underline">Detail menu</Link></div>}
                         </div></td></tr>}
                       </Fragment>;
@@ -220,6 +240,8 @@ export default function MenuItemsPage() {
           </section>
         </main>
       </section>
+      <ConfirmDialog open={!!deleteTarget} title="Hapus menu" message={`Hapus menu “${deleteTarget?.name||""}”? Menu hanya bisa dihapus jika belum memiliki resep.`} confirmText="Hapus" tone="danger" submitting={deleting} onCancel={()=>{if(!deleting)setDeleteTarget(null)}} onConfirm={()=>void confirmDelete()}/>
+      {createOpen&&<CreateMenuModal categories={categories} initialCategory={categories.some(row=>row.category_id===categoryID&&row.active)?categoryID:""} onClose={()=>setCreateOpen(false)} onCreated={(category,name)=>{setCreateOpen(false);setCategoryID(category);setSearch(name);setSearchInput(name);setPage(1);setRefreshKey(value=>value+1);setCreatedMessage("Menu berhasil ditambahkan. Buka menu tersebut untuk membuat resep.")}}/>}
     </div>
   );
 }
