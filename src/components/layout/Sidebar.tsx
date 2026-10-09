@@ -139,6 +139,7 @@ export default function Sidebar({
       icon: ClipboardCheck,
     });
   if (userCan(user, "menu_items")) operationalMenuLinks.push({ label: "Resep Item", to: "/operational-menu", icon: CupSoda });
+  if (userCan(user, "orders")) operationalMenuLinks.push({ label: "Riwayat Pesanan", to: "/order-history", icon: ClipboardList });
   if (canReadCurrentStock)
     inventoryOperationLinks.push({
       label: t("Current Stock"),
@@ -151,7 +152,6 @@ export default function Sidebar({
       to: "/reconciliation",
       icon: Scale,
     });
-  if (userCan(user, "orders")) inventoryOperationLinks.push({ label: "Riwayat Pesanan", to: "/order-history", icon: ClipboardList });
   if (canReadInventoryCounts || canReadOpeningCounts || canReadClosingCounts) {
     for (const department of stockCountDepartments.filter((part) => userCanStockDepartment(user, part.key))) {
       const query = new URLSearchParams(stockOpnameContextQuery.replace(/^\?/, ""));
