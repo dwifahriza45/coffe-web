@@ -33,3 +33,5 @@ export const closeBusinessDay = async (businessDayID: string) =>
 
 export const deleteBusinessDay = async (businessDayID: string) =>
   (await api.delete<ApiResponse<null>>(`/business-days/${businessDayID}`)).data;
+export interface BusinessDaySummary {business_day_id:string;closing_submitted:boolean;draft_adjustment_count:number;stock_count_exists:boolean}
+export const getBusinessDaySummaries=async(business_day_ids:string[])=>(await api.post<ApiResponse<BusinessDaySummary[]>>("/business-days/status-summary",{business_day_ids})).data;

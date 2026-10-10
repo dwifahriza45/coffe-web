@@ -6,6 +6,7 @@ import {
   closeBusinessDay,
   deleteBusinessDay,
   getBusinessDays,
+  getBusinessDaySummaries,
   openBusinessDay,
   type BusinessDay,
 } from "../../api/businessDay.api";
@@ -16,8 +17,6 @@ import Sidebar from "../../components/layout/Sidebar";
 import { useAuth } from "../../app/AuthContext";
 import { useLanguage } from "../../app/LanguageContext";
 import { getUserRoleNames, userCan } from "../../app/roleAccess";
-import { getInventoryCounts } from "../../api/inventoryCount.api";
-import { getDraftStockAdjustmentCount } from "../../api/stockAdjustment.api";
 
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50];
 
@@ -87,24 +86,11 @@ export default function BusinessDayPage() {
         const nextItems = response.data ?? [];
         setItems(nextItems);
         setTotal(response.total ?? 0);
-        const statusEntries = await Promise.all(
-          nextItems.map(async (item) => {
-            const counts = await getInventoryCounts({
-              start: 0,
-              limit: 10,
-              business_day_id: item.business_day_id,
-              count_type: "",
-              status: "",
-              name: "",
-            });
-            const pendingAdjustment = item.status === "OPEN" ? await getDraftStockAdjustmentCount(item.business_day_id) : 0;
-            return [item.business_day_id, counts.data?.some((count) => count.count_type === "CLOSING" && count.status === "SUBMITTED") ?? false, pendingAdjustment, Boolean(counts.data?.length)] as const;
-          }),
-        );
+        const summaries=nextItems.length?(await getBusinessDaySummaries(nextItems.map(item=>item.business_day_id))).data||[]:[];
         if (!current) return;
-        setClosingSubmitted(Object.fromEntries(statusEntries.map(([id, submitted]) => [id, submitted])));
-        setDraftStockAdjustmentCounts(Object.fromEntries(statusEntries.map(([id, , pending]) => [id, pending])));
-        setStockCountExists(Object.fromEntries(statusEntries.map(([id, , , exists]) => [id, exists])));
+        setClosingSubmitted(Object.fromEntries(summaries.map(item=>[item.business_day_id,item.closing_submitted])));
+        setDraftStockAdjustmentCounts(Object.fromEntries(summaries.map(item=>[item.business_day_id,item.draft_adjustment_count])));
+        setStockCountExists(Object.fromEntries(summaries.map(item=>[item.business_day_id,item.stock_count_exists])));
       } catch (requestError) {
         if (!current) return;
         const response = isAxiosError<{ message?: string }>(requestError)

@@ -3,16 +3,16 @@ import { useLanguage } from "../../app/LanguageContext";
 import { inventorySectionLabel } from "../../utils/stockDisplay";
 
 type Props = {
- categories: CategoryIngredient[]; subcategories: IngredientSubcategory[];
+ hideAllSections?: boolean; categories: CategoryIngredient[]; subcategories: IngredientSubcategory[];
  category: string; subcategory: string; counts: Record<string, number>; total: number | null;
  onCategory: (id: string) => void; onSubcategory: (id: string) => void;
 };
-export default function InventoryCategoryFilters({categories,subcategories,category,subcategory,counts,total,onCategory,onSubcategory}: Props) {
+export default function InventoryCategoryFilters({categories,subcategories,category,subcategory,counts,total,onCategory,onSubcategory,hideAllSections=false}: Props) {
  const {t}=useLanguage();
  const selectedSubs=category ? subcategories.filter((sub) => sub.category_ingredient_id===category) : [];
  return <>
   <div className="mt-6 flex flex-wrap gap-3" aria-label={t("Ingredient Category")}>
-   {[{category_ingredient_id:"",name:t("All sections")},...categories].map((item) => {
+   {[...(hideAllSections ? [] : [{category_ingredient_id:"",name:t("All sections")}]),...categories].map((item) => {
     const active=category===item.category_ingredient_id;
     const count=total===null ? "…" : item.category_ingredient_id ? counts[item.category_ingredient_id] ?? 0 : total;
     return <button key={item.category_ingredient_id} type="button" aria-pressed={active} title={item.category_ingredient_id ? item.name : undefined} onClick={() => onCategory(item.category_ingredient_id)} className={`inline-flex items-center gap-3 rounded-2xl px-5 py-3 text-sm font-semibold transition ${active ? "bg-[var(--color-brand-primary)] text-[var(--color-brand-cream)]" : "bg-[var(--color-brand-soft)] text-[var(--color-brand-primary)] hover:bg-[var(--color-brand-sage)]"}`}>

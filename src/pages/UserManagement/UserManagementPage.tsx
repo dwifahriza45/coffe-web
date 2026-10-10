@@ -178,6 +178,7 @@ export default function UserManagementPage() {
   }
 
   function openAction(mode: ActionMode, user: User) {
+    if (mode === "active" && user.active && user.is_admin) return;
     setActionUser(user);
     setActionMode(mode);
     setActionError("");
@@ -585,12 +586,14 @@ export default function UserManagementPage() {
                                   <button
                                     type="button"
                                     onClick={() => openAction("active", user)}
-                                    disabled={isCurrentUser}
+                                    disabled={isCurrentUser || Boolean(user.active && user.is_admin)}
                                     className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-800 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent"
                                     title={
                                       isCurrentUser
                                         ? t("Cannot change your own account status")
-                                        : user.active
+                                        : user.active && user.is_admin
+                                          ? "User Admin tidak bisa dinonaktifkan"
+                                          : user.active
                                           ? t("Deactivate user")
                                           : t("Activate user")
                                     }

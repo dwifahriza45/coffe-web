@@ -1,14 +1,11 @@
-import POReceivingPanel from "./POReceivingPanel";
 import SupplierShoppingForm from "./SupplierShoppingForm";
 import { isAxiosError } from "axios";
 import {
   ArrowLeft,
-  ChevronDown,
   ExternalLink,
   Package,
   Truck,
   Plus,
-  Pencil,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
@@ -42,10 +39,7 @@ const money = (value: string | null) =>
         minimumFractionDigits: 0,
         maximumFractionDigits: 2,
       }).format(Number(value));
-const quantity = (value: string) =>
-  new Intl.NumberFormat("id-ID", { maximumFractionDigits: 4 }).format(
-    Number(value),
-  );
+const quantity=(value:string)=>new Intl.NumberFormat("id-ID",{maximumFractionDigits:4}).format(Number(value));
 const safeLink = (value: string) => {
   try {
     const url = new URL(value);
@@ -66,6 +60,7 @@ export default function SupplierDetailPage() {
   const canReadCatalog = userCan(user, "ingredients", "read");
   const canReadLegacyHistory = userCan(user, "suppliers", "read");
   const canReadHistory = userCan(user, "suppliers", "read");
+  const canReadPO = userCan(user, "purchase_orders");
   const canWriteShopping =
     userCan(user, "suppliers", "update") && canReadCatalog;
   const [shoppingOpen, setShoppingOpen] = useState(false);
@@ -164,14 +159,6 @@ export default function SupplierDetailPage() {
   const phone = normalizeSupplierPhone(supplier?.phone || "");
   const whatsapp = supplierWhatsAppUrl(phone);
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const statusLabel = (status: string) =>
-    ({
-      RECORDED: t("Recorded"),
-      DRAFT: t("Draft"),
-      SUBMITTED: t("Submitted"),
-      PARTIALLY_RECEIVED: t("Partially received"),
-      RECEIVED: t("Received"),
-    })[status] || status;
 
   return (
     <div className="flex min-h-screen bg-[var(--color-brand-cream)]">
@@ -423,228 +410,12 @@ export default function SupplierDetailPage() {
                       {t("No supplier transactions yet")}
                     </p>
                   ) : (
-                    <div className="divide-y divide-stone-200">
-                      {transactions.map((transaction) => (
-                        <details
-                          key={`${transaction.source}:${transaction.transaction_id}`}
-                          className="group"
-                          open={transactions.length === 1}
-                        >
-                          <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-3 p-5 hover:bg-stone-50">
-                            <div>
-                              <p className="text-xs font-semibold text-stone-500">
-                                {formatBusinessDate(transaction.date)} ·{" "}
-                                {t(
-                                  transaction.source === "purchase"
-                                    ? "Purchase order"
-                                    : transaction.source === "shopping"
-                                      ? "Purchase order"
-                                      : "Goods receipt",
-                                )}
-                              </p>
-                              <p className="mt-1 font-semibold">
-                                {transaction.number}
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-4">
-                              {transaction.source !== "shopping" && (
-                                <span className="rounded-full bg-stone-100 px-3 py-1 text-xs font-semibold text-stone-600">
-                                  {statusLabel(transaction.status)}
-                                </span>
-                              )}
-                              <span className="text-sm font-semibold">
-                                {money(transaction.total)}
-                              </span>
-                              <ChevronDown
-                                size={18}
-                                className="text-stone-400 group-open:rotate-180"
-                              />
-                            </div>
-                          </summary>
-                          <div className="border-t border-stone-100 bg-stone-50/40 p-5">
-                            {transaction.source === "shopping" && (
-                              <POReceivingPanel
-                                supplierID={supplierID}
-                                detailID={transaction.transaction_id}
-                                canReceive={
-                                  userCan(user, "suppliers", "update")
-                                }
-                              />
-                            )}
-
-                            <details
-                              open={transaction.source !== "shopping"}
-                              className="rounded-xl border border-stone-200 bg-white"
-                            >
-                              <summary className="cursor-pointer px-5 py-4 text-sm font-semibold text-stone-700">
-                                {t(
-                                  transaction.source === "shopping"
-                                    ? "Order details and delivery information"
-                                    : "Transaction details",
-                                )}
-                              </summary>
-                              <div className="border-t border-stone-100 p-5">
-                                <div className="mb-4 flex flex-wrap justify-between gap-3 text-sm">
-                                  <p>
-                                    <span className="text-stone-500">
-                                      {t("Created by")}:{" "}
-                                    </span>
-                                    {transaction.created_by || "—"}
-                                  </p>
-                                </div>
-                                {transaction.source === "shopping" && (
-                                  <>
-                                    <dl className="mb-4 grid gap-4 rounded-lg border border-stone-200 bg-white p-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
-                                      {[
-                                        [
-                                          "Delivery date",
-                                          formatBusinessDate(
-                                            transaction.delivery_date ||
-                                              undefined,
-                                          ),
-                                        ],
-                                        [
-                                          "Payment method",
-                                          transaction.payment_method,
-                                        ],
-                                        [
-                                          "Supplier bank account",
-                                          transaction.bank_account,
-                                        ],
-                                        ["Ship to", transaction.ship_to],
-                                        ["Recipient", transaction.recipient],
-                                        [
-                                          "Shipping address",
-                                          transaction.shipping_address,
-                                        ],
-                                        [
-                                          "Shipping phone",
-                                          transaction.shipping_phone,
-                                        ],
-                                      ].map(([label, value]) => (
-                                        <div key={label}>
-                                          <dt className="text-xs font-semibold text-stone-500">
-                                            {t(label)}
-                                          </dt>
-                                          <dd className="mt-1 whitespace-pre-wrap">
-                                            {value || "—"}
-                                          </dd>
-                                        </div>
-                                      ))}
-                                    </dl>
-                                    {canWriteShopping && (
-                                      <button
-                                        type="button"
-                                        className="mb-4 inline-flex items-center gap-2 rounded-lg border border-stone-300 px-3 py-2 text-xs font-semibold hover:bg-stone-100"
-                                        onClick={() => {
-                                          setEditingShopping(transaction);
-                                          setShoppingOpen(true);
-                                          setNotice("");
-                                        }}
-                                      >
-                                        <Pencil size={14} />
-                                        {t("Edit purchase order")}
-                                      </button>
-                                    )}
-                                  </>
-                                )}
-                                {transaction.notes && (
-                                  <p className="mb-4 whitespace-pre-wrap rounded-lg bg-white p-3 text-sm text-stone-600">
-                                    {transaction.notes}
-                                  </p>
-                                )}
-                                <div className="overflow-x-auto">
-                                  <table className="w-full min-w-160 text-left text-sm">
-                                    <thead className="bg-[var(--color-brand-accent)] text-xs text-white">
-                                      <tr>
-                                        {[
-                                          "No",
-                                          "Ingredient",
-                                          "Brand / Type",
-                                          "Qty",
-                                          "Packaging / Unit",
-                                          "Price",
-                                          "Content Qty",
-                                          "Content unit",
-                                          "Total",
-                                          ...(transaction.source === "shopping"
-                                            ? []
-                                            : ["Notes"]),
-                                        ].map((label) => (
-                                          <th key={label} className="px-3 py-3">
-                                            {t(label)}
-                                          </th>
-                                        ))}
-                                      </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-stone-100 bg-white">
-                                      {transaction.items.length === 0 ? (
-                                        <tr>
-                                          <td
-                                            colSpan={
-                                              transaction.source === "shopping"
-                                                ? 9
-                                                : 10
-                                            }
-                                            className="p-5 text-center text-stone-500"
-                                          >
-                                            {t("No transaction items")}
-                                          </td>
-                                        </tr>
-                                      ) : (
-                                        transaction.items.map((item, index) => (
-                                          <tr key={index}>
-                                            <td className="px-3 py-3">
-                                              {index + 1}
-                                            </td>
-                                            <td className="px-3 py-3 font-medium">
-                                              {item.name}
-                                            </td>
-                                            <td className="px-3 py-3">
-                                              {item.brand || "—"}
-                                            </td>
-                                            <td className="px-3 py-3">
-                                              {quantity(item.quantity)}
-                                            </td>
-                                            <td className="px-3 py-3">
-                                              {item.unit || "—"}
-                                            </td>
-                                            <td className="whitespace-nowrap px-3 py-3">
-                                              {money(item.unit_price)}
-                                            </td>
-                                            <td className="px-3 py-3">
-                                              {item.content_qty
-                                                ? quantity(item.content_qty)
-                                                : "—"}
-                                            </td>
-                                            <td className="px-3 py-3">
-                                              {item.content_unit || "—"}
-                                            </td>
-                                            <td className="whitespace-nowrap px-3 py-3">
-                                              {money(item.total)}
-                                            </td>
-                                            {transaction.source !==
-                                              "shopping" && (
-                                              <td className="max-w-xs whitespace-pre-wrap px-3 py-3">
-                                                {item.notes || "—"}
-                                              </td>
-                                            )}
-                                          </tr>
-                                        ))
-                                      )}
-                                    </tbody>
-                                  </table>
-                                </div>
-                                {transaction.source === "receipt" && (
-                                  <p className="mt-3 text-xs text-stone-500">
-                                    {t("Receipt prices are not recorded")}
-                                  </p>
-                                )}
-                              </div>
-                            </details>
-                          </div>
-                        </details>
-                      ))}
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-sm"><thead className="bg-stone-50 text-xs text-stone-500"><tr>{["Nomor PO / transaksi","Tanggal","Dibuat oleh","Total",...(canReadPO?["Detail"]:[])].map(label=><th key={label} className="px-5 py-4">{label}</th>)}</tr></thead><tbody className="divide-y divide-stone-100">{transactions.map(transaction=>{
+                        const canOpen=transaction.source==="shopping"&&canReadPO;
+                        const destination=`/purchase-orders?${new URLSearchParams({supplier_id:supplierID,order_id:transaction.transaction_id,start_date:transaction.date,end_date:transaction.date})}`;
+                        return <tr key={`${transaction.source}:${transaction.transaction_id}`} className="hover:bg-stone-50"><td className="px-5 py-4 font-semibold">{canOpen?<Link to={destination} className="text-brand-primary hover:underline">{transaction.number}</Link>:transaction.number}{transaction.source!=="shopping"&&<p className="mt-1 text-xs font-normal text-stone-500">{transaction.source==="purchase"?"Pembelian lama":"Penerimaan lama"}</p>}</td><td className="whitespace-nowrap px-5 py-4">{formatBusinessDate(transaction.date)}</td><td className="px-5 py-4">{transaction.created_by||"Tidak tercatat"}</td><td className="whitespace-nowrap px-5 py-4 font-semibold">{money(transaction.total)}</td>{canReadPO&&<td className="px-5 py-4 text-right">{canOpen?<Link to={destination} className="font-semibold text-brand-primary hover:underline">Detail PO →</Link>:"—"}</td>}</tr>
+                      })}</tbody></table>
                     </div>
                   )}
                   <footer className="flex items-center justify-between border-t border-stone-200 p-5 text-xs text-stone-500">

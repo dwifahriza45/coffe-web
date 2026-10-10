@@ -169,7 +169,7 @@ export default function AppRouter() {
         <Route path="/supplier-management" element={<RequireAuth><RequirePermission menuKey="suppliers"><SupplierManagementPage /></RequirePermission></RequireAuth>} />
         <Route path="/order-history" element={<RequireAuth><RequirePermission menuKey="orders"><OrderHistoryPage /></RequirePermission></RequireAuth>} />
         <Route path="/order" element={<RequireAuth><RequirePermission menuKey="orders"><OrderPage /></RequirePermission></RequireAuth>} />
-        <Route path="/purchase-orders" element={<RequireAuth><RequirePermission menuKey="suppliers"><PurchaseOrderPage /></RequirePermission></RequireAuth>} />
+        <Route path="/purchase-orders" element={<RequireAuth><RequirePermission menuKey="purchase_orders"><PurchaseOrderPage /></RequirePermission></RequireAuth>} />
         <Route path="/selling-price-hpp" element={<RequireAuth><RequirePermission menuKey="selling_price_hpp"><SellingPriceHPPPage /></RequirePermission></RequireAuth>} />
         <Route path="/operational-menu" element={<RequireAuth><RequirePermission menuKey="menu_items"><OperationalMenuPage /></RequirePermission></RequireAuth>} />
         <Route path="/operational-menu/products/:productID" element={<RequireAuth><RequirePermission menuKey="menu_items"><OperationalMenuPage /></RequirePermission></RequireAuth>} />

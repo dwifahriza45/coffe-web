@@ -1,3 +1,6 @@
+import { useAuth } from "../../app/AuthContext";
+import { userCanStockDepartment } from "../../app/roleAccess";
+import { stockCountDepartments, matchesStockCountDepartment } from "../../utils/stockCountDepartment";
 import InventoryCategoryFilters from "../../components/common/InventoryCategoryFilters";
 import CurrentStockCharts from "../../components/common/CurrentStockCharts";
 import { getAllCategoryIngredients, getIngredientSubcategories, type CategoryIngredient, type IngredientSubcategory } from "../../api/categoryIngredient.api";
@@ -36,6 +39,10 @@ function formatQuantity(value: number, unit?: string) {
 
 export default function CurrentStockPage() {
   const { t } = useLanguage();
+  const { user } = useAuth();
+  const allowedDepartments = stockCountDepartments.filter(part => userCanStockDepartment(user, part.key));
+  const departmentKeys = allowedDepartments.map(part => part.key).join(",");
+
   const [searchParams] = useSearchParams();
   const [view,setView]=useState<"list" | "grid">(() => {try {return localStorage.getItem("coffee-current-stock-view")==="grid" ? "grid" : "list";} catch {return "list";}});
   function changeView(next: "list" | "grid") {setView(next);try {localStorage.setItem("coffee-current-stock-view",next);} catch { /* View selection still works when storage is unavailable. */ }}
@@ -46,6 +53,7 @@ export default function CurrentStockPage() {
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [categories,setCategories]=useState<CategoryIngredient[]>([]);
+  const allowedCategories = categories.filter(category => allowedDepartments.some(part => matchesStockCountDepartment(category.name, part.key)));
   const [subcategories,setSubcategories]=useState<IngredientSubcategory[]>([]);
   const [categoryFilter,setCategoryFilter]=useState("");
   const [subcategoryFilter,setSubcategoryFilter]=useState("");
@@ -105,14 +113,21 @@ export default function CurrentStockPage() {
     };
   }, [date, refresh, t]);
 
+  useEffect(() => {
+    const permitted = categories.filter(category => departmentKeys.split(",").some(key => key && matchesStockCountDepartment(category.name,key)));
+    setCategoryFilter(previous => permitted.length === 1 ? permitted[0].category_ingredient_id : permitted.some(category => category.category_ingredient_id === previous) ? previous : "");
+    setSubcategoryFilter("");
+  }, [departmentKeys, categories]);
+
   const searchedRows = useMemo(() => {
     const keyword = search.trim().toLowerCase();
-    const suppliedRows=supplierFilter ? rows.filter((row) => row.ingredient.supplier_id===supplierFilter) : rows;
+    const scopedRows=rows.filter(row => departmentKeys.split(",").some(key => key && matchesStockCountDepartment(row.ingredient.category_ingredient_name,key)));
+    const suppliedRows=supplierFilter ? scopedRows.filter((row) => row.ingredient.supplier_id===supplierFilter) : scopedRows;
     if (!keyword) return suppliedRows;
     return suppliedRows.filter((row) =>
       [row.ingredient.name, row.ingredient.ingredient_id, row.ingredient.category_ingredient_name, row.metadata?.brand, row.metadata?.subcategory, row.metadata?.supplier].filter(Boolean).join(" ").toLowerCase().includes(keyword),
     );
-  }, [rows, search, supplierFilter]);
+  }, [rows, search, supplierFilter, departmentKeys]);
 
   const visibleRows = useMemo(() => searchedRows.filter(({ingredient}) => (!categoryFilter || ingredient.category_ingredient_id===categoryFilter) && (!subcategoryFilter || ingredient.subcategory_ingredient_id===subcategoryFilter)),[searchedRows,categoryFilter,subcategoryFilter]);
   const categoryCounts=useMemo(() => {
@@ -214,7 +229,7 @@ export default function CurrentStockPage() {
 
           <div className="mt-5"><StockDateFilter /></div>
           {historical && <p className="mt-2 text-xs text-stone-500">Harga, minimum, target, dan konversi memakai snapshot stock count yang tersedia; data yang belum direkam ditampilkan kosong. Nama dan kategori item mengikuti master saat ini.</p>}
-          <InventoryCategoryFilters categories={categories} subcategories={subcategories} category={categoryFilter} subcategory={subcategoryFilter} counts={categoryCounts} total={loading ? null : searchedRows.length} onCategory={(id) => {setCategoryFilter(id);setSubcategoryFilter("");}} onSubcategory={setSubcategoryFilter} />
+          <InventoryCategoryFilters hideAllSections categories={allowedCategories} subcategories={subcategories} category={categoryFilter} subcategory={subcategoryFilter} counts={categoryCounts} total={loading ? null : searchedRows.length} onCategory={(id) => {setCategoryFilter(id);setSubcategoryFilter("");}} onSubcategory={setSubcategoryFilter} />
 
           {!loading && displayRows.some(row => !row.known) && <p className="mt-3 text-xs text-amber-800">{displayRows.filter(row => !row.known).length} item belum memiliki stok yang bisa dihitung pada tanggal ini; item tersebut tidak masuk grafik.</p>}
           <CurrentStockCharts rows={displayRows.filter(row => row.known)} loading={loading} />

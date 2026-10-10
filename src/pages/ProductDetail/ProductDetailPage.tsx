@@ -28,7 +28,7 @@ import { useAuth } from "../../app/AuthContext";
 import { useLanguage } from "../../app/LanguageContext";
 import { userCan } from "../../app/roleAccess";
 import { matchesStockCountDepartment } from "../../utils/stockCountDepartment";
-import { formatNumber, normalizeNumberInput } from "../../utils/numberFormat";
+import { formatNumber, formatNumberInput, normalizeNumberInput, storedNumberInput } from "../../utils/numberFormat";
 
 const emptyRecipeForm = { product_id: "", recipe_category: "", version: "", active: true, is_base: false, serving_quantity: "", yield_quantity: "", initial_quantity: "", yield_unit: "" };
 const emptyItemForm: RecipeItemPayload = { recipe_id: "", ingredient_id: "", base_recipe_id: "", quantity: "" };
@@ -164,7 +164,7 @@ export default function ProductDetailPage() {
   function openRecipeModal(recipe?: Recipe) {
     setEditingRecipe(recipe ?? null);
     setRecipeRows([{ ingredient_id: "", base_recipe_id: "", quantity: "" }]);
-    setRecipeForm(recipe ? { product_id: productID, recipe_category: recipe.recipe_category ?? "", version: String(recipe.version), active: recipe.active, is_base: recipe.is_base ?? false, serving_quantity: recipe.serving_quantity ?? "", yield_quantity: recipe.yield_quantity ?? "", initial_quantity: "", yield_unit: recipe.yield_unit ?? "" } : { ...emptyRecipeForm, product_id: productID });
+    setRecipeForm(recipe ? { product_id: productID, recipe_category: recipe.recipe_category ?? "", version: String(recipe.version), active: recipe.active, is_base: recipe.is_base ?? false, serving_quantity: storedNumberInput(recipe.serving_quantity), yield_quantity: recipe.yield_quantity ?? "", initial_quantity: "", yield_unit: recipe.yield_unit ?? "" } : { ...emptyRecipeForm, product_id: productID });
     setFieldErrors({});
     setActionError("");
     setRecipeModalOpen(true);
@@ -482,7 +482,10 @@ export default function ProductDetailPage() {
               </div>
             </div>
           </section>
-          {selectedRecipe && <RecipeCostPanel recipeID={selectedRecipe.recipe_id} name={product?.name ?? ""} version={selectedRecipe.version} isBase={selectedRecipe.is_base ?? false} refreshKey={refreshKey} onSaveYield={userCan(user, "recipes", "update") && selectedRecipe.is_base ? async (quantity, unit) => {
+          {selectedRecipe && <RecipeCostPanel recipeID={selectedRecipe.recipe_id} name={product?.name ?? ""} version={selectedRecipe.version} isBase={selectedRecipe.is_base ?? false} refreshKey={refreshKey} servingQuantity={selectedRecipe.serving_quantity} onSaveServing={userCan(user,"recipes","update") && selectedRecipe.is_base ? async quantity => {
+ await updateRecipe(selectedRecipe.recipe_id, {product_id:selectedRecipe.product_id,recipe_category:selectedRecipe.recipe_category,version:selectedRecipe.version,active:selectedRecipe.active,is_base:true,serving_quantity:quantity,yield_quantity:selectedRecipe.yield_quantity,yield_unit:selectedRecipe.yield_unit,initial_quantity:""});
+ setRefreshKey(value=>value+1);
+ } : undefined} onSaveYield={userCan(user, "recipes", "update") && selectedRecipe.is_base ? async (quantity, unit) => {
  await updateRecipe(selectedRecipe.recipe_id, { product_id: selectedRecipe.product_id, recipe_category: selectedRecipe.recipe_category, version: selectedRecipe.version, active: selectedRecipe.active, is_base: true, serving_quantity: selectedRecipe.serving_quantity, yield_quantity: quantity, yield_unit: unit, initial_quantity: "" });
  setRefreshKey(value => value + 1);
  } : undefined} />}
@@ -524,7 +527,7 @@ export default function ProductDetailPage() {
  const scale = normalized === "kg" || normalized === "l" ? 1000 : normalized === "mg" ? 0.001 : 1;
  return total + (Number(row.quantity) || 0) * scale;
  }, 0)), 3)}</p><p className="mt-1 text-xs text-stone-500">Jumlah qty komposisi Item dan base. GR dan ML menjadi acuan qty gabungan; hasil akhir tetap diukur sendiri.</p></div>
-                  <label className="mt-4 block text-xs font-semibold text-stone-600">Takaran base untuk satu menu<input inputMode="decimal" placeholder="Contoh: 18" value={formatQuantity(recipeForm.serving_quantity)} onChange={event => setRecipeForm(current => ({ ...current, serving_quantity: normalizeNumberInput(event.target.value) }))} className="mt-2 h-11 w-full rounded-lg border border-stone-300 bg-white px-3 text-sm" disabled={submitting} /><span className="mt-1 block text-xs font-normal text-stone-500">Satuan sama dengan hasil akhir. Otomatis terbawa saat base dipilih di resep menu. Jika kosong, memakai seluruh hasil akhir.</span></label>
+                  <label className="mt-4 block text-xs font-semibold text-stone-600">Takaran default base per menu (opsional)<input aria-label="Takaran default base per menu" inputMode="decimal" placeholder="Isi takaran pemakaian base" value={formatNumberInput(recipeForm.serving_quantity)} onChange={event => setRecipeForm(current => ({ ...current, serving_quantity: normalizeNumberInput(event.target.value) }))} className="mt-2 h-11 w-full rounded-lg border border-stone-300 bg-white px-3 text-sm" disabled={submitting} /><span className="mt-1 block text-xs font-normal text-stone-500">Satuan sama dengan hasil akhir base. Isi jumlah base yang dipakai untuk satu menu; jika kosong, memakai seluruh hasil akhir. Menyimpan perubahan takaran juga memperbarui pemakaian base pada resep yang menggunakannya.</span></label>
                   <div className="mt-4 grid grid-cols-[minmax(0,1fr)_7rem] items-start gap-3 sm:grid-cols-[minmax(0,1fr)_10rem]">
                     <label className="block text-xs font-semibold text-stone-600">Jumlah hasil akhir
                       <input inputMode="decimal" placeholder="Contoh: 700" value={formatQuantity(recipeForm.yield_quantity)} onChange={event => setRecipeForm(current => ({ ...current, yield_quantity: normalizeNumberInput(event.target.value) }))} className="mt-2 h-11 w-full rounded-lg border border-stone-300 bg-white px-3 text-sm font-normal outline-none focus:border-[var(--color-brand-accent)] focus:ring-2 focus:ring-[var(--color-brand-accent)]/15" disabled={submitting} />

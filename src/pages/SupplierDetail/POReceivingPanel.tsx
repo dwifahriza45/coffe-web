@@ -48,7 +48,7 @@ export default function POReceivingPanel({
 }) {
   const { t } = useLanguage();
   const { user } = useAuth();
-  const canCheckDay = userCan(user, "business_days", "read");
+  const canCheckDay = userCan(user, "business_days", "read") || userCan(user,"purchase_orders");
   const [data, setData] = useState<POReceiving | null>(null);
   const [quantities, setQuantities] = useState<Record<string, string>>({});
   const [date, setDate] = useState(currentBusinessDate());
@@ -85,16 +85,35 @@ export default function POReceivingPanel({
       return;
     }
     let current = true;
+    let inFlight = false;
     setDayStatus("checking");
-    getBusinessDays({ start: 0, limit: 1, status: "OPEN", business_date: date })
-      .then((result) => {
+    async function checkDay() {
+      if (!current || inFlight) return;
+      inFlight = true;
+      try {
+        const result = await getBusinessDays({ start: 0, limit: 1, status: "OPEN", business_date: date });
         if (current) setDayStatus(result.data?.length ? "open" : "closed");
-      })
-      .catch(() => {
+      } catch {
         if (current) setDayStatus("unknown");
-      });
+      } finally {
+        inFlight = false;
+      }
+    }
+    void checkDay();
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") void checkDay();
+    }, 5000);
+    const onFocus = () => { void checkDay(); };
+    const onVisible = () => {
+      if (document.visibilityState === "visible") void checkDay();
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       current = false;
+      window.clearInterval(timer);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [editing, date, canCheckDay, dayRefresh]);
   useEffect(() => {
@@ -617,6 +636,10 @@ export default function POReceivingPanel({
                         {t("Delivery")} {index + 1} ·{" "}
                         {formatBusinessDate(receipt.date)}
                       </p>
+                      <p className="text-sm font-semibold">Diterima oleh {receipt.received_by_name||"Tidak tercatat"}</p>
+                      <p className="mt-1 text-xs text-stone-500">Dicatat {new Date(receipt.created_at).toLocaleDateString("id-ID",{timeZone:"Asia/Jakarta",day:"2-digit",month:"long",year:"numeric"})} · pukul {new Date(receipt.created_at).toLocaleTimeString("id-ID",{timeZone:"Asia/Jakarta",hour:"2-digit",minute:"2-digit",hour12:false}).replace(".",":")} WIB</p>
+                      <span className={`mt-2 inline-flex rounded-full px-2 py-1 text-xs font-semibold ${receipt.status==="RECEIVED"?"bg-green-50 text-green-700":"bg-blue-50 text-blue-700"}`}>{receipt.status==="RECEIVED"?"Diterima semua":"Diterima sebagian"}</span>
+                      <ul className="mt-2 space-y-1 text-xs text-stone-600">{receipt.items?.map((line,lineIndex)=><li key={lineIndex}>{line.name} · {new Intl.NumberFormat("id-ID",{maximumFractionDigits:4}).format(Number(line.quantity))} {line.packaging}</li>)}</ul>
                       {receipt.notes && (
                         <p className="mt-1 text-xs text-stone-500">
                           {receipt.notes}

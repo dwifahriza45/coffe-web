@@ -3,6 +3,8 @@ import { useState, type FormEvent } from "react";
 import { ExternalLink, X } from "lucide-react";
 import {
   saveSupplierShopping,
+  createPurchaseOrder,
+  updatePurchaseOrder,
   type SupplierCatalogItem,
   type Supplier,
   type SupplierTransaction,
@@ -29,6 +31,7 @@ const rupiah = (value: number) =>
   }).format(value);
 
 type Props = {
+  purchaseOrderMode?: boolean;
   supplierID: string;
   supplier: Supplier | null;
   catalog: SupplierCatalogItem[];
@@ -37,6 +40,7 @@ type Props = {
   onSaved: () => void;
 };
 export default function SupplierShoppingForm({
+  purchaseOrderMode=false,
   supplierID,
   supplier,
   catalog,
@@ -150,7 +154,8 @@ export default function SupplierShoppingForm({
     }
     setSaving(true);
     try {
-      await saveSupplierShopping(
+      if(purchaseOrderMode){if(editing)await updatePurchaseOrder(supplierID,editing.transaction_id,{...form,items:selected});else await createPurchaseOrder(supplierID,{...form,items:selected});}
+      else await saveSupplierShopping(
         supplierID,
         { ...form, items: selected },
         editing?.transaction_id,

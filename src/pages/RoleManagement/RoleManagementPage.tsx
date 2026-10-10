@@ -53,6 +53,10 @@ const PERMISSION_MENUS = [
   { key: "inventory_counts", label: "Stock Count" },
   { key: "menu_items", label: "Resep Item" },
   { key: "orders", label: "Order" },
+  { key: "purchase_orders", label: "Purchase Order" },
+  { key: "products", label: "HPP" },
+  { key: "recipes", label: "HPP - Resep" },
+  { key: "recipe_items", label: "HPP - Bahan Resep" },
   { key: "selling_price_hpp", label: "HPP Harga Penjualan" },
   { key: "current_stock", label: "Current Stock" },
   { key: "reconciliations", label: "Reconciliation" },
@@ -66,10 +70,7 @@ const PERMISSION_MENUS = [
   { key: "category_ingredient", label: "Ingredient Categories" },
   { key: "brand_types", label: "Brand / Type" },
   { key: "suppliers", label: "Suppliers" },
-  { key: "categories", label: "Categories" },
-  { key: "products", label: "Products" },
-  { key: "recipes", label: "Recipes" },
-  { key: "recipe_items", label: "Recipe Items" },
+  { key: "categories", label: "Kategori Menu" },
 ] as const;
 const PERMISSION_ACTIONS = [
   { key: "can_read", label: "Read" },
@@ -84,13 +85,7 @@ const WRITE_PERMISSION_FLAGS: PermissionFlag[] = [
   "can_delete",
 ];
 const READ_DEPENDENCIES: Record<string, string[]> = {
-  business_days: [
-    "inventory_counts",
-    "inventory_opening_counts",
-    "stock_adjustments",
-    "stock_movements",
-    "inventory_closing_counts",
-  ],
+  business_days: [],
   inventory_counts: [
     "inventory_opening_counts",
     "stock_adjustments",
@@ -103,10 +98,10 @@ const READ_DEPENDENCIES: Record<string, string[]> = {
   inventory_closing_counts: ["inventory_counts"],
   brand_types: ["category_ingredient"],
   ingredients: ["brand_types", "category_ingredient"],
-  categories: ["products", "recipes", "recipe_items"],
-  products: ["categories", "recipes", "recipe_items"],
-  recipes: ["categories", "products", "recipe_items"],
-  recipe_items: ["categories", "products", "recipes"],
+  categories: [],
+  products: ["recipes", "recipe_items"],
+  recipes: ["products", "recipe_items"],
+  recipe_items: ["products", "recipes"],
 };
 const LINKED_READ_GROUPS: string[][] = [
   [
@@ -114,7 +109,7 @@ const LINKED_READ_GROUPS: string[][] = [
     "inventory_opening_counts",
     "inventory_closing_counts",
   ],
-  ["categories", "products", "recipes", "recipe_items"],
+  ["products", "recipes", "recipe_items"],
   ["ingredients", "brand_types"],
 ];
 
@@ -229,12 +224,12 @@ export default function RoleManagementPage() {
     permissions: RolePermission[],
   ): RolePermission[] {
     return applyPermissionDependencies([...PERMISSION_MENUS, ...STOCK_ACCESS].map((menu) => {
-      const existing = menu.key === "inventory_counts" ? {
+      const existing = permissions.find((item) => item.menu_key === menu.key) ?? (menu.key === "inventory_counts" ? {
         can_read: permissions.some((p) => ["inventory_counts", ...STOCK_CHILD_KEYS].includes(p.menu_key) && (p.can_read || p.can_create || p.can_update || p.can_delete)),
         can_create: permissions.some((p) => ["inventory_counts", ...STOCK_CHILD_KEYS.filter((key) => key !== "stock_movements")].includes(p.menu_key) && p.can_create),
         can_update: permissions.some((p) => ["inventory_counts", ...STOCK_CHILD_KEYS.filter((key) => key !== "stock_movements")].includes(p.menu_key) && p.can_update),
         can_delete: permissions.some((p) => ["inventory_counts", ...STOCK_CHILD_KEYS.filter((key) => key !== "stock_movements")].includes(p.menu_key) && p.can_delete),
-      } : permissions.find((item) => item.menu_key === menu.key);
+      } : undefined);
       return {
         menu_key: menu.key,
         can_read: existing?.can_read ?? false,

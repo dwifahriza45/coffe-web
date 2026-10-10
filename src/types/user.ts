@@ -6,6 +6,7 @@ export interface User {
   address: string;
   position: string;
   active: boolean;
+  is_admin?: boolean;
 }
 
 export interface GetUsersRequest {
@@ -41,4 +42,5 @@ export interface UpdateUserPasswordRequest {
 export interface UpdateUserActiveRequest {
   current_password: string;
   active: boolean;
+  is_admin?: boolean;
 }

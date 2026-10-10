@@ -1,4 +1,4 @@
-import { userCanStockDepartment } from "../../app/roleAccess";
+import { userCan, userCanStockDepartment } from "../../app/roleAccess";
 import { stockCountDepartments, getStockCountDepartment } from "../../utils/stockCountDepartment";
 import { isOpeningStockSubmitted } from "../../api/inventoryCount.api";
 import { isAxiosError } from "axios";
@@ -44,7 +44,11 @@ export default function StockAdjustmentPage() {
   const queryDate = searchParams.get("date") ?? "";
   const scopedDate = todayOnly ? currentBusinessDate() : businessDayID ? queryDate || currentBusinessDate() : queryDate;
   const contextQuery = businessDayID || scopedDate ? `?${new URLSearchParams({ ...(businessDayID ? { businessDayID } : {}), ...(scopedDate ? { date: scopedDate } : {}) })}` : "";
-  const [department, setDepartment] = useState<string>(getStockCountDepartment(searchParams.get("department"))?.key || allowedDepartments[0]?.key || "");
+  const [department, setDepartment] = useState<string>(allowedDepartments.find(part => part.key === searchParams.get("department"))?.key || allowedDepartments[0]?.key || "");
+  const allowedDepartmentKeys = allowedDepartments.map(part => part.key).join(",");
+  useEffect(() => {
+    setDepartment(previous => allowedDepartmentKeys.split(",").includes(previous) ? previous : allowedDepartmentKeys.split(",")[0] || "");
+  }, [allowedDepartmentKeys]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [items, setItems] = useState<StockAdjustment[]>([]);
   const [activeBusinessDay, setActiveBusinessDay] = useState<BusinessDay | null>(null);
@@ -117,7 +121,7 @@ export default function StockAdjustmentPage() {
   }, [refreshKey, scopedDate, businessDayID, requiresOpening, department]);
 
   const canWrite = !requiresOpening || openingSubmitted;
-  const canCreate = Boolean(activeBusinessDay) && canWrite;
+  const canCreate = Boolean(activeBusinessDay) && canWrite && userCan(user, "stock_adjustments", "create");
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   function openModal() {
@@ -157,7 +161,7 @@ export default function StockAdjustmentPage() {
   }
 
   function requestDelete(item: StockAdjustment) {
-    if (!canWrite || item.status === "SUBMITTED" || item.has_items) return;
+    if (!userCan(user, "stock_adjustments", "delete") || !canWrite || item.status === "SUBMITTED" || item.has_items) return;
     setConfirm({
       title: t("Delete stock adjustment"),
       message: t("Delete this empty stock adjustment record?"),
@@ -192,9 +196,9 @@ export default function StockAdjustmentPage() {
               <h1 className="font-serif text-3xl font-bold">{t("Stock Adjustment")}</h1>
               <p className="mt-2 text-sm text-stone-500">{scopedDate ? formatDate(scopedDate) : t("Record approved inventory corrections.")}</p>
             </div>
-            <button type="button" onClick={openModal} disabled={!canCreate} className="flex items-center gap-2 rounded-lg bg-[var(--color-brand-primary)] px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60">
+            {userCan(user, "stock_adjustments", "create") && <button type="button" onClick={openModal} disabled={!canCreate} className="flex items-center gap-2 rounded-lg bg-[var(--color-brand-primary)] px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60">
               <Plus size={17} /> {t("Add adjustment")}
-            </button>
+            </button>}
           </header>
           <div className="mt-6 flex flex-wrap gap-2" aria-label="Bagian penyesuaian">{allowedDepartments.map((d) => <button key={d.key} onClick={() => { setDepartment(d.key); setPage(1); }} className={`rounded-lg px-5 py-3 text-sm font-semibold ${department === d.key ? "bg-[var(--color-brand-primary)] text-white" : "border border-stone-200 bg-white"}`}>{d.key === "waiters" ? "Waiter" : d.label}</button>)}</div>
           {notice && <p role="status" className="mt-4 text-sm text-emerald-700">{notice}</p>}
@@ -225,7 +229,7 @@ export default function StockAdjustmentPage() {
                       <td className="max-w-xs whitespace-pre-wrap break-words px-5 py-4 text-sm">{item.reason}</td>
                       <td className="px-5 py-4 text-sm">{item.created_by_info?.fullname ?? item.created_by}</td>
                       <td className="px-5 py-4 text-sm text-stone-600">{formatDateTime(item.created_at)}</td>
-                      <td className="px-5 py-4"><div className="flex justify-end gap-1.5"><Link to={`/stock-adjustments/${item.adjustment_id}${contextQuery}${item.department ? `${contextQuery ? "&" : "?"}department=${item.department}` : ""}`} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-900" title={t("Open")}><ArrowRight size={15} /></Link><button type="button" onClick={() => requestDelete(item)} disabled={!canWrite || item.status === "SUBMITTED" || item.has_items} className="grid size-8 place-items-center rounded-lg text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40" title={item.has_items ? t("Remove all items before deleting this adjustment") : t("Delete")}><Trash2 size={15} /></button></div></td>
+                      <td className="px-5 py-4"><div className="flex justify-end gap-1.5"><Link to={`/stock-adjustments/${item.adjustment_id}${contextQuery}${item.department ? `${contextQuery ? "&" : "?"}department=${item.department}` : ""}`} className="grid size-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-900" title={t("Open")}><ArrowRight size={15} /></Link>{userCan(user, "stock_adjustments", "delete") && <button type="button" onClick={() => requestDelete(item)} disabled={!canWrite || item.status === "SUBMITTED" || item.has_items} className="grid size-8 place-items-center rounded-lg text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40" title={item.has_items ? t("Remove all items before deleting this adjustment") : t("Delete")}><Trash2 size={15} /></button>}</div></td>
                     </tr>
                   ))}
                 </tbody>
@@ -238,7 +242,7 @@ export default function StockAdjustmentPage() {
           </section>
         </main>
       </section>
-      {modalOpen && <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"><form onSubmit={submitForm} className="w-full max-w-lg rounded-2xl bg-white shadow-2xl"><header className="flex items-start justify-between border-b border-stone-200 p-5"><h2 className="text-lg font-bold">{t("Add stock adjustment")}</h2><button type="button" onClick={() => setModalOpen(false)} className="grid size-9 place-items-center rounded-lg hover:bg-stone-100"><X size={18} /></button></header><div className="space-y-4 p-5"><label className="block text-sm font-semibold">Bagian *<select required value={form.department} onChange={(e) => { setForm({ ...form, department: e.target.value }); setDepartment(e.target.value); }} className="mt-2 block w-full rounded-lg border border-stone-300 p-3"><option value="">Pilih bagian</option>{allowedDepartments.map((d) => <option key={d.key} value={d.key}>{d.key === "waiters" ? "Waiter" : d.label}</option>)}</select></label><label className="block text-sm font-semibold text-stone-700">{t("Business Date")}<div className="mt-2 rounded-lg border border-stone-200 bg-stone-50 px-3.5 py-3"><p className="text-sm font-semibold text-stone-900">{formatDate(activeBusinessDay?.business_date)}</p><p className="mt-1 text-xs font-medium text-stone-500">{t("Auto from current open business day")}</p></div></label><label className="block text-sm font-semibold text-stone-700">{t("Reason *")}<textarea value={form.reason} onChange={(event) => { setForm((current) => ({ ...current, reason: event.target.value })); setReasonError(""); }} required className="mt-2 min-h-20 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm font-normal outline-none focus:border-[var(--color-brand-accent)]" />{reasonError && <span role="alert" className="mt-2 block text-xs text-red-600">{reasonError}</span>}</label><label className="block text-sm font-semibold text-stone-700">{t("Notes")}<textarea value={form.notes} onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} className="mt-2 min-h-20 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm outline-none focus:border-[var(--color-brand-accent)]" /></label></div><footer className="flex flex-wrap justify-start gap-3 border-t border-stone-200 p-5"><button type="button" onClick={() => setModalOpen(false)} className="rounded-lg border border-stone-300 px-4 py-2.5 text-sm font-semibold hover:bg-stone-50">{t("Cancel")}</button><button type="submit" disabled={submitting || !canCreate} className="rounded-lg bg-[var(--color-brand-primary)] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">{submitting ? t("Saving...") : t("Save Draft")}</button></footer></form></div>}
+      {modalOpen && <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm"><form onSubmit={submitForm} className="w-full max-w-lg rounded-2xl bg-white shadow-2xl"><header className="flex items-start justify-between border-b border-stone-200 p-5"><h2 className="text-lg font-bold">{t("Add stock adjustment")}</h2><button type="button" onClick={() => setModalOpen(false)} className="grid size-9 place-items-center rounded-lg hover:bg-stone-100"><X size={18} /></button></header><div className="space-y-4 p-5"><label className="block text-sm font-semibold">Bagian *<select required disabled={allowedDepartments.length === 1} value={form.department} onChange={(e) => { setForm({ ...form, department: e.target.value }); setDepartment(e.target.value); }} className="mt-2 block w-full rounded-lg border border-stone-300 p-3"><option value="">Pilih bagian</option>{allowedDepartments.map((d) => <option key={d.key} value={d.key}>{d.key === "waiters" ? "Waiter" : d.label}</option>)}</select></label><label className="block text-sm font-semibold text-stone-700">{t("Business Date")}<div className="mt-2 rounded-lg border border-stone-200 bg-stone-50 px-3.5 py-3"><p className="text-sm font-semibold text-stone-900">{formatDate(activeBusinessDay?.business_date)}</p><p className="mt-1 text-xs font-medium text-stone-500">{t("Auto from current open business day")}</p></div></label><label className="block text-sm font-semibold text-stone-700">{t("Reason *")}<textarea value={form.reason} onChange={(event) => { setForm((current) => ({ ...current, reason: event.target.value })); setReasonError(""); }} required className="mt-2 min-h-20 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm font-normal outline-none focus:border-[var(--color-brand-accent)]" />{reasonError && <span role="alert" className="mt-2 block text-xs text-red-600">{reasonError}</span>}</label><label className="block text-sm font-semibold text-stone-700">{t("Notes")}<textarea value={form.notes} onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} className="mt-2 min-h-20 w-full rounded-lg border border-stone-300 px-3.5 py-3 text-sm outline-none focus:border-[var(--color-brand-accent)]" /></label></div><footer className="flex flex-wrap justify-start gap-3 border-t border-stone-200 p-5"><button type="button" onClick={() => setModalOpen(false)} className="rounded-lg border border-stone-300 px-4 py-2.5 text-sm font-semibold hover:bg-stone-50">{t("Cancel")}</button><button type="submit" disabled={submitting || !canCreate} className="rounded-lg bg-[var(--color-brand-primary)] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">{submitting ? t("Saving...") : t("Save Draft")}</button></footer></form></div>}
       <ConfirmDialog open={Boolean(confirm)} title={confirm?.title ?? ""} message={confirm?.message ?? ""} confirmText={confirm?.confirmText ?? t("Confirm")} tone={confirm?.tone} submitting={submitting} onCancel={() => setConfirm(null)} onConfirm={() => void confirm?.onConfirm()} />
     </div>
   );

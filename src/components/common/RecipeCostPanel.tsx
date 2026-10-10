@@ -3,7 +3,7 @@ import { isAxiosError } from "axios";
 import { Download } from "lucide-react";
 import * as XLSX from "xlsx-js-style";
 import { getRecipeCost, type RecipeCost } from "../../api/recipe.api";
-import { formatNumber, formatNumberInput, normalizeNumberInput } from "../../utils/numberFormat";
+import { formatNumber, formatNumberInput, normalizeNumberInput, storedNumberInput } from "../../utils/numberFormat";
 import { createExportWorksheet } from "../../utils/exportWorksheet";
 
 const money = (value: string | null, digits = 2) =>
@@ -17,6 +17,8 @@ export default function RecipeCostPanel({
   isBase,
   refreshKey,
   onSaveYield,
+  servingQuantity,
+  onSaveServing,
 }: {
   recipeID: string;
   name: string;
@@ -24,7 +26,11 @@ export default function RecipeCostPanel({
   isBase: boolean;
   refreshKey: number;
   onSaveYield?: (quantity: string, unit: string) => Promise<void>;
+  servingQuantity?: string;
+  onSaveServing?: (quantity: string) => Promise<void>;
 }) {
+  const [servingValue,setServingValue] = useState(storedNumberInput(servingQuantity));
+  useEffect(() => {setServingValue(storedNumberInput(servingQuantity));}, [recipeID,servingQuantity,refreshKey]);
   const [yieldValue, setYieldValue] = useState("");
   const [yieldUnit, setYieldUnit] = useState("ml");
   const [savingYield, setSavingYield] = useState(false);
@@ -205,7 +211,7 @@ export default function RecipeCostPanel({
               )}
             </div>
             {isBase && (
-              <div className="mx-4 mb-4 grid grid-cols-3 gap-3 rounded-xl border border-stone-200 p-3 text-sm">
+              <div className="mx-4 mb-4 grid grid-cols-1 gap-4 rounded-xl md:grid-cols-2 xl:grid-cols-4 border border-stone-200 p-3 text-sm">
                 <div>
                   <p className="text-xs text-stone-500">Total qty awal</p>
                   <p className="mt-1 font-semibold">
@@ -228,6 +234,19 @@ export default function RecipeCostPanel({
                     catch (err) { setYieldError(isAxiosError<{message?:string}>(err) ? err.response?.data?.message || "Gagal menyimpan hasil akhir" : "Gagal menyimpan hasil akhir"); }
                     finally { setSavingYield(false); }
                   }}><div className="flex flex-wrap gap-2"><input aria-label="Jumlah hasil akhir base" required inputMode="decimal" value={formatNumberInput(yieldValue)} onBlur={() => { if (yieldValue) setYieldValue(String(Math.round(Number(yieldValue)))); }} onChange={(e) => setYieldValue(normalizeNumberInput(e.target.value))} disabled={savingYield} className="h-10 min-w-0 flex-1 rounded-lg border border-stone-300 px-3" /><select aria-label="Satuan hasil akhir base" value={yieldUnit} onChange={(e) => setYieldUnit(e.target.value)} disabled={savingYield || Boolean(cost.yield_unit)} className="h-10 rounded-lg border border-stone-300 px-2"><option value="ml">ml</option><option value="gr">gr</option></select></div><button disabled={savingYield || !yieldValue || (Number(yieldValue) === Number(cost.yield_quantity) && yieldUnit === cost.yield_unit)} className="rounded-lg bg-[var(--color-brand-primary)] px-3 py-2 text-xs font-semibold text-white disabled:opacity-40">{savingYield ? "Menyimpan…" : "Simpan hasil akhir"}</button>{yieldError && <p role="alert" className="text-xs text-red-700">{yieldError}</p>}<p className="text-xs text-stone-500">Input hasil racikan yang kamu ukur. HPP diperbarui setelah disimpan.</p></form> : <p className="mt-1 font-semibold">{quantity(cost.yield_quantity, cost.yield_unit)}</p>}
+                </div>
+                <div>
+                  <p className="text-xs text-stone-500">Takaran base per menu (opsional)</p>
+                  {onSaveServing ? <form className="mt-2 space-y-2" onSubmit={async event => {
+                    event.preventDefault(); if(savingYield)return;
+                    if(servingValue && !(Number(servingValue)>0)){setYieldError("Isi takaran lebih dari 0 atau kosongkan untuk memakai seluruh hasil akhir.");return;}
+                    setSavingYield(true);setYieldError("");
+                    try{await onSaveServing(servingValue);}catch(err){setYieldError(isAxiosError<{message?:string}>(err)?err.response?.data?.message||"Gagal menyimpan takaran":"Gagal menyimpan takaran");}finally{setSavingYield(false);}
+                  }}>
+                    <div className="flex items-center gap-2"><input aria-label="Takaran base per menu" inputMode="decimal" placeholder="Seluruh hasil akhir" value={formatNumberInput(servingValue)} onChange={event=>setServingValue(normalizeNumberInput(event.target.value))} disabled={savingYield} className="h-10 min-w-0 flex-1 rounded-lg border border-stone-300 px-3"/><span className="text-xs text-stone-500">{cost.yield_unit || "—"}</span></div>
+                    <button disabled={savingYield || storedNumberInput(servingQuantity)===servingValue} className="rounded-lg bg-[var(--color-brand-primary)] px-3 py-2 text-xs font-semibold text-white disabled:opacity-40">{savingYield?"Menyimpan…":"Simpan takaran"}</button>
+                    <p className="text-xs text-stone-500">Mengubah pemakaian base pada semua resep yang menggunakannya. Kosongkan untuk memakai seluruh hasil akhir.</p>
+                  </form> : <p className="mt-1 font-semibold">{servingQuantity ? quantity(servingQuantity,cost.yield_unit || "") : "Seluruh hasil akhir"}</p>}
                 </div>
               </div>
             )}

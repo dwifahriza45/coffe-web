@@ -5,7 +5,7 @@ import { getRecipes, getRecipeCost, type Recipe } from "../../api/recipe.api";
 import { exportAllRecipeHpp } from "../../utils/recipeHppReport";
 import { useAuth } from "../../app/AuthContext";
 import { userCan } from "../../app/roleAccess";
-import { CupSoda, Search, Download, ChevronDown, Plus, Trash2 } from "lucide-react";
+import { CupSoda, Search, Download, ChevronDown, Plus, Trash2, Pencil } from "lucide-react";
 import { isAxiosError } from "axios";
 import { Fragment, useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
@@ -38,6 +38,9 @@ export default function MenuItemsPage() {
   const [hpp,setHpp]=useState<Record<string,{versions:{recipe:Recipe;value:string|null;note:string}[];note:string}>>({});
   const [expanded,setExpanded]=useState<Set<string>>(()=>new Set());
   const canReadRecipes=userCan(user,"recipes");
+  const [editTarget,setEditTarget]=useState<Product|null>(null);
+  const canUpdateProducts=userCan(user,"products","update");
+  const canManageProducts=canUpdateProducts||userCan(user,"products","delete");
   const canDeleteProducts=userCan(user,"products","delete");
   const [products, setProducts] = useState<Product[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -189,14 +192,14 @@ export default function MenuItemsPage() {
                     <th className="px-5 py-3">{t("Category")}</th>
                     <th className="px-5 py-3">HPP satu porsi</th>
                     <th className="px-5 py-3">{t("Status")}</th>
-                    {canDeleteProducts&&<th className="w-20 px-5 py-3 text-right">Aksi</th>}
+                    {canManageProducts&&<th className="w-32 min-w-32 px-5 py-3 text-right">Aksi</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-100">
                   {loading ? (
-                    <tr><td colSpan={canDeleteProducts?5:4} className="px-5 py-14 text-center text-sm text-stone-500">{t("Loading menu items...")}</td></tr>
+                    <tr><td colSpan={canManageProducts?5:4} className="px-5 py-14 text-center text-sm text-stone-500">{t("Loading menu items...")}</td></tr>
                   ) : products.length === 0 ? (
-                    <tr><td colSpan={canDeleteProducts?5:4} className="px-5 py-14 text-center text-sm text-stone-500">{t("No menu items found")}</td></tr>
+                    <tr><td colSpan={canManageProducts?5:4} className="px-5 py-14 text-center text-sm text-stone-500">{t("No menu items found")}</td></tr>
                   ) : (
                     products.map(product=>{
                       const data=hpp[product.product_id];const open=expanded.has(product.product_id);
@@ -211,9 +214,9 @@ export default function MenuItemsPage() {
                           <td className="px-5 py-4 text-sm">{product.category_info?.name||"—"}</td>
                           <td className="px-5 py-4 text-sm text-stone-500">{data?.versions.length?"Lihat per versi":"—"}</td>
                           <td className="px-5 py-4"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${product.active?"bg-green-50 text-green-700":"bg-stone-100 text-stone-500"}`}>{product.active?t("Active"):t("Inactive")}</span></td>
-                          {canDeleteProducts&&<td className="px-5 py-4 text-right"><button type="button" disabled={loading||deleting||!unusedProducts.has(product.product_id)} onClick={()=>setDeleteTarget(product)} aria-label={`Hapus menu ${product.name}`} title={unusedProducts.has(product.product_id)?"Hapus menu":"Hanya menu tanpa resep yang dapat dihapus"} className="inline-flex rounded-lg p-2 align-middle text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent"><Trash2 size={17}/></button></td>}
+                          {canManageProducts&&<td className="w-32 min-w-32 px-5 py-4 text-right"><div className="flex items-center justify-end gap-3 whitespace-nowrap">{canUpdateProducts&&<button type="button" onClick={()=>setEditTarget(product)} aria-label={`Ubah menu ${product.name}`} title="Ubah menu" className="inline-flex rounded-lg p-2 text-brand-primary hover:bg-stone-100"><Pencil size={17}/></button>}{canDeleteProducts&&<button type="button" disabled={loading||deleting||!unusedProducts.has(product.product_id)} onClick={()=>setDeleteTarget(product)} aria-label={`Hapus menu ${product.name}`} title={unusedProducts.has(product.product_id)?"Hapus menu":"Hanya menu tanpa resep yang dapat dihapus"} className="inline-flex rounded-lg p-2 align-middle text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent"><Trash2 size={17}/></button>}</div></td>}
                         </tr>
-                        {open&&<tr><td colSpan={canDeleteProducts?5:4} className="p-0"><div id={`versions-${product.product_id}`} className="border-l-4 border-[var(--color-brand-sage)] bg-stone-50/60 px-5 py-3">
+                        {open&&<tr><td colSpan={canManageProducts?5:4} className="p-0"><div id={`versions-${product.product_id}`} className="border-l-4 border-[var(--color-brand-sage)] bg-stone-50/60 px-5 py-3">
                           {data?.versions.length?<table className="w-full text-left text-sm"><thead className="text-xs text-stone-500"><tr><th scope="col" className="px-3 pb-2">Versi resep</th><th scope="col" className="px-3 pb-2">HPP satu porsi</th><th scope="col" className="px-3 pb-2">Status resep</th><th scope="col" className="px-3 pb-2 text-right">Detail</th></tr></thead><tbody>{data.versions.map(({recipe,value,note})=><tr key={recipe.recipe_id} className="border-t border-stone-200"><td className="px-3 py-3 font-semibold"><Link to={`/menu-items/${encodeURIComponent(product.product_id)}?recipe=${encodeURIComponent(recipe.recipe_id)}`} className="text-[var(--color-brand-primary)] hover:underline">{recipe.version}</Link></td><td className="px-3 py-3"><p className="font-semibold">{value!==null?`Rp ${formatNumber(value,2)}`:"—"}</p>{note&&<p className="mt-1 text-xs text-stone-500">{note}</p>}</td><td className="px-3 py-3"><span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${recipe.active?"bg-green-50 text-green-700":"bg-stone-100 text-stone-500"}`}>{recipe.active?t("Active"):t("Inactive")}</span></td><td className="px-3 py-3 text-right"><Link to={`/menu-items/${encodeURIComponent(product.product_id)}?recipe=${encodeURIComponent(recipe.recipe_id)}`} className="font-semibold text-[var(--color-brand-primary)] hover:underline">Detail</Link></td></tr>)}</tbody></table>:<div className="flex items-center justify-between gap-3 py-2 text-sm text-stone-500"><span>{data?.note||"Akses resep diperlukan"}</span><Link to={`/menu-items/${encodeURIComponent(product.product_id)}`} className="font-semibold text-[var(--color-brand-primary)] hover:underline">Detail menu</Link></div>}
                         </div></td></tr>}
                       </Fragment>;
@@ -240,6 +243,7 @@ export default function MenuItemsPage() {
           </section>
         </main>
       </section>
+      {editTarget&&canUpdateProducts&&<CreateMenuModal product={editTarget} categories={categories} initialCategory={editTarget.category_id} onClose={()=>setEditTarget(null)} onCreated={()=>{setEditTarget(null);setRefreshKey(value=>value+1);setCreatedMessage("Menu berhasil diperbarui.")}}/>}
       <ConfirmDialog open={!!deleteTarget} title="Hapus menu" message={`Hapus menu “${deleteTarget?.name||""}”? Menu hanya bisa dihapus jika belum memiliki resep.`} confirmText="Hapus" tone="danger" submitting={deleting} onCancel={()=>{if(!deleting)setDeleteTarget(null)}} onConfirm={()=>void confirmDelete()}/>
       {createOpen&&<CreateMenuModal categories={categories} initialCategory={categories.some(row=>row.category_id===categoryID&&row.active)?categoryID:""} onClose={()=>setCreateOpen(false)} onCreated={(category,name)=>{setCreateOpen(false);setCategoryID(category);setSearch(name);setSearchInput(name);setPage(1);setRefreshKey(value=>value+1);setCreatedMessage("Menu berhasil ditambahkan. Buka menu tersebut untuk membuat resep.")}}/>}
     </div>

@@ -465,14 +465,14 @@ export default function InventoryCountDetailPage() {
             </label>
 
             <div className="mt-4 flex flex-wrap items-center gap-2">
-              <button
+              {userCan(user, permissionKey, "update") && <button
                 type="button"
                 onClick={() => void saveDraft()}
                 disabled={!canMutateDraft || submitting || loading}
                 className="rounded-lg border border-stone-300 px-4 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent"
               >
                 {savingDraft ? t("Saving...") : t("Save Draft")}
-              </button>
+              </button>}
               {canCreateItem && canMutateDraft && count?.count_type === "OPENING" && <button type="button" disabled={loading || submitting} className="rounded-lg border border-stone-300 px-4 py-2 text-sm font-semibold" onClick={() => setConfirm({title: t("Copy previous closing stock"), message: t("Copy previous submitted closing quantities into this section? Existing items are kept."), confirmText: t("Copy"), onConfirm: async () => {setConfirm(null);setSubmitting(true);try {const result=await copyPreviousStockCountSection(inventoryCountID,department!.key);setNotice(`${t("Items copied")}: ${result.data?.copied ?? 0}`);setRefreshKey((value) => value+1);} catch (requestError) {setError(isAxiosError<{message?: string}>(requestError) ? requestError.response?.data?.message || t("Could not copy stock.") : t("Could not copy stock."));} finally {setSubmitting(false);}}})}>{t("Copy previous closing stock")}</button>}
               {canSubmit && (
                 <button
@@ -535,7 +535,7 @@ export default function InventoryCountDetailPage() {
           <section className="mt-5 overflow-hidden rounded-xl border border-stone-200 bg-white">
             <div className="flex items-center justify-between gap-3 border-b border-stone-200 p-4">
               <div><h2 className="font-semibold">Rekap SO</h2><p className="mt-1 text-xs text-stone-500">{visibleItems.length} item · {count?.count_type === "OPENING" ? "Stok Awal" : "Stok Akhir"}</p></div>
-              <button type="button" onClick={() => openItemModal()} disabled={!canCreateItem || loading || submitting} className="flex items-center gap-2 rounded-lg bg-brand-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"><Plus size={16} />{t("Add item")}</button>
+              {userCan(user, permissionKey, "create") && <button type="button" onClick={() => openItemModal()} disabled={!canCreateItem || loading || submitting} className="flex items-center gap-2 rounded-lg bg-brand-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"><Plus size={16} />{t("Add item")}</button>}
             </div>
             <p className="px-4 py-3 text-xs leading-relaxed text-stone-500">Barista/Kitchen: pemakaian dari Stock Movement tercatat; selisih membandingkan stok fisik dengan stok sistem. Waiters: pemakaian dihitung dari stok awal + masuk + penyesuaian − stok akhir fisik, termasuk waste jika ada. Hasil negatif perlu diperiksa. Rekap draft masih sementara.</p>
             <div className="overflow-x-auto px-3 pb-3">
@@ -566,8 +566,8 @@ export default function InventoryCountDetailPage() {
                     <td className="whitespace-nowrap px-4 py-4 font-semibold">{row.item.stock_value ? `Rp ${formatNumber(row.item.stock_value,2)}` : "—"}</td>
                     <td className="rounded-r-2xl px-4 py-4"><div className="flex gap-2">
                       {count?.count_type === "CLOSING" && userCan(user, "stock_adjustments", "create") && <button type="button" disabled={!editable || loading || submitting} onClick={() => { setError(""); setWaste({ ingredientID: row.item.ingredient_id, name: row.ingredient?.name || row.item.ingredient_id, department: row.item.department || department?.key || "", unit: row.unit, quantity: row.variance != null && row.variance < 0 ? String(-row.variance) : "", reason: "", requestID: crypto.randomUUID() }); }} className="rounded-lg border border-amber-300 px-3 py-2 text-xs font-semibold text-amber-800 disabled:opacity-30">Catat Waste</button>}
-                      <button type="button" onClick={() => openItemModal(row.item)} disabled={!canMutateDraft || loading || submitting} className="rounded-lg p-2 text-brand-primary disabled:opacity-30" title={t("Update item")}><Pencil size={16} /></button>
-                      <button type="button" onClick={() => requestDelete(row.item)} disabled={!canDeleteItem || loading || submitting} className="rounded-lg p-2 text-red-600 disabled:opacity-30" title={t("Delete item")}><Trash2 size={16} /></button>
+                      {userCan(user, permissionKey, "update") && <button type="button" onClick={() => openItemModal(row.item)} disabled={!canMutateDraft || loading || submitting} className="rounded-lg p-2 text-brand-primary disabled:opacity-30" title={t("Update item")}><Pencil size={16} /></button>}
+                      {userCan(user, permissionKey, "delete") && <button type="button" onClick={() => requestDelete(row.item)} disabled={!canDeleteItem || loading || submitting} className="rounded-lg p-2 text-red-600 disabled:opacity-30" title={t("Delete item")}><Trash2 size={16} /></button>}
                     </div></td>
                   </tr>)}
                 </tbody>

@@ -124,7 +124,7 @@ export default function Sidebar({
     });
   if (canReadSuppliers)
     inventoryOperationLinks.push({ label: t("Suppliers"), to: "/supplier-management", icon: Truck });
-  if (canReadSuppliers)
+  if (userCan(user,"purchase_orders"))
     inventoryOperationLinks.push({ label: "Purchase Order", to: "/purchase-orders", icon: ClipboardList });
   if (canReadIngredients)
     inventoryOperationLinks.unshift({
@@ -310,20 +310,12 @@ export default function Sidebar({
                       </NavLink>
                     ))}
                     {stockOpnameLink && StockOpnameIcon && (
-                      <NavLink
-                        key={stockOpnameLink.label}
-                        to={stockOpnameLink.to}
-                        onClick={() => {
-                          rememberScroll();
-                          onClose();
-                        }}
-                        className={({ isActive }) =>
-                          `flex items-center gap-3 rounded-lg p-3 text-sm ${isActive ? "bg-[var(--color-brand-hover)] text-[var(--color-brand-sage)]" : "text-[var(--color-brand-cream)] hover:bg-white/5"}`
-                        }
+                      <div
+                        className="flex items-center gap-3 rounded-lg p-3 text-sm text-[var(--color-brand-cream)]"
                       >
                         <StockOpnameIcon size={18} />
                         {stockOpnameLink.label}
-                      </NavLink>
+                      </div>
                     )}
                     {filteredStockOpnameChildLinks.length > 0 && (
                       <div className="ml-5 space-y-1 border-l border-white/10 pl-3">
